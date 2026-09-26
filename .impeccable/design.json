@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T00:00:00Z",
+  "title": "Design System: Bark & Meow",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Papel Hueso",
+        "canonical": "#F4F1EA",
+        "tonalRamp": ["#26241F", "#3D3A33", "#565249", "#726D62", "#948E80", "#B8B2A3", "#D9D3C6", "#F4F1EA"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Blanco Ficha",
+        "canonical": "#FFFFFF",
+        "tonalRamp": ["#262626", "#3D3D3D", "#565656", "#727272", "#949494", "#B8B8B8", "#DBDBDB", "#FFFFFF"]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#DDD7CB",
+        "tonalRamp": ["#232119", "#38352A", "#4F4B3D", "#6B6555", "#8C8574", "#B0A997", "#DDD7CB", "#F2EEE6"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta",
+        "canonical": "#1B2420",
+        "tonalRamp": ["#0C110F", "#1B2420", "#2E3B35", "#45564E", "#5F736A", "#84998F", "#AEC0B8", "#DCE7E2"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Apagado",
+        "canonical": "#5A625E",
+        "tonalRamp": ["#141614", "#252925", "#3A403C", "#4F5651", "#5A625E", "#7E8782", "#A8B0AB", "#D5DAD7"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Verde Consulta",
+        "canonical": "#1D6B57",
+        "tonalRamp": ["#08201A", "#0E362C", "#15503F", "#1D6B57", "#2A8B72", "#48AB92", "#8ECDBA", "#D5EDE4"]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Verde Hoja",
+        "canonical": "#E3EFE9",
+        "tonalRamp": ["#0F1F1A", "#1A342C", "#274E42", "#386D5C", "#55937F", "#85B9A7", "#B6D7CA", "#E3EFE9"]
+      },
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Verde Consulta Tinta",
+        "canonical": "#154F40",
+        "tonalRamp": ["#061713", "#0B2A22", "#154F40", "#1E6E58", "#2B9075", "#52B195", "#94D0BC", "#D8EFE6"]
+      },
+      "alert": {
+        "role": "secondary",
+        "displayName": "Rojo Alergia",
+        "canonical": "#B4380E",
+        "tonalRamp": ["#2A0D03", "#471606", "#6B210A", "#8F2C0C", "#B4380E", "#D9551F", "#EC8C61", "#FBE9E0"]
+      },
+      "alert-soft": {
+        "role": "secondary",
+        "displayName": "Rojo Alergia Suave",
+        "canonical": "#FBE9E0",
+        "tonalRamp": ["#2A1710", "#45251A", "#643628", "#874A37", "#AE6A52", "#CE9680", "#E8C4B2", "#FBE9E0"]
+      },
+      "alert-ink": {
+        "role": "secondary",
+        "displayName": "Rojo Alergia Tinta",
+        "canonical": "#9A2F0B",
+        "tonalRamp": ["#240B02", "#3D1305", "#5C1C07", "#7B2509", "#9A2F0B", "#C24A1B", "#E08462", "#F7DFD4"]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Azul Informe",
+        "canonical": "#1F4F8F",
+        "tonalRamp": ["#08162A", "#0E2545", "#153866", "#1C4480", "#1F4F8F", "#3A72BC", "#7CA3D8", "#E6ECF5"]
+      },
+      "owner": {
+        "role": "tertiary",
+        "displayName": "Pardo Declarado",
+        "canonical": "#5A4A2E",
+        "tonalRamp": ["#17120B", "#281F13", "#3B2F1D", "#4C3D26", "#5A4A2E", "#816A43", "#B09873", "#F1EEE6"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Fraunces 600. El nombre del animal y los titulos de pantalla de la app del dueno. Es la voz de portada y no se usa para nada mas."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Fraunces 600, 20-22px. Wordmark Bark & Meow, titulos de seccion en escritorio, cabecera de panel."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Plex Sans 600, 15-17px. El dato importante de una tarjeta: el valor, nunca la etiqueta."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Plex Sans 400, 14-15px, line-height 1.45. Descripciones, avisos legales, notas clinicas."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Plex Sans 600, 12-13px, mayusculas, letter-spacing 0.05-0.06em, color muted. Las versalitas que encabezan cada bloque."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Plex Mono 400-500, 12-14px. Todo numero transcribible: chip, dosis, fechas, lotes, codigos ATCvet, cuentas atras, insignias de nivel."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "120ms cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Cambios de color en hover y active de botones y pestanas. Provisional: el lienzo es estatico y no define movimiento."
+      }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "390px" },
+      { "name": "desktop", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "La accion principal de la pantalla. Verde a sangre con texto blanco, 52px.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2\"></path></svg>Llamar al tutor</button>",
+      "css": ".ds-btn-primary { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 52px; border: none; border-radius: 14px; background: #1D6B57; color: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 120ms cubic-bezier(0.2,0,0,1); } .ds-btn-primary:hover { background: #154F40; } .ds-btn-primary:focus-visible { outline: 3px solid #1D6B57; outline-offset: 2px; } .ds-btn-primary:active { background: #0E362C; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "La accion alternativa. Blanco con hairline, 48px, peso 500.",
+      "html": "<button class=\"ds-btn-secondary\">Mostrar ficha sin conexion</button>",
+      "css": ".ds-btn-secondary { width: 100%; height: 48px; border: 1px solid #DDD7CB; border-radius: 14px; background: #FFFFFF; color: #1B2420; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; transition: background 120ms cubic-bezier(0.2,0,0,1), border-color 120ms; } .ds-btn-secondary:hover { background: #F4F1EA; border-color: #C8C1B3; } .ds-btn-secondary:focus-visible { outline: 3px solid #1D6B57; outline-offset: 2px; }"
+    },
+    {
+      "name": "Destructive Ghost Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Revocar un acceso. Rojo en el texto y el borde, nunca en el relleno.",
+      "html": "<button class=\"ds-btn-destructive\">Revocar acceso ahora</button>",
+      "css": ".ds-btn-destructive { width: 100%; height: 48px; border: 1px solid #C9A796; border-radius: 14px; background: #FFFFFF; color: #9A2F0B; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 120ms cubic-bezier(0.2,0,0,1); } .ds-btn-destructive:hover { background: #FBE9E0; } .ds-btn-destructive:focus-visible { outline: 3px solid #9A2F0B; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip Number Field",
+      "kind": "input",
+      "refersTo": "input-primary",
+      "description": "El campo protagonista del nivel 0. Borde verde de 2px y monoespaciada de 18px, legible desde el otro lado del mostrador.",
+      "html": "<label class=\"ds-field-chip\">Numero del microchip<input type=\"text\" value=\"724098100001234\" inputmode=\"numeric\"></label>",
+      "css": ".ds-field-chip { display: flex; flex-direction: column; gap: 6px; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; font-weight: 500; color: #1B2420; } .ds-field-chip input { height: 52px; border: 2px solid #1D6B57; border-radius: 12px; padding: 0 14px; background: #FFFFFF; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 18px; letter-spacing: 0.04em; color: #1B2420; } .ds-field-chip input:focus-visible { outline: 3px solid #1D6B57; outline-offset: 2px; }"
+    },
+    {
+      "name": "Access Level Badge",
+      "kind": "chip",
+      "refersTo": "badge-level-1",
+      "description": "Insignia de nivel. Mono en mayusculas con el numero escrito, para que el nivel no dependa del color.",
+      "html": "<span class=\"ds-badge-level ds-badge-level--1\">NIVEL 1 &middot; PLACA</span> <span class=\"ds-badge-level ds-badge-level--2\">NIVEL 2</span> <span class=\"ds-badge-level ds-badge-level--3\">NIVEL 3</span>",
+      "css": ".ds-badge-level { display: inline-block; padding: 4px 8px; border-radius: 6px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; } .ds-badge-level--1 { background: #FBE9E0; color: #9A2F0B; } .ds-badge-level--2 { background: #E3EFE9; color: #154F40; } .ds-badge-level--3 { background: #E6ECF5; color: #1F4F8F; }"
+    },
+    {
+      "name": "Provenance Badge",
+      "kind": "chip",
+      "refersTo": "badge-source-owner",
+      "description": "Marca el origen de cada registro clinico. Azul para documento de clinica, pardo apagado para dato declarado por el dueno.",
+      "html": "<span class=\"ds-badge-source ds-badge-source--clinic\">Documento de la clinica</span> <span class=\"ds-badge-source ds-badge-source--owner\">Declarado por el dueno</span>",
+      "css": ".ds-badge-source { display: inline-block; padding: 3px 8px; border-radius: 6px; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; } .ds-badge-source--clinic { background: #E6ECF5; color: #1F4F8F; } .ds-badge-source--owner { background: #F1EEE6; color: #5A4A2E; }"
+    },
+    {
+      "name": "Data Row List",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "El patron mas repetido del sistema: etiqueta muda sobre dato, filas separadas por hairline interior y sin borde en la ultima.",
+      "html": "<div class=\"ds-rowlist\"><div class=\"ds-rowlist__row\"><span class=\"ds-rowlist__label\">Medicacion actual</span><span class=\"ds-rowlist__value\">Omeprazol &middot; <span class=\"ds-mono\">1 mg/kg c/24 h</span></span></div><div class=\"ds-rowlist__row\"><span class=\"ds-rowlist__label\">Vacuna antirrabica</span><span class=\"ds-rowlist__value\">Valida hasta <span class=\"ds-mono\">14/03/2027</span></span></div></div>",
+      "css": ".ds-rowlist { display: flex; flex-direction: column; border: 1px solid #DDD7CB; border-radius: 14px; background: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-rowlist__row { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-bottom: 1px solid #EEE9DF; } .ds-rowlist__row:last-child { border-bottom: none; } .ds-rowlist__label { font-size: 12px; color: #5A625E; } .ds-rowlist__value { font-size: 15px; font-weight: 600; color: #1B2420; } .ds-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 400; }"
+    },
+    {
+      "name": "Allergy Block (loud)",
+      "kind": "custom",
+      "refersTo": "card-alert-loud",
+      "description": "El componente firma y el unico relleno saturado del sistema. Version alta, para la web del veterinario de guardia.",
+      "html": "<div class=\"ds-allergy\"><div class=\"ds-allergy__head\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 3l9.5 17H2.5z\"></path><path d=\"M12 10v4\"></path><path d=\"M12 17.5v.5\"></path></svg>Alergias</div><div class=\"ds-allergy__subject\">Amoxicilina</div><div class=\"ds-allergy__detail\">Urticaria generalizada &middot; gravedad alta</div><div class=\"ds-allergy__code\">ATCvet QJ01CA04</div></div>",
+      "css": ".ds-allergy { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: #B4380E; color: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-allergy__head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; } .ds-allergy__subject { font-size: 20px; font-weight: 600; } .ds-allergy__detail { font-size: 14px; } .ds-allergy__code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; opacity: 0.9; }"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Navegacion de la app del dueno. La pestana activa suma peso 600 al color, para no depender solo del verde.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tabs__tab ds-tabs__tab--active\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M6 3h9l3 3v15H6z\"></path><path d=\"M9 11h6M9 15h6\"></path></svg>Ficha</a><a class=\"ds-tabs__tab\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><circle cx=\"12\" cy=\"12\" r=\"9\"></circle><path d=\"M12 7v5l3 2\"></path></svg>Historial</a><a class=\"ds-tabs__tab\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z\"></path><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"></circle></svg>Viaje</a></nav>",
+      "css": ".ds-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; height: 76px; background: #FFFFFF; border-top: 1px solid #DDD7CB; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-tabs__tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: #5A625E; text-decoration: none; } .ds-tabs__tab--active { color: #1D6B57; font-weight: 600; } .ds-tabs__tab:focus-visible { outline: 3px solid #1D6B57; outline-offset: -3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La cartilla que nunca caduca",
+    "overview": "Todo dueno de una mascota tiene una cartilla veterinaria de papel: hueso, sobria, con sellos de clinicas y numeros escritos a mano. Funciona porque cualquiera la entiende sin explicacion y se lee de un vistazo en un mostrador. Falla porque se pierde, se queda vieja y esta en un solo idioma. Bark & Meow es esa cartilla, con la autoridad del papel intacta y sus tres defectos corregidos. De ahi sale todo el sistema: fondo hueso en vez de blanco de aplicacion, un serif de display que firma el nombre del animal como una portada impresa, y monoespaciada para cada numero que un humano podria transcribir o dictar por telefono. La densidad es de ficha clinica, no de panel de datos, y hay un solo grito en toda la interfaz: el bloque de alergias es el unico elemento con relleno saturado a sangre.",
+    "keyCharacteristics": [
+      "Fondo hueso con tarjetas blancas y hairlines; cero sombras en todo el sistema.",
+      "Serif editorial solo para nombres y titulos; monoespaciada para todo dato transcribible.",
+      "Un unico color saturado a sangre, reservado al bloque de alergias.",
+      "Etiqueta en versalitas sobre dato grande, como una ficha impresa.",
+      "Controles de 44 px o mas, sin excepcion.",
+      "Cada estado lleva icono y texto ademas de color."
+    ],
+    "rules": [
+      {
+        "name": "La Regla del Unico Grito",
+        "body": "El rojo de alerta solo marca alergias, interacciones peligrosas y acciones destructivas. En ninguna pantalla debe aparecer mas de un elemento con relleno alert a sangre. Si aparece en mas sitios, deja de llamar la atencion y el sistema ha fallado en lo unico que no puede fallar.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Doble Canal",
+        "body": "Ningun significado viaja solo en el color. Todo estado lleva ademas icono y texto literal: NIVEL 1, Declarado por el dueno, Documento de la clinica. Se audita quitando el color de la captura: si el estado sigue siendo legible, pasa.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Ambar",
+        "body": "Verde y rojo nunca forman pareja de estados. Lo contrario de listo para viajar es ambar con texto, nunca rojo, porque el rojo ya esta reservado y porque la pareja verde/rojo desaparece para buena parte de los daltonicos. El valor ambar esta sin definir y hay que resolverlo con el usuario.",
+        "section": "colors"
+      },
+      {
+        "name": "La Regla del Monoespaciado",
+        "body": "Todo numero que un humano pueda transcribir, comparar, dictar o teclear va en Plex Mono: chip, dosis, fechas, lotes, codigos, caducidades. El texto que solo se lee va en Plex Sans. La duda se resuelve preguntando si alguien lo copiaria a mano.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla de la Etiqueta Muda",
+        "body": "La etiqueta en versalitas es siempre muted y siempre mas pequena que su dato. La etiqueta nombra, el dato habla. Nunca compiten en peso.",
+        "section": "typography"
+      },
+      {
+        "name": "La Regla del Plano Unico",
+        "body": "Todo vive en el mismo plano. Para destacar algo se cambia su color de relleno o se engorda su borde a 2px; nunca se le anade sombra ni se le desplaza en Z. Una sombra en este sistema es un error de revision, no una decision de estilo.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do poner en Plex Mono todo numero transcribible: chip, dosis, fechas, lotes, codigos, cuentas atras.",
+      "Do acompanar cada estado de icono y texto ademas de color, y auditarlo quitando el color.",
+      "Do etiquetar cada registro clinico con su procedencia, sin excepcion.",
+      "Do mantener todo control en 44 x 44px o mas, incluidas las filas de checkbox.",
+      "Do construir la profundidad con el escalon hueso/blanco y una hairline de 1px; subir a 2px en color cuando haga falta mas enfasis.",
+      "Do dar a las pantallas de urgencia fondo blanco a sangre y que quepan sin scroll.",
+      "Do empaquetar las tres fuentes OFL con la app y la web.",
+      "Do mostrar el texto libre en su idioma original con aviso, y marcar toda traduccion automatica como automatica."
+    ],
+    "donts": [
+      "Don't usar el rojo de alerta para nada que no sea una alergia, una interaccion peligrosa o una accion destructiva.",
+      "Don't anadir ninguna box-shadow. El sistema es plano y eso es una invariante, no una preferencia.",
+      "Don't emparejar verde y rojo como estados opuestos. Lo contrario de listo es ambar con texto.",
+      "Don't usar emojis en la interfaz. Las banderas de pais van como SVG.",
+      "Don't cargar Google Fonts en produccion, aunque las pantallas del lienzo lo hagan.",
+      "Don't nombrar medicamentos por marca comercial: siempre principio activo.",
+      "Don't mostrar un bloque de alergias en rojo cuando no hay alergias.",
+      "Don't presentar un dato declarado por el dueno con el mismo peso visual que un informe firmado por una clinica.",
+      "Don't meter una cuenta, un registro o un muro de sesion en el camino del veterinario de guardia.",
+      "Don't inventar precios, planes, clinicas piloto, testimonios ni metricas: no existen."
+    ]
+  }
+}

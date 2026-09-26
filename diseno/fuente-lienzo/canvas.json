@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-09-26T07:40:00Z"},
+  "title": "Bark & Meow — Pantallas",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 390, "h": 844, "title": "Dueño · Ficha"},
+    "Compartir.dc.html": {"x": 470, "y": 0, "w": 390, "h": 844, "title": "Dueño · Compartir historial"},
+    "Accesos.dc.html": {"x": 940, "y": 0, "w": 390, "h": 844, "title": "Dueño · Avisos y accesos"},
+    "Viaje.dc.html": {"x": 1410, "y": 0, "w": 390, "h": 844, "title": "Dueño · Viaje"},
+    "VetChip.dc.html": {"x": 0, "y": 1264, "w": 390, "h": 844, "title": "Veterinario · Nivel 0 (chip)"},
+    "VetEmergencia.dc.html": {"x": 470, "y": 1264, "w": 390, "h": 844, "title": "Veterinario · Nivel 1 (placa)"},
+    "VetHistorial.dc.html": {"x": 940, "y": 1264, "w": 1280, "h": 900, "title": "Veterinario · Nivel 2 (historial)"}
+  },
+  "order": ["Main.dc.html", "Compartir.dc.html", "Accesos.dc.html", "Viaje.dc.html", "VetChip.dc.html", "VetEmergencia.dc.html", "VetHistorial.dc.html"],
+  "notes": {
+    "t1": {"x": 0, "y": -300, "text": "App del dueño", "kind": "title1", "maxW": 1800},
+    "t2": {"x": 0, "y": 964, "text": "Web del veterinario (se abre en su idioma)", "kind": "title1", "maxW": 2220},
+    "n1": {"x": 1880, "y": 0, "text": "Datos clínicos, nombres de clínicas y fechas son de ejemplo. Los campos entre corchetes son placeholders.", "w": 280, "size": "s", "fill": "orange"}
+  },
+  "designSystems": []
+}

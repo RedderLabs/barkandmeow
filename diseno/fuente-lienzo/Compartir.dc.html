@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Compartir historial</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',sans-serif;background:#F4F1EA;color:#1B2420}
+a{color:#1D6B57}a:hover{color:#154F40}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F1EA; padding: 20px; display: flex; flex-direction: column; gap: 18px; font-family: 'IBM Plex Sans', sans-serif; color: #1B2420">
+<div style="display: flex; align-items: center; gap: 12px">
+<a href="Main.dc.html" aria-label="Volver" style="width: 44px; height: 44px; border: 1px solid #DDD7CB; border-radius: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; color: #1B2420">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5l-7 7 7 7"></path></svg>
+</a>
+<div style="font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600">Compartir historial</div>
+</div>
+
+<div style="background: #FFFFFF; border: 1px solid #DDD7CB; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; align-items: center; gap: 14px">
+<svg width="220" height="220" viewBox="0 0 29 29" role="img" aria-label="Código QR de acceso temporal">
+<rect width="29" height="29" fill="#FFFFFF"></rect>
+<g fill="#1B2420">
+<rect x="0" y="0" width="7" height="7"></rect><rect x="1" y="1" width="5" height="5" fill="#FFFFFF"></rect><rect x="2" y="2" width="3" height="3"></rect>
+<rect x="22" y="0" width="7" height="7"></rect><rect x="23" y="1" width="5" height="5" fill="#FFFFFF"></rect><rect x="24" y="2" width="3" height="3"></rect>
+<rect x="0" y="22" width="7" height="7"></rect><rect x="1" y="23" width="5" height="5" fill="#FFFFFF"></rect><rect x="2" y="24" width="3" height="3"></rect>
+<rect x="9" y="1" width="2" height="1"></rect><rect x="13" y="0" width="1" height="3"></rect><rect x="16" y="2" width="3" height="1"></rect><rect x="10" y="4" width="1" height="3"></rect><rect x="15" y="5" width="2" height="2"></rect><rect x="19" y="4" width="1" height="2"></rect>
+<rect x="0" y="9" width="3" height="1"></rect><rect x="4" y="10" width="2" height="2"></rect><rect x="8" y="9" width="3" height="1"></rect><rect x="12" y="8" width="1" height="4"></rect><rect x="14" y="10" width="3" height="1"></rect><rect x="18" y="9" width="2" height="2"></rect><rect x="22" y="9" width="1" height="3"></rect><rect x="25" y="10" width="3" height="1"></rect>
+<rect x="1" y="13" width="1" height="3"></rect><rect x="3" y="14" width="3" height="1"></rect><rect x="8" y="12" width="2" height="2"></rect><rect x="10" y="15" width="3" height="1"></rect><rect x="15" y="13" width="1" height="3"></rect><rect x="17" y="14" width="3" height="1"></rect><rect x="21" y="13" width="2" height="2"></rect><rect x="25" y="14" width="1" height="3"></rect><rect x="27" y="12" width="2" height="1"></rect>
+<rect x="0" y="18" width="2" height="1"></rect><rect x="4" y="17" width="1" height="3"></rect><rect x="7" y="18" width="3" height="1"></rect><rect x="11" y="17" width="2" height="2"></rect><rect x="14" y="19" width="3" height="1"></rect><rect x="18" y="17" width="1" height="3"></rect><rect x="20" y="19" width="3" height="1"></rect><rect x="24" y="18" width="2" height="2"></rect>
+<rect x="9" y="22" width="1" height="3"></rect><rect x="11" y="23" width="3" height="1"></rect><rect x="15" y="22" width="2" height="2"></rect><rect x="18" y="24" width="3" height="1"></rect><rect x="22" y="22" width="1" height="2"></rect><rect x="24" y="23" width="3" height="1"></rect><rect x="9" y="27" width="4" height="1"></rect><rect x="15" y="26" width="1" height="3"></rect><rect x="19" y="27" width="3" height="1"></rect><rect x="25" y="26" width="2" height="2"></rect>
+</g>
+</svg>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #5A625E">Caduca en 71 h 58 min</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A625E">Duración</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<button style="height: 44px; border-radius: 12px; border: 1px solid #DDD7CB; background: #FFFFFF; color: #1B2420; font-family: 'IBM Plex Mono', monospace; font-size: 14px">24 h</button>
+<button aria-pressed="true" style="height: 44px; border-radius: 12px; border: 2px solid #1D6B57; background: #E3EFE9; color: #154F40; font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500">72 h</button>
+<button style="height: 44px; border-radius: 12px; border: 1px solid #DDD7CB; background: #FFFFFF; color: #1B2420; font-family: 'IBM Plex Mono', monospace; font-size: 14px">7 días</button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A625E">Incluye</div>
+<div style="background: #FFFFFF; border: 1px solid #DDD7CB; border-radius: 14px; display: flex; flex-direction: column">
+<label style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 15px; border-bottom: 1px solid #EEE9DF"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #1D6B57">Resumen de emergencia</label>
+<label style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 15px; border-bottom: 1px solid #EEE9DF"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #1D6B57">Visitas y diagnósticos</label>
+<label style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 15px; border-bottom: 1px solid #EEE9DF"><input type="checkbox" checked style="width: 20px; height: 20px; accent-color: #1D6B57">Analíticas</label>
+<label style="min-height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 12px; font-size: 15px"><input type="checkbox" style="width: 20px; height: 20px; accent-color: #1D6B57">Documentos originales (PDF)</label>
+</div>
+</div>
+
+<div style="font-size: 13px; line-height: 1.45; color: #5A625E">El veterinario podrá añadir una nota de la visita. Al revocar se borra la copia del servidor, pero no lo que el veterinario ya haya descargado.</div>
+
+<button style="height: 48px; border-radius: 14px; background: #FFFFFF; border: 1px solid #C9A796; color: #9A2F0B; font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; font-weight: 600">Revocar acceso ahora</button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Secretos y entorno
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Artefactos locales
+.DS_Store
+Thumbs.db

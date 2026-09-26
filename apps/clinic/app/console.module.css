@@ -1,0 +1,471 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Tira de conexión ─────────────────────────────────────── */
+
+.link {
+  flex-shrink: 0;
+  padding: var(--s-md) 32px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.linkActive {
+  background: var(--accent-soft);
+  color: var(--accent-soft-ink);
+}
+.linkNone {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.linkDot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.linkActive .linkDot {
+  color: var(--accent-ink);
+}
+.linkNone .linkDot {
+  color: var(--warn);
+}
+
+.linkHead {
+  font-weight: 600;
+}
+.linkActive .linkHead {
+  color: var(--accent-ink);
+}
+.linkNone .linkHead {
+  color: var(--warn-ink);
+}
+
+.linkMeta {
+  margin-left: auto;
+  font-family: var(--font-data);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ── Contadores ───────────────────────────────────────────── */
+
+.counters {
+  flex-shrink: 0;
+  margin: var(--s-section) 32px 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.counter {
+  padding: var(--s-md) var(--s-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--divider);
+}
+.counter:last-child {
+  border-right: none;
+}
+
+.counterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.counterValue {
+  font-family: var(--font-data);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ── Rejilla principal ────────────────────────────────────── */
+
+.grid {
+  flex-grow: 1;
+  padding: var(--s-section) 32px 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--s-section);
+  align-items: start;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-md);
+  margin-bottom: var(--s-md);
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.sectionMeta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Registro de envíos ───────────────────────────────────── */
+
+.log {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: var(--s-lg);
+  align-items: start;
+  padding: var(--s-lg);
+  border-bottom: 1px solid var(--divider);
+}
+.row:last-child {
+  border-bottom: none;
+}
+.rowFailed {
+  background: var(--alert-soft);
+}
+
+.rowTime {
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: var(--muted);
+  padding-top: 1px;
+}
+
+.rowBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rowTitle {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rowChip {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--muted);
+}
+.rowFailed .rowChip {
+  color: var(--alert-soft-ink);
+}
+
+/* El momento de esta pantalla: lo enviado queda sellado y sin vista previa. */
+.sealed {
+  margin-top: var(--s-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  padding: var(--s-sm) var(--s-md);
+  border: 1px solid var(--line);
+  border-radius: var(--r-badge);
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 13px;
+}
+.sealedIcon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.reason {
+  margin-top: var(--s-xs);
+  font-size: 13px;
+  color: var(--alert-ink);
+}
+.recovery {
+  font-size: 13px;
+  color: var(--alert-soft-ink);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  font-size: 13px;
+  white-space: nowrap;
+  padding-top: 1px;
+}
+.stateSealed {
+  color: var(--muted);
+}
+.stateQueued {
+  color: var(--muted);
+}
+.stateFailed {
+  color: var(--alert-ink);
+  font-weight: 600;
+}
+
+/* Único momento con movimiento: lo que está en vuelo se ve avanzar. */
+.pending {
+  position: relative;
+  width: 44px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--divider);
+  overflow: hidden;
+}
+.pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: slide 1.6s var(--ease) infinite;
+}
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.retry {
+  min-height: 36px;
+  margin-top: var(--s-sm);
+  align-self: flex-start;
+  padding: 0 var(--s-md);
+  border: 1px solid var(--alert-ghost-line);
+  border-radius: var(--r-small);
+  background: var(--surface);
+  color: var(--alert-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-state) var(--ease);
+}
+.retry:hover {
+  background: var(--alert-soft);
+}
+
+/* ── Columna derecha ──────────────────────────────────────── */
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-section);
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  padding: var(--s-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.panelNote {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Sin caja propia: el panel ya es el contenedor y una tarjeta dentro de otra
+   rompe la lectura. Solo hairlines, como las listas de fila del lienzo. */
+.grantList {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.grant {
+  padding: var(--s-md) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-md);
+  border-bottom: 1px solid var(--divider);
+}
+.grant:last-child {
+  border-bottom: none;
+}
+
+.grantName {
+  font-size: 14px;
+  font-weight: 500;
+}
+.grantChip {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: var(--r-badge);
+  white-space: nowrap;
+}
+.tagPermanent {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.tagSoon {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.tagOk {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.primary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 var(--s-lg);
+  border: none;
+  border-radius: var(--r-card);
+  background: var(--accent);
+  color: var(--accent-on);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--t-state) var(--ease);
+}
+.primary:hover {
+  background: var(--accent-hover);
+}
+.primary:active {
+  background: var(--accent-press);
+}
+.primary:disabled {
+  background: var(--divider);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.secondary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 var(--s-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--t-state) var(--ease),
+    border-color var(--t-state) var(--ease);
+}
+.secondary:hover {
+  background: var(--ground);
+  border-color: var(--field-line);
+}
+
+/* ── Estado vacío: clínica sin software conectado ─────────── */
+
+.empty {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+  align-items: flex-start;
+  max-width: 62ch;
+}
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+.emptyBody {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.emptyActions {
+  margin-top: var(--s-sm);
+  display: flex;
+  gap: var(--s-md);
+  flex-wrap: wrap;
+}
+
+/* ── Adaptación a tableta ─────────────────────────────────── */
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .counters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .counter:nth-child(2) {
+    border-right: none;
+  }
+  .counter:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--divider);
+  }
+}
+
+@media (max-width: 720px) {
+  .link {
+    padding-left: var(--s-page);
+    padding-right: var(--s-page);
+  }
+  .counters,
+  .grid {
+    margin-left: var(--s-page);
+    margin-right: var(--s-page);
+  }
+  .grid {
+    padding: var(--s-xl) 0 var(--s-page);
+    margin: 0 var(--s-page);
+  }
+  .row {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+  .state {
+    grid-column: 2;
+  }
+  .linkMeta {
+    display: none;
+  }
+}

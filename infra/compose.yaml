@@ -1,0 +1,56 @@
+# Stack de desarrollo de Bark & Meow.
+# Puertos y volumen propios a propósito: en esta máquina ya corre un
+# hilo-postgres de otro proyecto en el 5442 y no se toca.
+
+name: barkandmeow
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: barkandmeow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: barkandmeow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barkandmeow_dev}
+      POSTGRES_DB: barkandmeow
+    ports:
+      - "127.0.0.1:5443:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barkandmeow -d barkandmeow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: barkandmeow-dragonfly
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    ports:
+      - "127.0.0.1:6390:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # El pepper del HMAC del chip vive aislado: otro proceso, otro secreto, y la
+  # API solo puede pedirle que indexe, nunca leer el pepper. Aquí corre como
+  # servicio aparte para que la separación sea real y no una carpeta.
+  pepper:
+    build:
+      context: ..
+      dockerfile: infra/pepper.Dockerfile
+    container_name: barkandmeow-pepper
+    restart: unless-stopped
+    environment:
+      CHIP_PEPPER: ${CHIP_PEPPER:-pepper_dev_no_usar_en_produccion}
+      PORT: 4600
+    ports:
+      - "127.0.0.1:4600:4600"
+
+volumes:
+  pgdata:

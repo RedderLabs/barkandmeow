@@ -1,0 +1,25 @@
+{
+  "name": "barkandmeow",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@12.6.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "tokens": "pnpm --filter @barkandmeow/tokens build"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "drizzle-kit": "^0.31.11",
+    "turbo": "^2.5.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": "0.44.7"
+    }
+  }
+}

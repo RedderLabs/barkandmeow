@@ -1,0 +1,11 @@
+Bark & Meow — paquete de descarga (26/09/2026)
+
+barkandmeow-arquitectura.pdf / .docx / .md   Documento de arquitectura (Word y Markdown editables)
+barkandmeow-pantallas.pdf                     Las 7 pantallas, una por página
+pantallas/*.png                        Cada pantalla en PNG a doble resolución
+diseno/tokens.json                     Paleta clara y oscura, tipografías
+diseno/fuente-lienzo/                  Código fuente del lienzo de diseño (.dc.html + canvas.json)
+
+Los datos clínicos, clínicas y fechas de las pantallas son de ejemplo.
+Los campos entre corchetes son placeholders.
+Fuentes usadas (SIL OFL): Fraunces, IBM Plex Sans, IBM Plex Mono.

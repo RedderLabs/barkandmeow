@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Consulta por microchip</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',sans-serif;background:#FFFFFF;color:#1B2420}
+a{color:#1D6B57}a:hover{color:#154F40}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #FFFFFF; padding: 20px; display: flex; flex-direction: column; gap: 18px; font-family: 'IBM Plex Sans', sans-serif; color: #1B2420">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<div style="display: flex; flex-direction: column"><div style="font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; color: #1D6B57">Bark & Meow</div><div style="font-size: 12px; color: #5A625E">Consulta veterinária</div></div>
+<select aria-label="Idioma" style="height: 44px; border-radius: 10px; border: 1px solid #DDD7CB; background: #FFFFFF; padding: 0 10px; font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #1B2420"><option>PT</option><option>ES</option><option>EN</option><option>FR</option></select>
+</div>
+
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 500">Número do microchip
+<input type="text" value="724098100001234" style="height: 52px; border-radius: 12px; border: 2px solid #1D6B57; padding: 0 14px; font-family: 'IBM Plex Mono', monospace; font-size: 18px; letter-spacing: 0.04em; color: #1B2420">
+</label>
+<div style="font-size: 12px; color: #5A625E; margin-top: -10px">Compatível com leitores Bluetooth de 134,2 kHz</div>
+
+<div style="background: #E3EFE9; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 16px; font-weight: 600; color: #154F40">Existe uma ficha para este microchip</div>
+<div style="font-size: 14px; line-height: 1.45; color: #2F5A4E">Os dados de saúde só ficam visíveis com autorização do tutor ou com a chapa da coleira.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5A625E">Avisar o tutor</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">Clínica
+<input type="text" placeholder="Nome da clínica" style="height: 48px; border-radius: 12px; border: 1px solid #C8C1B3; padding: 0 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 16px">
+</label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">Telefone
+<input type="tel" placeholder="+351" style="height: 48px; border-radius: 12px; border: 1px solid #C8C1B3; padding: 0 14px; font-family: 'IBM Plex Mono', monospace; font-size: 16px">
+</label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px">Motivo (opcional)
+<textarea rows="3" style="border-radius: 12px; border: 1px solid #C8C1B3; padding: 12px 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; resize: none"></textarea>
+</label>
+<button style="height: 52px; border-radius: 14px; background: #1D6B57; border: none; color: #FFFFFF; font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; font-weight: 600">Enviar aviso ao tutor</button>
+</div>
+
+<div style="font-size: 12px; line-height: 1.45; color: #5A625E">O tutor recebe uma notificação e pode conceder acesso ao histórico. Os contactos do tutor não são mostrados sem autorização.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
