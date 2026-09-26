@@ -1,0 +1,14 @@
+@font-face { font-family: "Fraunces"; src: url("FONTS/fraunces-latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+@font-face { font-family: "IBM Plex Sans"; src: url("FONTS/ibm-plex-sans-latin-400-normal.woff2"); font-weight: 400; }
+@font-face { font-family: "IBM Plex Sans"; src: url("FONTS/ibm-plex-sans-latin-600-normal.woff2"); font-weight: 600; }
+@font-face { font-family: "IBM Plex Mono"; src: url("FONTS/ibm-plex-mono-latin-400-normal.woff2"); font-weight: 400; }
+body { font-family: "IBM Plex Sans", sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1B2420; max-width: none; }
+h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 600; color: #1B2420; line-height: 1.2; }
+h1 { font-size: 22pt; } h2 { font-size: 15pt; margin-top: 1.6em; border-top: 1px solid #DDD7CB; padding-top: .7em; } h3 { font-size: 12pt; }
+code, pre { font-family: "IBM Plex Mono", monospace; font-size: 9pt; background: #F4F1EA; }
+pre { padding: 10px 12px; border: 1px solid #DDD7CB; border-radius: 6px; overflow-wrap: anywhere; white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+th, td { border: 1px solid #DDD7CB; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #F4F1EA; }
+a { color: #1D6B57; }
+#TOC { background: #F4F1EA; border: 1px solid #DDD7CB; border-radius: 8px; padding: 12px 18px; }

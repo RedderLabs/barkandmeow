@@ -24,7 +24,7 @@ packages/
   config/     tsconfig compartido
   schema/     Contratos Zod, catálogo de especies, identificadores
   db/         Esquema Drizzle y migraciones
-  crypto/     Rust → WASM                                      (sin crear)
+  crypto/     Rust → WASM                       (solo el esqueleto de cargo)
 services/
   pepper/     HMAC del número de chip, aislado en su propio proceso         (4600)
 infra/
@@ -50,7 +50,7 @@ pnpm dev
 | `pnpm tokens` | Regenera el sistema visual desde `diseno/tokens.json` |
 | `pnpm test` | Pruebas de integración de la API contra PostgreSQL |
 | `pnpm typecheck` | `tsc --noEmit` en todo el workspace |
-| `pnpm docs` | Regenera el .docx y el .pdf desde el markdown |
+| `pnpm docs:build` | Regenera el .docx y el .pdf desde el markdown |
 
 **El sistema visual no se edita en CSS.** Se edita `diseno/tokens.json` y se corre `pnpm tokens`, que reescribe `apps/clinic/app/tokens.generated.css` y el objeto TypeScript para la app nativa.
 

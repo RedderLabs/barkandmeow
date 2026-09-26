@@ -11,7 +11,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "tokens": "pnpm --filter @barkandmeow/tokens build",
-    "docs": "pandoc barkandmeow-arquitectura.md -o barkandmeow-arquitectura.docx --toc --toc-depth=2"
+    "docs:build": "node scripts/docs.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
