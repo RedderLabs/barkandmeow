@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ui from "../app/_ui/ui.module.css";
+import ui from "@barkandmeow/ui-web/ui.module.css";
 
 /* El rol no es un detalle administrativo: decide quién firma un diagnóstico y
    quién custodia la clave. Por eso cada opción explica lo que concede, cosa

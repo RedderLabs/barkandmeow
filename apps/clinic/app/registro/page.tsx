@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import ui from "../_ui/ui.module.css";
-import { IconKey, IconAlert, IconCheck } from "../_ui/parts";
+import ui from "@barkandmeow/ui-web/ui.module.css";
+import { IconKey, IconAlert, IconCheck } from "@barkandmeow/ui-web/parts";
 import { codigoRecuperacion, registroTxt } from "@/lib/demo";
 
 export const metadata: Metadata = {

@@ -10,7 +10,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "tokens": "pnpm --filter @barkandmeow/tokens build"
+    "tokens": "pnpm --filter @barkandmeow/tokens build",
+    "docs": "pandoc barkandmeow-arquitectura.md -o barkandmeow-arquitectura.docx --toc --toc-depth=2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

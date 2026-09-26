@@ -1,6 +1,7 @@
 import styles from "./console.module.css";
-import { AppHeader } from "./_ui/parts";
+import { AppHeader } from "@barkandmeow/ui-web/parts";
 import {
+  clinica,
   conexionActiva,
   conexionNinguna,
   contadores,
@@ -167,7 +168,7 @@ export default async function Page({
 
   return (
     <div className={styles.shell}>
-      <AppHeader active="consola" />
+      <AppHeader active="consola" clinica={clinica} />
 
       <div
         className={`${styles.link} ${

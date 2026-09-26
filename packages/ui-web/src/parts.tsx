@@ -1,6 +1,5 @@
 import Link from "next/link";
 import ui from "./ui.module.css";
-import { clinica } from "@/lib/demo";
 
 export function IconKey({ size = 18 }: { size?: number }) {
   return (
@@ -76,7 +75,18 @@ export function IconInvite({ size = 20 }: { size?: number }) {
 
 type Surface = "consola" | "equipo";
 
-export function AppHeader({ active }: { active?: Surface }) {
+/* Un paquete compartido no puede saber de qué clínica se trata: la recibe.
+   Antes importaba los datos de demostración de apps/clinic, que era una
+   dependencia al revés. */
+export type Organizacion = { nombre: string; ciudad: string; pais: string };
+
+export function AppHeader({
+  active,
+  clinica,
+}: {
+  active?: Surface;
+  clinica: Organizacion;
+}) {
   return (
     <header className={ui.header}>
       <div className={ui.brand}>

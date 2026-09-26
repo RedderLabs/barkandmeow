@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import ui from "../_ui/ui.module.css";
-import { AppHeader, IconInvite, IconKey, IconAlert } from "../_ui/parts";
-import { equipo, rolNombre, type Rol } from "@/lib/demo";
+import ui from "@barkandmeow/ui-web/ui.module.css";
+import { AppHeader, IconInvite, IconKey, IconAlert } from "@barkandmeow/ui-web/parts";
+import { clinica, equipo, rolNombre, type Rol } from "@/lib/demo";
 import { BajaMiembro } from "@/components/BajaMiembro";
 import { InvitarForm } from "@/components/InvitarForm";
 
@@ -31,7 +31,7 @@ export default function Equipo() {
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="equipo" />
+      <AppHeader active="equipo" clinica={clinica} />
 
       <main className={ui.grid}>
         <section>

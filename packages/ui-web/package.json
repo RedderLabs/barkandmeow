@@ -1,0 +1,19 @@
+{
+  "name": "@barkandmeow/ui-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./parts": "./src/parts.tsx",
+    "./ui.module.css": "./src/ui.module.css"
+  },
+  "peerDependencies": {
+    "next": "*",
+    "react": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,11 @@
+Las exportaciones vigentes están en la raíz del repositorio:
+
+  barkandmeow-arquitectura.pdf    generado con pandoc + wkhtmltopdf
+  barkandmeow-arquitectura.docx   generado con pandoc
+
+Se regeneran desde barkandmeow-arquitectura.md, que es la fuente. Cualquier
+cambio se hace ahí, nunca en el .docx ni en el .pdf.
+
+obsoleto-2026-09-26/ guarda las exportaciones anteriores: llevan el nombre
+viejo del producto (Hilo) y el contenido de antes de las secciones de alta de
+nivel 3, especies de viaje y SaaS de clínicas. Se pueden borrar.

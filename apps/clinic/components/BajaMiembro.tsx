@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import ui from "../app/_ui/ui.module.css";
+import ui from "@barkandmeow/ui-web/ui.module.css";
 
 /* Dar de baja es irreversible para lo ya descargado, así que se protege el
    foco con un diálogo. El resto de acciones de la pantalla no lo llevan:

@@ -18,6 +18,10 @@ apps/
   mobile/     App del dueño en React Native                    (sin crear)
 packages/
   tokens/     Fuente única del sistema visual → CSS y TypeScript
+  ui-web/     Cabecera, paneles, campos y botones compartidos por las webs
+  i18n/       Catálogos en es, pt, en y fr
+  spec/       OpenAPI público de la federación (CC BY 4.0)
+  config/     tsconfig compartido
   schema/     Contratos Zod, catálogo de especies, identificadores
   db/         Esquema Drizzle y migraciones
   crypto/     Rust → WASM                                      (sin crear)
@@ -46,6 +50,7 @@ pnpm dev
 | `pnpm tokens` | Regenera el sistema visual desde `diseno/tokens.json` |
 | `pnpm test` | Pruebas de integración de la API contra PostgreSQL |
 | `pnpm typecheck` | `tsc --noEmit` en todo el workspace |
+| `pnpm docs` | Regenera el .docx y el .pdf desde el markdown |
 
 **El sistema visual no se edita en CSS.** Se edita `diseno/tokens.json` y se corre `pnpm tokens`, que reescribe `apps/clinic/app/tokens.generated.css` y el objeto TypeScript para la app nativa.
 
