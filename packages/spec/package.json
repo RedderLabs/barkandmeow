@@ -1,0 +1,8 @@
+{
+  "name": "@barkandmeow/spec",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Especificación pública de la federación y del modelo clínico. CC BY 4.0.",
+  "license": "CC-BY-4.0",
+  "files": ["openapi.yaml"]
+}

@@ -20,6 +20,10 @@ colors:
   alert-soft-line: "#F0C4AE"
   alert-soft-ink: "#5A3A2C"
   alert-ghost-line: "#C9A796"
+  warn: "#8A5300"
+  warn-soft: "#FAEFD9"
+  warn-line: "#E0C691"
+  warn-ink: "#6F4200"
   info: "#1F4F8F"
   info-soft: "#E6ECF5"
   owner: "#5A4A2E"
@@ -241,7 +245,7 @@ Inversión tonal completa (`dark-ground` #141A18, `dark-surface` #1D2522, `dark-
 
 **La Regla del Doble Canal.** Ningún significado viaja solo en el color. Todo estado lleva además icono y texto literal: "NIVEL 1", "Declarado por el dueño", "Documento de la clínica". Se audita quitando el color de la captura: si el estado sigue siendo legible, pasa.
 
-**La Regla del Ámbar.** Verde y rojo nunca forman pareja de estados. Lo contrario de "listo para viajar" es ámbar con texto, nunca rojo, porque el rojo ya está reservado y porque la pareja verde/rojo desaparece para buena parte de los daltónicos. *El valor ámbar está sin definir: no hay token ni pantalla que lo muestre. Hay que resolverlo con el usuario antes de construir el estado "no listo".*
+**La Regla del Ámbar.** Verde y rojo nunca forman pareja de estados. Lo contrario de "listo para viajar" es ámbar con texto, nunca rojo, porque el rojo ya está reservado y porque la pareja verde/rojo desaparece para buena parte de los daltónicos. El ámbar es **Ocre Tostado** (#8A5300) sobre #FAEFD9, con borde #E0C691 y texto #6F4200 (7,50:1, AAA). Fijado el 2026-09-26. Se eligió tostado y no cobrizo precisamente para alejarlo en tono del rojo de alergia.
 
 ## Typography
 
@@ -310,7 +314,9 @@ Los iconos son SVG de trazo, 1.8–2.2 de grosor, con `stroke-linecap: round`, d
 - **Destructive (ghost):** fondo blanco, borde #C9A796, texto `alert-ink` (#9A2F0B), 48px, peso 600. Revocar un acceso se ve rojo pero no grita: no es un relleno a sangre.
 - **Soft:** relleno `accent-soft` (#E3EFE9) con texto `accent-ink`, 44px. Para la acción positiva dentro de una tarjeta ("Añadir a la ficha"), donde un verde a sangre competiría con el botón principal de la pantalla.
 - **Icon:** 44 × 44px exactos, fondo blanco, hairline, radio 12px, icono de 20px heredando `currentColor`. Siempre con `aria-label`.
-- **Hover / Focus:** sin definir en las pantallas del lienzo, que son estáticas. *Pendiente de resolver en la implementación: hace falta un anillo de foco visible, dado que la interfaz se opera con prisa y debe ser navegable por teclado.*
+- **Hover:** el relleno baja un escalón (`accent` → `accent-hover`), y las variantes de borde pasan su fondo a `ground` y su trazo a `field-line`. Transición de 120 ms con `cubic-bezier(0.2, 0, 0, 1)`.
+- **Focus:** anillo de 3 px en `accent` con 2 px de separación, aplicado globalmente a `:focus-visible`. No es opcional: la interfaz se opera con prisa y tiene que ser navegable por teclado.
+- **Disabled:** relleno `divider` y texto `muted`, con `cursor: not-allowed`. Nunca se oculta un control deshabilitado.
 
 ### Chips
 
@@ -335,7 +341,8 @@ Dos familias distintas que no deben mezclarse.
 - **Select:** 44px (40px en la cabecera de escritorio), radio 10px, hairline, contenido en Plex Mono. El selector de idioma es un select nativo a propósito: lo entiende cualquiera y funciona sin JavaScript.
 - **Textarea:** mismo trazo y radio, padding 12px 14px, `resize: none`.
 - **Checkbox:** 20 × 20px con `accent-color: #1D6B57`, dentro de una fila de 44px mínimos de alto.
-- **Error / Disabled:** sin definir en el lienzo. *Pendiente de resolver en la implementación.*
+- **Error:** la fila o el bloque toma fondo `alert-soft`, y debajo van dos líneas separadas: el motivo en `alert-ink` y la recuperación en `alert-soft-ink`. Un error que no dice cómo salir de él está a medias. *El estado de error del propio campo (trazo e icono dentro del input) sigue sin construirse.*
+- **Disabled:** el campo conserva su trazo y baja el texto a `muted`.
 
 ### Navigation
 

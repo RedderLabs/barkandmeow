@@ -1,0 +1,261 @@
+openapi: 3.1.0
+info:
+  title: Bark & Meow — API pública
+  version: 0.1.0
+  description: |
+    Protocolo abierto de la ficha de salud portátil. Implementarlo no requiere
+    permiso: la especificación es CC BY 4.0.
+
+    Dos principios que cualquier implementación debe respetar:
+
+    1. **El servidor no descifra.** Todo lo que lleva contenido clínico viaja
+       como bytes opacos en base64. Un nodo que pueda leer el contenido no es
+       conforme.
+    2. **Localizar no es abrir.** La consulta por identificador responde si
+       existe ficha y nada más, con el mismo tamaño y el mismo tiempo en ambos
+       casos, para que un observador de red no pueda recorrer números.
+  license:
+    name: CC BY 4.0
+    url: https://creativecommons.org/licenses/by/4.0/
+
+servers:
+  - url: https://api.barkandmeow.app
+    description: Nodo de referencia
+  - url: http://127.0.0.1:4601
+    description: Desarrollo
+
+tags:
+  - name: chip
+    description: Nivel 0. Localizar sin abrir.
+  - name: grants
+    description: Permisos de nivel 3 y su aprobación con número de comparación.
+  - name: clinics
+    description: Cuentas de organización. Nunca son una llave a los datos.
+  - name: federation
+    description: Consulta entre nodos. Sin implementar todavía.
+
+paths:
+  /chip/v1/lookup:
+    post:
+      tags: [chip]
+      summary: ¿Existe ficha para este identificador?
+      description: |
+        La respuesta se rellena siempre al mismo tamaño y consume el mismo
+        presupuesto de tiempo exista o no la ficha. Cuando no existe, `requestId`
+        y `sas` llevan señuelos con la forma correcta que no apuntan a nada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChipLookupBody' }
+      responses:
+        '200':
+          description: Respuesta de tamaño constante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChipLookupRespuesta' }
+        '400': { description: Cuerpo inválido }
+        '429': { description: Límite de consultas superado }
+
+  /grants/v1/request:
+    post:
+      tags: [grants]
+      summary: Pedir alta de nivel 3 para un identificador
+      description: |
+        Devuelve el número de comparación de seis dígitos, derivado de
+        `BLAKE2b(pk_veterinario ‖ pk_dueño ‖ id_petición)` truncado a 20 bits.
+        **El número no es secreto y no abre nada:** sirve para que el dueño
+        detecte a un intermediario comparándolo con el de su pantalla.
+        La petición caduca a los 10 minutos.
+      security: [{ sesionClinica: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GrantRequestBody' }
+      responses:
+        '201':
+          description: Petición abierta
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, sas, caduca]
+                properties:
+                  requestId: { type: string, format: uuid }
+                  sas: { type: string, pattern: '^\d{6}$' }
+                  caduca: { type: string, format: date-time }
+        '401': { description: Sin sesión }
+        '404': { description: Sin ficha }
+
+  /grants/v1/request/{id}:
+    get:
+      tags: [grants]
+      summary: Estado de una petición
+      security: [{ sesionClinica: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Estado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId: { type: string, format: uuid }
+                  estado:
+                    type: string
+                    enum: [pending, approved, rejected, expired]
+                  caduca: { type: string, format: date-time }
+        '404': { description: No encontrada }
+
+  /grants/v1/approve:
+    post:
+      tags: [grants]
+      summary: El dueño aprueba y sube la clave envuelta
+      description: |
+        Lo llama la app del dueño tras comparar el número. `wrappedKey` es la
+        clave de la ficha envuelta contra la clave pública del veterinario: el
+        servidor la guarda tal cual y no puede abrirla.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, wrappedKey]
+              properties:
+                requestId: { type: string, format: uuid }
+                wrappedKey: { $ref: '#/components/schemas/Base64' }
+      responses:
+        '201':
+          description: Permiso creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grantId: { type: string, format: uuid }
+                  level: { type: integer, enum: [3] }
+        '410': { description: Petición caducada o ya resuelta }
+
+  /grants/v1/revoke:
+    post:
+      tags: [grants]
+      summary: Retirar un permiso
+      description: |
+        Borra la copia del servidor. **No retira lo que el titular del permiso
+        ya haya descargado**, y la respuesta lo dice explícitamente en
+        `descargadoNoVuelve`. Una implementación que afirme lo contrario miente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grantId]
+              properties:
+                grantId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Retirado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  descargadoNoVuelve: { type: boolean, enum: [true] }
+
+  /federation/v1/lookup:
+    post:
+      tags: [federation]
+      summary: ¿Tienes ficha para este identificador? (entre nodos)
+      description: |
+        **Sin implementar.** La respuesta solo puede decir si existe y ofrecer un
+        enlace de aviso; nunca datos de salud ni del dueño. Tiempo máximo de
+        espera por nodo: 2 s. Cada nodo firma peticiones y respuestas con Ed25519.
+      responses:
+        '501': { description: No implementado todavía }
+
+components:
+  securitySchemes:
+    sesionClinica:
+      type: apiKey
+      in: cookie
+      name: bam_clinic
+      description: |
+        Identifica a la organización y a la persona. **No es una llave a los
+        datos:** cada paciente exige además un permiso de nivel 3 del dueño.
+
+  schemas:
+    Base64:
+      type: string
+      pattern: '^[A-Za-z0-9+/]+={0,2}$'
+      description: Bytes opacos. El servidor no los interpreta.
+
+    Identificador:
+      oneOf:
+        - type: object
+          required: [tipo, valor]
+          properties:
+            tipo: { type: string, enum: [iso] }
+            valor: { type: string, pattern: '^\d{15}$' }
+        - type: object
+          required: [tipo, valor]
+          properties:
+            tipo: { type: string, enum: [nonISO] }
+            valor: { type: string, pattern: '^nonISO:[0-9A-F]{9,10}$' }
+        - type: object
+          required: [tipo, valor]
+          properties:
+            tipo: { type: string, enum: [ring, tattoo] }
+            valor: { type: string, minLength: 3, maxLength: 32 }
+      description: |
+        Un animal lleva una lista, no un campo. El microchip ISO solo es
+        obligatorio en la Parte A del Reglamento (UE) 576/2013; un ave lleva
+        anilla y un reptil puede no llevar nada.
+
+    ChipLookupBody:
+      type: object
+      required: [identificador]
+      properties:
+        identificador: { $ref: '#/components/schemas/Identificador' }
+        vetPubKey:
+          allOf: [{ $ref: '#/components/schemas/Base64' }]
+          description: Clave pública X25519 del navegador, si ya quiere pedir el alta.
+
+    ChipLookupRespuesta:
+      type: object
+      required: [existe, origen, requestId, sas, pad]
+      properties:
+        existe: { type: boolean }
+        origen:
+          type: object
+          description: Resuelto offline desde los tres primeros dígitos (tablas ICAR).
+          properties:
+            clase: { type: string, enum: [pais, fabricante, desconocido, no-iso] }
+            codigo: { type: string }
+            iso2: { type: [string, 'null'] }
+        requestId:
+          type: string
+          format: uuid
+          description: Señuelo cuando no existe ficha.
+        sas:
+          type: string
+          pattern: '^\d{6}$'
+          description: Señuelo cuando no existe ficha.
+        pad:
+          type: string
+          description: Relleno hasta 512 bytes. Sin él, el tamaño delataría el resultado.
+
+    GrantRequestBody:
+      type: object
+      required: [identificador, vetPubKey]
+      properties:
+        identificador: { $ref: '#/components/schemas/Identificador' }
+        vetPubKey: { $ref: '#/components/schemas/Base64' }

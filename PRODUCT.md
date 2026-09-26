@@ -60,7 +60,6 @@ El segundo diferencial es la federación: Bark & Meow publica un protocolo abier
 
 - **Dominio: `barkandmeow.app`** (decidido 2026-09-26, ya en posesión del titular). Cierra la búsqueda de dominio; `hilo.fans` pertenece a otro producto. **Queda una tensión sin resolver:** el nombre del dominio habla de perros y gatos, y el catálogo de especies cubre además hurones, aves, conejos, roedores, reptiles, anfibios y peces ornamentales, que es justo lo que se amplió el mismo día. O el nombre de marca se separa del dominio, o hay que asumir que la marca promete menos de lo que el producto hace.
 - **Monetización.** Sin decidir (2026-09-26). El SaaS de clínicas se construye sin cobro, planes ni facturación. No hay precios que mostrar y no deben inventarse.
-- **Estado ámbar de "no listo para viajar".** La regla existe (lo contrario de "listo" es ámbar con texto, nunca rojo) pero el color no está definido en `diseno/tokens.json` ni aparece en ninguna pantalla.
 - **`apps/clinic` y `apps/mobile` no existen todavía** como workspaces. `packages/crypto` es una carpeta vacía.
 
 ## Brand Commitments

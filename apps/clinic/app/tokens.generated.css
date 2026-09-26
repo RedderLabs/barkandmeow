@@ -2,7 +2,6 @@
    No editar a mano: los cambios se pierden en la siguiente generación. */
 
 /* PROVISIONAL
-   · warn: El ámbar no está decidido. La regla dice que lo contrario de «listo» es ámbar con texto, nunca rojo, pero el valor es una propuesta verificada en contraste, no una elección del titular. Afecta a warn, warn-soft, warn-line y warn-ink en los dos modos.
    · dark-derived: Los valores oscuros de line, divider, field-line, ink-soft, los accent-* suaves, los alert-* suaves, info-soft, owner, owner-soft y quote-ground se derivaron al implementar, no venían del diseño original.
 */
 
