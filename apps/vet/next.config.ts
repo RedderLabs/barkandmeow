@@ -39,6 +39,7 @@ export default function config(phase: string): NextConfig {
           { source: "/mi-mascota/:path*", destination: `${PORTAL_DEV}/mi-mascota/:path*` },
           { source: "/e/:id", destination: "/e" },
           { source: "/s/:id", destination: "/s" },
+          { source: "/p/:id", destination: "/p" },
         ];
       },
     };

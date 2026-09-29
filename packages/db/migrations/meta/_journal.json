@@ -64,6 +64,20 @@
       "when": 1790653966390,
       "tag": "0008_invitacion_caduca",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790692783432,
+      "tag": "0009_software_conectado",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790696185058,
+      "tag": "0010_pasaporte_firmas",
+      "breakpoints": true
     }
   ]
 }

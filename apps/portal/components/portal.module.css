@@ -229,6 +229,11 @@
   background: var(--warn-soft);
   color: var(--warn-ink);
 }
+/* Información: ni hecho ni pendiente, algo que conviene saber. */
+.paso_info {
+  background: var(--info-soft);
+  color: var(--info);
+}
 .pasoTexto {
   grid-area: texto;
   display: flex;
@@ -368,7 +373,7 @@
   text-align: right;
 }
 
-/* ── Bandeja: notas de consulta y avisos ──────────────────── */
+/* ── Bandeja: notas de consulta, informes y avisos ────────── */
 
 .bandeja {
   list-style: none;
@@ -389,6 +394,24 @@
 .mensajeAviso {
   background: var(--warn-soft);
   border-color: var(--warn-line);
+}
+/* Un informe llega del software de la clínica habitual: el tono del documento
+   de clínica, en el borde para no competir con los avisos. */
+.mensajeInforme {
+  border-left: 3px solid var(--info);
+}
+.mensajeInforme .mensajeTipo {
+  color: var(--info);
+}
+.mensajeOrigen {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.mensajeOrigen strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 .mensajeCabecera {
   display: flex;
@@ -445,4 +468,107 @@
   line-height: 1.5;
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+
+/* ── Pasaporte de viaje ───────────────────────────────────── */
+
+/* Un <select> nativo con el aspecto de los campos: en móvil abre el selector
+   del sistema, que es lo que mejor funciona con una lista corta. */
+.selector {
+  min-height: var(--tap);
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+}
+.selector:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.viajeResumen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+/* De dónde sale un dato: firmado por la clínica o declarado por el dueño.
+   Es la diferencia que importa en una frontera, así que va escrita. */
+.origen {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--r-badge);
+  background: var(--ground);
+  color: var(--muted);
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  vertical-align: 1px;
+}
+.origenClinica {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.registros {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--divider);
+}
+.registro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.registroTexto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.registroTexto .origen {
+  margin-left: 0;
+}
+.formDeclarado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+.qr {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+/* El QR siempre en negro sobre blanco, también en modo oscuro: los lectores
+   no leen bien el invertido. */
+.qrImagen {
+  padding: 8px;
+  background: #fff;
+  color: #000;
+  border-radius: var(--r-control);
+}
+.qrImagen svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+@media (max-width: 560px) {
+  .qr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .qrImagen {
+    max-width: 240px;
+  }
 }

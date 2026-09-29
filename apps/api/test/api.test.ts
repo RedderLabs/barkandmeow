@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { crearCliente } from "@barkandmeow/db";
 import { crearApp } from "../src/index.js";
@@ -1170,5 +1170,253 @@ describe("correos ocupados sin verificar", () => {
     });
     assert.equal(acepta.statusCode, 400);
     assert.equal((await invitar()).statusCode, 201);
+  });
+});
+
+describe("software de gestión conectado por API", () => {
+  const CHIP_API = "724098100007010";
+  const correo = "dueno-api@correo.example";
+  let cookieDueno = "";
+  let petApi = "";
+  let token = "";
+  let claveId = "";
+  const pubDueno = b64();
+  const firmaPub = b64();
+
+  const conClave = (url: string, t = token, payload?: object) =>
+    app.inject({
+      method: payload ? "POST" : "GET",
+      url,
+      headers: { authorization: `Bearer ${t}` },
+      payload,
+    });
+  const idApi = { tipo: "iso", valor: CHIP_API };
+
+  before(async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email: correo, password: "clave-del-dueno-larga", pubKey: pubDueno, mascota: { identificador: idApi, nombre: "" } },
+    });
+    assert.equal(r.statusCode, 201);
+    petApi = r.json().mascota.petId;
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: r.cookies.map((c) => `${c.name}=${c.value}`).join("; ") },
+      payload: { codigo: ultimoCodigo(correo) },
+    });
+    cookieDueno = v.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    // Activada en clínica, como la dejaría /pets/v1/activate.
+    await sql`UPDATE pets SET estado = 'activa' WHERE id = ${petApi}`;
+    await sql`UPDATE pet_identifiers SET activo = true WHERE pet_id = ${petApi}`;
+  });
+
+  it("solo un administrador crea claves, y el token sale una sola vez", async () => {
+    const anonimo = await app.inject({ method: "POST", url: "/clinics/v1/api-keys", payload: { nombre: "Gestión", firmaPub } });
+    assert.equal(anonimo.statusCode, 401);
+    // Sin clave de firma no hay conexión: lo que envíe tiene que poder certificarse.
+    const sinFirma = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/api-keys",
+      headers: { cookie },
+      payload: { nombre: "Sin firma" },
+    });
+    assert.equal(sinFirma.statusCode, 400);
+
+    const r = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/api-keys",
+      headers: { cookie },
+      payload: { nombre: "Software de gestión", firmaPub },
+    });
+    assert.equal(r.statusCode, 201);
+    token = r.json().token;
+    claveId = r.json().id;
+    assert.match(token, /^bmk_[A-Za-z0-9_-]{43}$/);
+    assert.ok(token.startsWith(r.json().prefijo));
+
+    const lista = await app.inject({ method: "GET", url: "/clinics/v1/api-keys", headers: { cookie } });
+    assert.equal(lista.json().claves.length, 1);
+    assert.equal(lista.json().claves[0].token, undefined);
+    assert.ok(!lista.body.includes(token));
+    // En la base solo está el hash.
+    const [fila] = await sql`SELECT token_hash FROM clinic_api_keys WHERE id = ${claveId}`;
+    assert.notEqual(fila.token_hash, token);
+  });
+
+  it("sin clave, o con una inventada, no responde nada", async () => {
+    assert.equal((await app.inject({ method: "GET", url: "/clinics/v1/api/me" })).statusCode, 401);
+    assert.equal((await conClave("/clinics/v1/api/me", `bmk_${"A".repeat(43)}`)).statusCode, 401);
+    // La sesión de la consola no sirve como clave.
+    const conCookie = await app.inject({ method: "GET", url: "/clinics/v1/api/me", headers: { cookie } });
+    assert.equal(conCookie.statusCode, 401);
+
+    const me = await conClave("/clinics/v1/api/me");
+    assert.equal(me.statusCode, 200);
+    assert.equal(me.json().clinica.nombre, "Clínica de prueba");
+  });
+
+  it("sin nivel 3 no encuentra al paciente ni le envía nada", async () => {
+    const busca = await conClave("/clinics/v1/api/patients/search", token, { identificador: idApi });
+    assert.equal(busca.statusCode, 404);
+    const envia = await conClave("/clinics/v1/reports", token, { petId: petApi, sellado: b64(96) });
+    assert.equal(envia.statusCode, 404);
+    assert.equal((await conClave("/clinics/v1/api/patients")).json().pacientes.length, 0);
+  });
+
+  it("con nivel 3 busca, envía, y el dueño recibe el informe con la clínica como origen", async () => {
+    const [{ clinic_id }] = await sql`SELECT clinic_id FROM clinic_api_keys WHERE id = ${claveId}`;
+    await sql`INSERT INTO grants (pet_id, clinic_id, level, wrapped_key) VALUES (${petApi}, ${clinic_id}, 3, ${randomBytes(48)})`;
+
+    const pacientes = (await conClave("/clinics/v1/api/patients")).json().pacientes;
+    assert.deepEqual(
+      pacientes.map((p: { petId: string }) => p.petId),
+      [petApi],
+    );
+    const busca = await conClave("/clinics/v1/api/patients/search", token, { identificador: idApi });
+    assert.equal(busca.statusCode, 200);
+    assert.equal(busca.json().petId, petApi);
+    assert.equal(busca.json().ownerPubKey, pubDueno);
+
+    const sellado = b64(200);
+    const envia = await conClave("/clinics/v1/reports", token, { petId: petApi, sellado });
+    assert.equal(envia.statusCode, 201);
+
+    const bandeja = await app.inject({ method: "GET", url: "/owners/v1/inbox", headers: { cookie: cookieDueno } });
+    const [m] = bandeja.json().mensajes;
+    assert.equal(m.sellado, sellado);
+    assert.equal(m.origen.clinica, "Clínica de prueba");
+    // La clave de firma de la conexión que lo envió: la que tiene que haberlo firmado.
+    assert.equal(m.origen.firma, firmaPub);
+
+    const registro = await app.inject({ method: "GET", url: "/clinics/v1/reports", headers: { cookie } });
+    assert.equal(registro.json().envios.length, 1);
+    assert.equal(registro.json().envios[0].clave, "Software de gestión");
+    assert.equal(registro.json().envios[0].bytes, 200);
+  });
+
+  it("si el dueño retira el permiso, deja de poder enviarle", async () => {
+    await sql`UPDATE grants SET revoked_at = now() WHERE pet_id = ${petApi}`;
+    const envia = await conClave("/clinics/v1/reports", token, { petId: petApi, sellado: b64(96) });
+    assert.equal(envia.statusCode, 404);
+  });
+
+  it("el directorio público dice de qué clínica es una clave de firma", async () => {
+    const url = `/firmas/v1/${Buffer.from(firmaPub, "base64").toString("base64url")}`;
+    const r = await app.inject({ method: "GET", url });
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().clinica, "Clínica de prueba");
+    assert.equal(r.json().retirada, null);
+    const otra = await app.inject({ method: "GET", url: `/firmas/v1/${randomBytes(32).toString("base64url")}` });
+    assert.equal(otra.statusCode, 404);
+  });
+
+  it("una clave retirada deja de valer al momento", async () => {
+    const r = await app.inject({ method: "DELETE", url: `/clinics/v1/api-keys/${claveId}`, headers: { cookie } });
+    assert.equal(r.statusCode, 200);
+    assert.equal((await conClave("/clinics/v1/api/me")).statusCode, 401);
+    // Su clave de firma sigue en el directorio, con fecha: lo firmado antes sigue valiendo.
+    const dir = await app.inject({ method: "GET", url: `/firmas/v1/${Buffer.from(firmaPub, "base64").toString("base64url")}` });
+    assert.notEqual(dir.json().retirada, null);
+    // Lo que ya se envió sigue en el registro de la clínica.
+    const registro = await app.inject({ method: "GET", url: "/clinics/v1/reports", headers: { cookie } });
+    assert.equal(registro.json().envios.length, 1);
+  });
+});
+
+describe("pasaporte de viaje", () => {
+  let cookieDueno = "";
+  let cookieOtro = "";
+  let petP = "";
+
+  const abrir = async (email: string, chip: string) => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email, password: "clave-del-dueno-larga", pubKey: b64(), mascota: { identificador: { tipo: "iso", valor: chip }, nombre: "" } },
+    });
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: r.cookies.map((c) => `${c.name}=${c.value}`).join("; ") },
+      payload: { codigo: ultimoCodigo(email) },
+    });
+    return { cookie: v.cookies.map((c) => `${c.name}=${c.value}`).join("; "), petId: r.json().mascota.petId as string };
+  };
+
+  before(async () => {
+    const a = await abrir("dueno-pasaporte@correo.example", "724098100007020");
+    cookieDueno = a.cookie;
+    petP = a.petId;
+    cookieOtro = (await abrir("otro-pasaporte@correo.example", "724098100007021")).cookie;
+  });
+
+  const pasaporte = (payload?: object, c = cookieDueno) =>
+    app.inject({ method: payload ? "PUT" : "GET", url: `/owners/v1/pets/${petP}/passport`, headers: { cookie: c }, payload });
+
+  it("se guarda cifrado y con versión: un cambio de otro navegador no se pisa", async () => {
+    assert.deepEqual((await pasaporte()).json(), { sobre: null, version: 0 });
+    const r1 = await pasaporte({ sobre: b64(300), version: 0 });
+    assert.equal(r1.statusCode, 200);
+    assert.equal(r1.json().version, 1);
+    // Otro navegador que leyó la versión 0 no puede crear otro encima.
+    assert.equal((await pasaporte({ sobre: b64(300), version: 0 })).statusCode, 409);
+    const r2 = await pasaporte({ sobre: b64(310), version: 1 });
+    assert.equal(r2.json().version, 2);
+    assert.equal((await pasaporte({ sobre: b64(310), version: 1 })).statusCode, 409);
+    assert.equal((await pasaporte()).json().version, 2);
+  });
+
+  it("nadie más lo lee ni lo escribe", async () => {
+    assert.equal((await app.inject({ method: "GET", url: `/owners/v1/pets/${petP}/passport` })).statusCode, 401);
+    assert.equal((await pasaporte(undefined, cookieOtro)).statusCode, 404);
+    assert.equal((await pasaporte({ sobre: b64(10), version: 2 }, cookieOtro)).statusCode, 404);
+  });
+
+  it("el enlace de viaje se abre por la web del veterinario hasta que se retira", async () => {
+    const id = randomUUID();
+    const sobre = b64(400);
+    const crea = await app.inject({
+      method: "POST",
+      url: `/owners/v1/pets/${petP}/shares`,
+      headers: { cookie: cookieDueno },
+      payload: { id, sobre, horas: 72 },
+    });
+    assert.equal(crea.statusCode, 201);
+    const horas = (new Date(crea.json().caduca).getTime() - Date.now()) / 3600_000;
+    assert.ok(horas > 71 && horas <= 72);
+
+    const abre = await app.inject({ method: "GET", url: `/s/v1/${id}` });
+    assert.equal(abre.statusCode, 200);
+    assert.equal(abre.json().sobre, sobre);
+
+    // Ni se repite el id, ni otro dueño lo retira.
+    const repetido = await app.inject({
+      method: "POST",
+      url: `/owners/v1/pets/${petP}/shares`,
+      headers: { cookie: cookieDueno },
+      payload: { id, sobre, horas: 24 },
+    });
+    assert.equal(repetido.statusCode, 409);
+    const ajeno = await app.inject({ method: "DELETE", url: `/owners/v1/pets/${petP}/shares/${id}`, headers: { cookie: cookieOtro } });
+    assert.equal(ajeno.statusCode, 404);
+
+    const lista = await app.inject({ method: "GET", url: `/owners/v1/pets/${petP}/shares`, headers: { cookie: cookieDueno } });
+    assert.equal(lista.json().enlaces.length, 1);
+
+    const retira = await app.inject({ method: "DELETE", url: `/owners/v1/pets/${petP}/shares/${id}`, headers: { cookie: cookieDueno } });
+    assert.equal(retira.statusCode, 200);
+    assert.equal((await app.inject({ method: "GET", url: `/s/v1/${id}` })).statusCode, 404);
+  });
+
+  it("solo admite 24 h, 72 h o 7 días", async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: `/owners/v1/pets/${petP}/shares`,
+      headers: { cookie: cookieDueno },
+      payload: { id: randomUUID(), sobre: b64(40), horas: 24 * 365 },
+    });
+    assert.equal(r.statusCode, 400);
   });
 });

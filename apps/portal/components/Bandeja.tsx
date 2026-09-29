@@ -19,12 +19,15 @@ import { Button } from "@barkandmeow/ui-web/components/button";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
 import { toast } from "@barkandmeow/ui-web/components/sonner";
-import { borrarMensaje, leerBandeja, type MensajeSellado } from "@/lib/api";
+import { sobreFirmado } from "@barkandmeow/schema";
+import { borrarMensaje, leerBandeja, type MensajeSellado, type Origen } from "@/lib/api";
+import { comprobar, resumenRegistro } from "@/lib/pasaporte";
 import { guardarClave, leerClave } from "@/lib/claves";
 import { CRYPTO_WASM_URL } from "@/lib/crypto-url";
 import s from "./portal.module.css";
 
-/* La bandeja del dueño: notas de consulta y avisos de nivel 0.
+/* La bandeja del dueño: notas de consulta, avisos de nivel 0 e informes que
+   envía el software de gestión de su veterinario habitual.
 
    Llegan sellados a su clave pública y se abren aquí, con la secreta que
    guarda este navegador. Si no está (otro navegador, datos borrados), el
@@ -50,11 +53,29 @@ type Contenido =
       observaciones: string;
     }
   | { tipo: "aviso"; clinica: string; telefono: string; motivo: string }
+  | {
+      tipo: "informe";
+      fecha: string;
+      veterinario: string;
+      motivo: string;
+      diagnostico: string;
+      tratamiento: string;
+      observaciones: string;
+      /** Firmado por la clínica con la clave de su conexión. */
+      firmado?: boolean;
+    }
+  /** Vacuna, tratamiento o análisis firmado por la clínica: va al pasaporte. */
+  | { tipo: "certificado"; titulo: string; detalle: string }
+  /** Llegó firmado, pero la firma no es de la clínica que lo envió. */
+  | { tipo: "firma-mala" }
   | { tipo: "ilegible" };
 
-type Mensaje = { id: string; petId: string; llegada: string; contenido: Contenido };
+type Mensaje = { id: string; petId: string; llegada: string; origen: Origen | null; contenido: Contenido };
 
-function interpretar(claro: Uint8Array): Contenido {
+/* Un informe solo cuenta como tal si llegó con clave de API: entonces el
+   servidor sabe qué clínica lo envió. Sellado por otra vía (la nota de la web
+   del veterinario acepta cualquier sobre), se enseña como nota, sin clínica. */
+function interpretar(c: Cripto, claro: Uint8Array, origen: Origen | null): Contenido {
   let j: Record<string, unknown>;
   try {
     j = JSON.parse(new TextDecoder().decode(claro)) as Record<string, unknown>;
@@ -62,6 +83,25 @@ function interpretar(claro: Uint8Array): Contenido {
     return { tipo: "ilegible" };
   }
   if (j?.version !== 1) return { tipo: "ilegible" };
+  if (j.tipo === "firmado") {
+    const f = sobreFirmado.safeParse(j);
+    if (!f.success) return { tipo: "ilegible" };
+    // La firma tiene que ser de la conexión que lo envió, según el servidor.
+    const r = comprobar(c, f.data, origen, null);
+    if (!r.valido) return { tipo: "firma-mala" };
+    if (r.registro.tipo === "informe")
+      return {
+        tipo: "informe",
+        fecha: r.registro.fecha,
+        veterinario: r.registro.veterinario,
+        motivo: r.registro.motivo,
+        diagnostico: r.registro.diagnostico,
+        tratamiento: r.registro.tratamiento,
+        observaciones: r.registro.observaciones,
+        firmado: true,
+      };
+    return { tipo: "certificado", ...resumenRegistro(r.registro) };
+  }
   if (j.tipo === "nota")
     return {
       tipo: "nota",
@@ -73,6 +113,22 @@ function interpretar(claro: Uint8Array): Contenido {
     };
   if (j.tipo === "aviso")
     return { tipo: "aviso", clinica: texto(j.clinica), telefono: texto(j.telefono), motivo: texto(j.motivo) };
+  if (j.tipo === "informe") {
+    const campos = {
+      motivo: texto(j.motivo),
+      diagnostico: texto(j.diagnostico),
+      tratamiento: texto(j.tratamiento),
+      observaciones: texto(j.observaciones),
+    };
+    if (!origen) return { tipo: "nota", clinica: "", ...campos };
+    const fecha = texto(j.fecha);
+    return {
+      tipo: "informe",
+      fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : "",
+      veterinario: texto(j.veterinario),
+      ...campos,
+    };
+  }
   return { tipo: "ilegible" };
 }
 
@@ -82,12 +138,12 @@ function abrirTodos(c: Cripto, secreta: Uint8Array, sellados: MensajeSellado[]):
     const sobre = deBase64(m.sellado);
     if (sobre) {
       try {
-        contenido = interpretar(c.abrirSellado(secreta, sobre));
+        contenido = interpretar(c, c.abrirSellado(secreta, sobre), m.origen);
       } catch {
         // Sellado para otra clave o dañado: se enseña como ilegible.
       }
     }
-    return { id: m.id, petId: m.petId, llegada: m.llegada, contenido };
+    return { id: m.id, petId: m.petId, llegada: m.llegada, origen: m.origen, contenido };
   });
 }
 
@@ -189,7 +245,8 @@ export function Bandeja({
     return (
       <p className={ui.panelNote}>
         No tienes mensajes. Aquí llegan las notas que te deja el veterinario después de una
-        consulta y los avisos de una clínica si alguien lleva a tu mascota perdida.
+        consulta, los informes de tu clínica habitual y los avisos de una clínica si alguien
+        lleva a tu mascota perdida.
       </p>
     );
 
@@ -212,14 +269,29 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
   let titulo: string;
   if (c.tipo === "aviso") titulo = `Una clínica tiene a ${nombre}`;
   else if (c.tipo === "nota") titulo = c.motivo || "Nota de la consulta";
+  else if (c.tipo === "informe") titulo = c.motivo || "Informe de la clínica";
+  else if (c.tipo === "certificado") titulo = c.titulo;
+  else if (c.tipo === "firma-mala") titulo = "Registro con una firma que no cuadra";
   else titulo = "Mensaje que no se puede abrir";
 
+  const etiqueta = {
+    aviso: "Aviso",
+    nota: "Nota de consulta",
+    informe: "Informe",
+    certificado: "Pasaporte",
+    "firma-mala": "Sin validar",
+    ilegible: "Sin abrir",
+  }[c.tipo];
+
   return (
-    <article className={`${s.mensaje} ${aviso ? s.mensajeAviso : ""}`} aria-labelledby={`${ids}-t`}>
+    <article
+      className={`${s.mensaje} ${aviso ? s.mensajeAviso : ""} ${c.tipo === "informe" || c.tipo === "certificado" ? s.mensajeInforme : ""}`}
+      aria-labelledby={`${ids}-t`}
+    >
       <header className={s.mensajeCabecera}>
         <span className={s.mensajeTipo}>
           {aviso && <IconAlert size={14} />}
-          {c.tipo === "aviso" ? "Aviso" : c.tipo === "nota" ? "Nota de consulta" : "Sin abrir"} · {nombre}
+          {etiqueta} · {nombre}
         </span>
         <time className={s.mensajeFecha} dateTime={m.llegada}>
           {cuando(m.llegada)}
@@ -228,6 +300,16 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
       <h2 id={`${ids}-t`} className={s.mensajeTitulo}>
         {titulo}
       </h2>
+
+      {/* El remitente lo pone el servidor por la clave con que llegó el
+          mensaje; lo que dice dentro lo escribe la clínica. */}
+      {m.origen && (
+        <p className={s.mensajeOrigen}>
+          Enviado por <strong>{m.origen.clinica}</strong>
+          {m.origen.dominio ? ` · ${m.origen.dominio}, dominio verificado` : ` · ${m.origen.pais}`} · desde
+          su software de gestión
+        </p>
+      )}
 
       {c.tipo === "aviso" && (
         <>
@@ -263,6 +345,48 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
         </dl>
       )}
 
+      {c.tipo === "informe" && (
+        <dl className={s.nota}>
+          {(
+            [
+              ["Fecha", c.fecha && c.fecha.split("-").reverse().join("/")],
+              ["Veterinario", c.veterinario],
+              ["Diagnóstico", c.diagnostico],
+              ["Tratamiento", c.tratamiento],
+              ["Observaciones", c.observaciones],
+            ] as const
+          )
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <div key={k} className={s.notaFila}>
+                <dt className={s.filaEtiqueta}>{k}</dt>
+                <dd className={s.notaValor}>{v}</dd>
+              </div>
+            ))}
+        </dl>
+      )}
+
+      {c.tipo === "informe" && c.firmado && (
+        <p className={s.mensajeOrigen}>Firma de la clínica comprobada en este navegador.</p>
+      )}
+
+      {c.tipo === "certificado" && (
+        <>
+          <p className={s.mensajeTexto}>{c.detalle}</p>
+          <p className={s.mensajeOrigen}>
+            Firma de la clínica comprobada. Se guarda en el pasaporte de viaje de {nombre} al abrirlo.{" "}
+            <a href={`/mi-mascota/mascota/${m.petId}/pasaporte`}>Abrir el pasaporte</a>
+          </p>
+        </>
+      )}
+
+      {c.tipo === "firma-mala" && (
+        <p className={s.mensajeTexto}>
+          Dice venir de tu clínica, pero la firma no es la de su conexión con Bark &amp; Meow. No se
+          guarda en el pasaporte. Si esperabas un registro, pregunta a tu clínica.
+        </p>
+      )}
+
       {c.tipo === "ilegible" && (
         <p className={s.mensajeTexto}>
           No se ha podido abrir con tu clave. Puede estar dañado o sellado para otra clave.
@@ -279,8 +403,8 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
           <AlertDialogHeader>
             <AlertDialogTitle>¿Borrar este mensaje?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borra del servidor y no se puede recuperar. Si es una nota de consulta y la
-              quieres conservar, guárdala antes por tu cuenta.
+              Se borra del servidor y no se puede recuperar. Si es una nota o un informe y lo
+              quieres conservar, guárdalo antes por tu cuenta.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -294,12 +418,15 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
 }
 
 /** Sin la clave en este navegador: se reconstruye con el código en papel. */
-function Recuperar({
+export function Recuperar({
   publica,
   alRecuperar,
+  que = "La bandeja",
 }: {
   publica: Uint8Array | null;
   alRecuperar: (secreta: Uint8Array) => Promise<void>;
+  /** Qué se abre con la clave, para el texto: «La bandeja», «El pasaporte». */
+  que?: string;
 }) {
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -334,8 +461,9 @@ function Recuperar({
         <IconKey size={20} /> Este navegador no tiene tu clave
       </h2>
       <p className={ui.panelNote}>
-        Las notas y los avisos llegan cerrados con tu clave, y solo se abren donde está
-        guardada. Escribe el código de recuperación que apuntaste en el alta: la clave se
+        {que === "La bandeja"
+          ? "Las notas, los informes y los avisos llegan cerrados con tu clave, y solo se abren donde está guardada."
+          : `${que} se guarda cerrado con tu clave, y solo se abre donde está guardada.`} Escribe el código de recuperación que apuntaste en el alta: la clave se
         reconstruye aquí y no sale de este navegador.
       </p>
       <form className="flex flex-col gap-3" onSubmit={alEnviar} noValidate>
@@ -360,7 +488,7 @@ function Recuperar({
         )}
         <div className={ui.actions}>
           <Button type="submit" size="md" disabled={comprobando || !codigo.trim()}>
-            {comprobando ? "Comprobando…" : "Abrir la bandeja"}
+            {comprobando ? "Comprobando…" : `Abrir ${que.toLowerCase()}`}
           </Button>
         </div>
       </form>

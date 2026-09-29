@@ -115,7 +115,7 @@ export type Enlace = { id: string; clave: string | null; ejemplo: boolean };
 export const ID_EJEMPLO = "ejemplo";
 
 /** Lee el id del último tramo de la ruta y la clave del fragmento. */
-export function leerEnlace(nivel: "e" | "s"): Enlace | null {
+export function leerEnlace(nivel: "e" | "s" | "p"): Enlace | null {
   const tramos = window.location.pathname.split("/").filter(Boolean);
   const i = tramos.lastIndexOf(nivel);
   const id = i >= 0 ? tramos[i + 1] : undefined;

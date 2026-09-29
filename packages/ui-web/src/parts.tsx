@@ -74,7 +74,7 @@ export function IconInvite({ size = 20 }: { size?: number }) {
   );
 }
 
-type Surface = "consola" | "activar" | "equipo";
+type Surface = "consola" | "activar" | "equipo" | "conexion";
 
 /* Un paquete compartido no puede saber de qué clínica se trata: la recibe.
    Antes importaba los datos de demostración de apps/clinic, que era una
@@ -118,6 +118,12 @@ export function AppHeader({
           className={`${ui.navLink} ${active === "equipo" ? ui.navLinkActive : ""}`}
         >
           Equipo
+        </Link>
+        <Link
+          href="/conexion"
+          className={`${ui.navLink} ${ui.navLinkSecundario} ${active === "conexion" ? ui.navLinkActive : ""}`}
+        >
+          Conexión
         </Link>
         {/* Un enlace normal, no de Next: la ruta de salida es del servidor. */}
         <a href="/clinica/salir" className={ui.navLink}>

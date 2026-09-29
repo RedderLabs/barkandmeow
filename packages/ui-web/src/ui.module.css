@@ -395,6 +395,11 @@ svg.wordmark {
   .header:has(nav) .navLink {
     padding: 0 6px;
   }
+  /* Conexión no cabe como quinto destino: en la consola, la tira de conexión
+     lleva a ella. Se deja visible si es la página en la que se está. */
+  .header:has(nav) .navLinkSecundario:not(.navLinkActive) {
+    display: none;
+  }
 }
 
 /* ── Formularios con estado (registro) ─────────────────────── */

@@ -110,9 +110,46 @@ export const impugnar = (reclamacionId: string) =>
   });
 
 /** Mensaje de la bandeja tal como llega: sellado a la clave pública del dueño. */
-export type MensajeSellado = { id: string; petId: string; sellado: string; llegada: string };
+/** Quién envió un informe, según la clave de API con que llegó. Lo pone el
+    servidor, no la clínica; en notas y avisos es null. */
+export type Origen = {
+  clinica: string;
+  pais: string;
+  dominio: string | null;
+  /** Clave de firma de la conexión que lo envió (base64), si la tiene. */
+  firma: string | null;
+};
+
+export type MensajeSellado = {
+  id: string;
+  petId: string;
+  sellado: string;
+  llegada: string;
+  origen: Origen | null;
+};
 
 export const leerBandeja = () => llamar<{ mensajes: MensajeSellado[] }>("/owners/v1/inbox", { cache: "no-store" });
 
 export const borrarMensaje = (id: string) =>
   llamar<{ ok: true }>(`/owners/v1/inbox/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/* ── Pasaporte de viaje ────────────────────────────────────── */
+
+const mascota = (petId: string) => `/owners/v1/pets/${encodeURIComponent(petId)}`;
+
+export const leerPasaporte = (petId: string) =>
+  llamar<{ sobre: string | null; version: number }>(`${mascota(petId)}/passport`, { cache: "no-store" });
+
+export const guardarPasaporte = (petId: string, sobre: string, version: number) =>
+  llamar<{ version: number }>(`${mascota(petId)}/passport`, { method: "PUT", json: { sobre, version } });
+
+export type Enlace = { id: string; caduca: string; creado: string };
+
+export const listarEnlaces = (petId: string) =>
+  llamar<{ enlaces: Enlace[] }>(`${mascota(petId)}/shares`, { cache: "no-store" });
+
+export const crearEnlace = (petId: string, id: string, sobre: string, horas: 24 | 72 | 168) =>
+  llamar<{ id: string; caduca: string }>(`${mascota(petId)}/shares`, { method: "POST", json: { id, sobre, horas } });
+
+export const retirarEnlace = (petId: string, id: string) =>
+  llamar<{ ok: true }>(`${mascota(petId)}/shares/${encodeURIComponent(id)}`, { method: "DELETE" });

@@ -219,6 +219,46 @@ export const drafts = pgTable('drafts', {
 });
 ```
 
+**Software de gestión conectado por API** (decidido el 29/09/2026). El software de gestión de la clínica envía los informes de la consulta a la bandeja del dueño sin que nadie los copie a mano.
+
+- Un administrador crea una **clave de API** en la consola (pantalla Conexión). El token (`bmk_…`) se enseña una sola vez; el servidor guarda su hash. Hasta 10 claves vivas por clínica; retirar una la invalida al momento.
+- La clave **no abre ninguna ficha**. Solo sirve para enviar, y solo a mascotas activas cuyo dueño dio a esa clínica un nivel 3 que sigue vivo. Fuera de ellas la API responde 404 sin decir si el chip existe, así que tampoco sirve para recorrer números.
+- El software **sella el informe en su propio servidor** con `crypto_box_seal` de libsodium para la clave pública del dueño, la misma primitiva que las notas y los avisos. Bark & Meow lo guarda sin poder leerlo.
+- **El remitente lo pone el servidor**, según la clave con que llegó, no el contenido. El portal del dueño enseña «Enviado por Clínica X · dominio verificado · desde su software de gestión». Un sobre con forma de informe que llegue por otra vía (la nota de la web del veterinario) se enseña como nota, sin clínica.
+- La consola lleva un **registro de envíos** sin contenido: fecha, últimos dígitos del chip, clave y tamaño. Sobrevive a que el dueño borre el mensaje.
+- Límite de 120 peticiones por minuto y clave. Sin clave válida cuenta la IP, así que inventar tokens no abre cupos nuevos.
+- **Firma** (hecho el 29/09/2026). Cada conexión tiene además una **clave de firma Ed25519** que nace en el navegador del administrador y se entrega al software una sola vez (`bmf_…`); el servidor solo guarda la pública. El software firma el JSON del registro y lo sella dentro de un sobre `{ tipo: "firmado", registro, firma, clave }`. El dueño comprueba que la firma es de la clave de la conexión que lo envió, y quien reciba el pasaporte en un viaje la comprueba contra el directorio público `GET /firmas/v1/{clave}`. Una clave retirada sigue en el directorio con su fecha: lo firmado antes sigue valiendo.
+- **Pendiente:** documentos adjuntos (PDF). El registro es texto, hasta 64 KB sellado.
+
+| Endpoint | Quién lo llama | Función |
+| --- | --- | --- |
+| `GET /clinics/v1/api/me` | Software de gestión (clave de API) | Comprobar la clave |
+| `GET /clinics/v1/api/patients` | Software de gestión | Pacientes con nivel 3 vivo y la clave pública de su dueño |
+| `POST /clinics/v1/api/patients/search` | Software de gestión | El paciente de un chip, solo entre los que tienen nivel 3 con la clínica |
+| `POST /clinics/v1/reports` | Software de gestión | Enviar un informe sellado: `{ petId, sellado }` |
+| `GET/POST/DELETE /clinics/v1/api-keys` | Consola (sesión) | Ver, crear (administrador) y retirar claves |
+| `GET /clinics/v1/reports` | Consola (sesión) | Registro de envíos |
+| `GET /firmas/v1/{clave}` | Cualquiera (web del veterinario) | De qué clínica es una clave de firma, y si se retiró |
+| `GET/PUT /owners/v1/pets/{id}/passport` | Portal del dueño | Pasaporte de viaje cifrado, con versión |
+| `GET/POST/DELETE /owners/v1/pets/{id}/shares` | Portal del dueño | Enlaces de viaje temporales |
+
+El informe, antes de sellarlo:
+
+```json
+{
+  "version": 1,
+  "tipo": "informe",
+  "fecha": "2026-09-29",
+  "veterinario": "Dra. Ruiz",
+  "motivo": "Revisión anual",
+  "diagnostico": "Sano",
+  "tratamiento": "Vacuna de la rabia",
+  "observaciones": "Próxima revisión en un año"
+}
+```
+
+`BM_API_KEY=… BM_FIRMA=… pnpm --filter @barkandmeow/api registro <registro.json>` hace de software de gestión: valida el registro, lo firma, lo sella y lo envía. Solo usa primitivas que cualquier libsodium tiene (`crypto_sign_detached`, `crypto_box_seal`), y sirve de referencia para quien lo integre.
+
 ## Modelo de datos clínicos e idiomas
 
 Todo lo que un veterinario necesita en una urgencia se guarda como dato estructurado con código, no como texto libre. Así la web lo muestra traducido al idioma del navegador y se evitan malentendidos entre países.
@@ -242,7 +282,7 @@ Reglas:
 
 ## Especies que viajan y cómo se identifican
 
-**Qué especies.** El Reglamento (UE) 576/2013 separa dos grupos, y la ficha tiene que cubrir los dos:
+**Qué especies.** El Reglamento (UE) 576/2013 separa dos grupos, y la ficha tiene que cubrir los dos. Desde el 22/04/2026 lo sustituye, para los movimientos sin fines comerciales, el Reglamento Delegado (UE) 2026/131, con los mismos grupos y requisitos:
 
 - **Anexo I Parte A:** perro, gato y hurón. Microchip ISO obligatorio, pasaporte europeo y vacuna antirrábica vigente. Es el grupo con reglas armonizadas y el que la sección de viaje cubre a fondo.
 - **Anexo I Parte B:** aves distintas de las de corral, conejos y roedores domésticos, reptiles, anfibios, invertebrados (salvo abejas, abejorros, moluscos y crustáceos) y peces ornamentales. Sin reglas europeas armonizadas: manda el país de destino y, encima, lo que acepte la aerolínea.
@@ -323,7 +363,7 @@ Bark & Meow no pretende ser la única base de datos: publica un protocolo abiert
 | --- | --- | --- |
 | Otra app de fichas de mascotas | Sus fichas, en su propio servidor | Nodo federado (API de federación) |
 | Registro de identificación (autonómico, nacional) | Saber si el chip está registrado y avisar al titular | Conector de solo aviso, sin datos de salud |
-| Software de gestión de clínicas | Enviar informes firmados a la ficha del dueño, con su permiso | Cliente de la API de nivel 3 |
+| Software de gestión de clínicas | Enviar informes sellados a la bandeja del dueño, con su permiso de nivel 3 | Clave de API de la clínica (ver «Software de gestión conectado por API») |
 | Protectoras y ayuntamientos | Lectura de chip y aviso al dueño | Web de nivel 0, sin integración |
 
 **Identificador universal del chip**
@@ -363,7 +403,7 @@ sequenceDiagram
 | `POST /federation/v1/notify` | Nodos entre sí | Avisar al dueño de que un veterinario pide acceso |
 | `GET /federation/v1/nodes` | Cualquiera | Directorio público de nodos y sus claves |
 | `POST /records/v1/import` | App del dueño | Traer un paquete cifrado exportado desde otra plataforma |
-| `POST /clinics/v1/reports` | Software de clínica con permiso de nivel 3 | Subir un informe firmado a la ficha |
+| `POST /clinics/v1/reports` | Software de clínica con clave de API y permiso de nivel 3 | Enviar un informe sellado a la bandeja del dueño |
 
 **Portabilidad**
 
@@ -558,11 +598,16 @@ Las tres son de licencia SIL OFL y se empaquetan con la app y la web, sin cargar
 - El resumen de emergencia puede ir comprimido dentro del propio QR (hasta unos 2 KB). Se lee sin internet con la cámara de cualquier móvil, a cambio de no ir cifrado. Es opcional y el dueño decide qué campos incluye.
 - Exportación en PDF firmado y multilingüe como último recurso: se regenera en cada cambio, lleva fecha y un QR a la versión viva.
 
-**Documentación de viaje**
+**Pasaporte de viaje** (hecho el 29/09/2026)
 
-- Sección de "Requisitos del viaje" por país de destino, con checklist: pasaporte europeo, vacuna de la rabia vigente, análisis de anticuerpos, tratamiento antiparasitario, certificado sanitario. Los requisitos se mantienen en un catálogo revisado a mano con fecha de última comprobación, porque cambian.
-- Recordatorios de plazos (por ejemplo, días mínimos entre vacuna y viaje).
-- Guardar escaneado el pasaporte europeo dentro de la ficha, como documento original.
+No sustituye al pasaporte europeo: es de papel y lo sella un veterinario autorizado, y eso es lo que vale en una frontera. Tampoco hay, a fecha de hoy, pasaporte digital oficial en la UE; el Reglamento (UE) 2026/1818 sobre bienestar y trazabilidad de perros y gatos crea una base de datos de viajeros con mascotas, pero no un pasaporte digital. Bark & Meow ofrece la **copia digital verificable**:
+
+- **Registros firmados por la clínica** que llegan por su software de gestión: vacunas (la de la rabia con validez), tratamiento contra *Echinococcus* con fecha y hora, análisis de anticuerpos. El portal del dueño los comprueba y los guarda en el pasaporte.
+- **Registros declarados por el dueño**, copiados de su pasaporte de papel, marcados siempre como tales.
+- El pasaporte se guarda **cifrado con una clave que sale del código en papel del dueño** (`GET/PUT /owners/v1/pets/{id}/passport`, con versión para no pisar cambios de otro navegador). El servidor no ve nada.
+- **Requisitos por destino** (`packages/schema/src/viajes.ts`): otro país de la UE; Irlanda, Finlandia, Malta, Noruega e Irlanda del Norte (tenia, perros, entre 24 y 120 h antes de llegar); Gran Bretaña; y fuera de la UE con vuelta (análisis de anticuerpos, 30 días tras la vacuna, 3 meses de espera si no se hizo antes de salir). Lo certificado por una clínica cuenta antes que lo declarado. Cada destino enlaza su fuente oficial y la pantalla enseña la fecha de revisión (29/09/2026).
+- **Enseñarlo en el viaje:** un enlace temporal (24 h, 72 h o 7 días, revocable) con la clave en el fragmento y su QR, generado en el navegador. Abre `/p/{id}` en la web del veterinario, en su idioma: el chip para compararlo con el lector, cada registro con su firma comprobada allí mismo y la clínica que firmó según el directorio público, y lo declarado aparte.
+- Pendiente: recordatorios de plazos y guardar escaneado el pasaporte de papel como documento original.
 
 **Urgencias en destino**
 

@@ -15,7 +15,7 @@ Bark & Meow tiene tres superficies sobre dos familias de plataforma. `apps/mobil
 - **El dueño de la mascota (custodio).** Tiene las claves y decide quién ve qué. Usa la app móvil y el portal web del dueño, donde gestiona el perfil público de la mascota. Situación típica: de viaje, en una urgencia, con prisa y a veces sin cobertura.
 - **El veterinario de guardia, en otra ciudad o país.** No conoce al animal ni a Bark & Meow. Necesita alergias, medicación y antecedentes en segundos, en su idioma, sin instalar nada ni crear cuenta. Llega por QR, NFC o tecleando el número de chip.
 - **El veterinario habitual.** Acceso permanente concedido por el dueño. Ve lo que pasó fuera y sube sus propios informes.
-- **La clínica como organización** (decidido 2026-09-26). Cuenta, equipo y panel propio en el SaaS: gestiona sus pacientes con permiso de nivel 3 y conecta su software de gestión por API para enviar informes.
+- **La clínica como organización** (decidido 2026-09-26). Cuenta, equipo y panel propio en el SaaS: gestiona sus pacientes con permiso de nivel 3 y conecta su software de gestión por API para enviar informes (hecho el 2026-09-29: clave de API y clave de firma Ed25519 por conexión; vacunas, tratamientos e informes firmados y sellados para el dueño, que alimentan su pasaporte de viaje).
 - **Quien encuentra al animal perdido.** Solo quiere contactar con el dueño. Llega por el QR o NFC de la placa, o un veterinario lo busca por el número de chip. Ve el perfil público: foto, bio y teléfonos de contacto.
 
 ## Product Purpose

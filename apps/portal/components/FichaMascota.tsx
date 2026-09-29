@@ -244,6 +244,9 @@ export function FichaMascota({ m }: { m: Mascota }) {
           </Button>
         )}
         <Button asChild variant="outline" size="md">
+          <Link href={`${editar}/pasaporte`}>Pasaporte de viaje</Link>
+        </Button>
+        <Button asChild variant="outline" size="md">
           <Link href={editar}>Editar el perfil público</Link>
         </Button>
       </footer>

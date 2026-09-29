@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ad, aBase64Url, cargarCripto, claveDeClinica, claveDeFragmento, ErrorCripto, leerCodigo, nuevoCodigo } from "./index.ts";
+import { ad, aBase64Url, cargarCripto, claveDeClinica, claveDeFragmento, ErrorCripto, firmaValida, firmarRegistro, leerCodigo, nuevoCodigo } from "./index.ts";
 
 const cripto = await cargarCripto(readFileSync(new URL("../wasm/bm_crypto.wasm", import.meta.url)));
 const enc = new TextEncoder();
@@ -66,4 +66,16 @@ test("O, I y L tecleadas por error se leen como 0 y 1", async () => {
   const { bloques, semilla } = await nuevoCodigo();
   const tecleado = bloques.join("-").replace(/0/g, "O").replace(/1/g, "l");
   assert.deepEqual(await leerCodigo(tecleado), semilla);
+});
+
+test("un registro firmado se comprueba, y cambiado en un byte ya no", () => {
+  const semilla = crypto.getRandomValues(new Uint8Array(32));
+  const f = firmarRegistro(cripto, semilla, { version: 1, tipo: "vacuna", chip: "724098100001234", validaHasta: "2027-03-14" });
+  assert.equal(firmaValida(cripto, f), true);
+  // El dueño adelanta la validez: la firma ya no vale.
+  assert.equal(firmaValida(cripto, { ...f, registro: f.registro.replace("2027", "2028") }), false);
+  // Otra clave: tampoco.
+  const otra = firmarRegistro(cripto, crypto.getRandomValues(new Uint8Array(32)), {});
+  assert.equal(firmaValida(cripto, { ...f, clave: otra.clave }), false);
+  assert.equal(firmaValida(cripto, { ...f, firma: "corta" }), false);
 });

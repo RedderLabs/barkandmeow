@@ -26,6 +26,9 @@ type Exports = {
   bm_publica(secreta: number): number;
   bm_derivar(s: number, sN: number, info: number, infoN: number): number;
   bm_cerrar_documento(clave: number, ad: number, adN: number, prefijo: number, t: number, tN: number): number;
+  bm_publica_firma(semilla: number): number;
+  bm_firmar(semilla: number, m: number, mN: number): number;
+  bm_verificar(publica: number, m: number, mN: number, f: number, fN: number): number;
 };
 
 export type Cripto = {
@@ -45,9 +48,16 @@ export type Cripto = {
   publica(secreta: Uint8Array): Uint8Array;
   /** HKDF-SHA256 de una semilla a 32 bytes, separando usos por info. */
   derivar(semilla: Uint8Array, info: string): Uint8Array;
+  /** Clave pública Ed25519 de una semilla de firma de 32 bytes. */
+  publicaFirma(semilla: Uint8Array): Uint8Array;
+  /** Firma Ed25519 (64 bytes) de un mensaje. */
+  firmar(semilla: Uint8Array, mensaje: Uint8Array): Uint8Array;
+  /** true si la firma es de esa clave y de ese mensaje, sin tocar nada. */
+  verificar(publica: Uint8Array, mensaje: Uint8Array, firma: Uint8Array): boolean;
 };
 
 const texto = new TextEncoder();
+const enc = texto;
 const azar = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
 /** Carga el núcleo desde los bytes del .wasm o desde la respuesta de un fetch. */
@@ -117,6 +127,24 @@ export async function cargarCripto(
       exigir(secreta, 32, "clave secreta");
       return llamar([{ b: secreta, fijo: true }], w.bm_publica);
     },
+    publicaFirma(semilla) {
+      exigir(semilla, 32, "semilla de firma");
+      return llamar([{ b: semilla, fijo: true }], w.bm_publica_firma);
+    },
+    firmar(semilla, m) {
+      exigir(semilla, 32, "semilla de firma");
+      return llamar([{ b: semilla, fijo: true }, { b: m }], w.bm_firmar);
+    },
+    verificar(publica, m, firma) {
+      if (publica.length !== 32) return false;
+      try {
+        llamar([{ b: publica, fijo: true }, { b: m }, { b: firma }], w.bm_verificar);
+        return true;
+      } catch (e) {
+        if (e instanceof ErrorCripto) return false;
+        throw e;
+      }
+    },
     sellar(destino, t) {
       exigir(destino, 32, "clave pública");
       return llamar([{ b: destino, fijo: true }, { b: azar(32), fijo: true }, { b: t }], w.bm_sellar);
@@ -156,7 +184,48 @@ export const ad = {
   emergencia: (id: string) => `bm:e:v1:${id}`,
   historial: (id: string) => `bm:s:v1:${id}`,
   documento: (id: string) => `bm:d:v1:${id}`,
+  /** El pasaporte del dueño, cifrado con su clave (ver clavePasaporte). */
+  pasaporte: (petId: string) => `bm:p:v1:${petId}`,
+  /** El pasaporte compartido para un viaje, con la clave del fragmento. */
+  pasaporteCompartido: (id: string) => `bm:pv:v1:${id}`,
 };
+
+/* ── Registros firmados ──────────────────────────────────────
+   La clínica firma el JSON del registro con Ed25519 y lo sella para el dueño.
+   La firma cubre los bytes exactos del texto: se guarda el texto, no el objeto,
+   y nadie tiene que volver a serializarlo igual para comprobarla. */
+
+export type Firmado = { version: 1; tipo: "firmado"; registro: string; firma: string; clave: string };
+
+export function firmarRegistro(cripto: Cripto, semilla: Uint8Array, registro: object): Firmado {
+  const texto = JSON.stringify(registro);
+  return {
+    version: 1,
+    tipo: "firmado",
+    registro: texto,
+    firma: aBase64(cripto.firmar(semilla, enc.encode(texto))),
+    clave: aBase64(cripto.publicaFirma(semilla)),
+  };
+}
+
+/** true si `firma` es de `clave` sobre `registro`. No dice de quién es la clave. */
+export function firmaValida(cripto: Cripto, f: { registro: string; firma: string; clave: string }): boolean {
+  const firma = deBase64(f.firma);
+  const clave = deBase64(f.clave);
+  if (!firma || !clave || firma.length !== 64 || clave.length !== 32) return false;
+  return cripto.verificar(clave, enc.encode(f.registro), firma);
+}
+
+/** Clave simétrica del pasaporte, derivada de la secreta X25519 del dueño:
+    el mismo papel la reconstruye en cualquier navegador. */
+export const clavePasaporte = (cripto: Cripto, secretaDueno: Uint8Array) =>
+  cripto.derivar(secretaDueno, "bm:dueno:pasaporte:v1");
+
+export function aBase64(b: Uint8Array): string {
+  let s = "";
+  for (const x of b) s += String.fromCharCode(x);
+  return btoa(s);
+}
 
 /* Código de recuperación de la clave de la clínica.
 

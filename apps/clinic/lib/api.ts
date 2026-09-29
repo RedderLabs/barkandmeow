@@ -109,3 +109,13 @@ export const entregarClave = (id: string, wrappedClinicKey: string) =>
     method: "POST",
     json: { wrappedClinicKey },
   });
+
+/* ── Software de gestión ───────────────────────────────────── */
+
+export type ClaveCreada = { id: string; prefijo: string; token: string };
+
+export const crearClaveApi = (nombre: string, firmaPub: string) =>
+  llamar<ClaveCreada>("/clinics/v1/api-keys", { method: "POST", json: { nombre, firmaPub } });
+
+export const retirarClaveApi = (id: string) =>
+  llamar<{ ok: true }>(`/clinics/v1/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" });

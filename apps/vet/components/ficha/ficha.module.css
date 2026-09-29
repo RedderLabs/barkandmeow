@@ -882,3 +882,48 @@
   font-weight: 600;
   line-height: 1.2;
 }
+
+/* ══ Pasaporte de viaje (/p) ══════════════════════════════════ */
+
+.pasaporte {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+/* El chip, grande y aparte: lo primero que se compara con el lector. */
+.pasaporteChip {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pasaporteChipNumero {
+  font-size: 24px;
+  color: var(--ink);
+}
+/* Una firma que no vale es un aviso, en ámbar: no se oculta el registro, se
+   dice que no hay que fiarse de él. */
+.firmaMala {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  white-space: normal;
+  text-align: right;
+}
+/* Un nombre de clínica o un dominio largos no pueden empujar la página a lo
+   ancho en un teléfono: aquí la procedencia parte línea. */
+.pasaporte .origen,
+.pasaporte .huella {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.pasaporte .registroMeta > :last-child {
+  min-width: 0;
+  max-width: 100%;
+}

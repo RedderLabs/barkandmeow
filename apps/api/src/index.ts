@@ -5,9 +5,11 @@ import { env } from "./core.js";
 import rutasChip, { caducarPeticiones } from "./routes/chip.js";
 import rutasClinicas, { sesionDe } from "./routes/clinics.js";
 import rutasDuenos from "./routes/duenos.js";
+import rutasPasaporte, { rutasFirmas } from "./routes/pasaporte.js";
 import rutasFicha from "./routes/ficha.js";
 import { purgarSinVerificar } from "./limpieza.js";
 import rutasMascotas, { resolverReclamaciones } from "./routes/mascotas.js";
+import { idDeClave, rutasApiSoftware, rutasSoftware } from "./routes/software.js";
 
 /* apps/api NO depende de packages/crypto, y es a propósito: el servidor guarda
    bloques que no puede abrir. Si algún día aparece esa dependencia en el
@@ -38,9 +40,10 @@ export async function crearApp() {
   });
 
   /* La web del veterinario es estática y vive en otro origen. Solo se le abren
-     sus rutas (nivel 0, placa, copia temporal y foto del perfil), sin
+     sus rutas (nivel 0, placa, copia temporal, foto del perfil y directorio
+     de claves de firma), sin
      credenciales: no llevan sesión, y la de clínica no sale de su origen. */
-  const WEB_VET = ["/chip/v1/", "/e/v1/", "/s/v1/", "/perfil/v1/"];
+  const WEB_VET = ["/chip/v1/", "/e/v1/", "/s/v1/", "/perfil/v1/", "/firmas/v1/"];
   app.addHook("onRequest", async (req, reply) => {
     const origen = req.headers.origin;
     if (!origen || !WEB_VET.some((p) => req.url.startsWith(p))) return;
@@ -75,15 +78,33 @@ export async function crearApp() {
     await scope.register(rateLimit, { max: 60, timeWindow: "1 minute" });
     await scope.register(rutasFicha);
     await scope.register(rutasMascotas);
+    await scope.register(rutasFirmas);
   });
 
   await app.register(rutasClinicas);
+  await app.register(rutasSoftware);
+
+  /* Software de gestión con clave de API: límite por clave, no por IP, porque
+     un servidor de clínica envía en tandas desde una sola dirección. Sin clave
+     válida cuenta la IP: inventar tokens no abre cupos nuevos. */
+  await app.register(async (scope) => {
+    await scope.register(rateLimit, {
+      max: Number(process.env.LIMITE_API_SOFTWARE ?? 120),
+      timeWindow: "1 minute",
+      keyGenerator: async (req) => {
+        const id = await idDeClave(req);
+        return id ? `clave:${id}` : `ip:${req.ip}`;
+      },
+    });
+    await scope.register(rutasApiSoftware);
+  });
 
   /* Portal del dueño: límite propio y más estricto, porque la entrada prueba
      contraseñas contra números de chip que cualquiera puede leer. */
   await app.register(async (scope) => {
     await scope.register(rateLimit, { max: Number(process.env.LIMITE_DUENOS ?? 20), timeWindow: "1 minute" });
     await scope.register(rutasDuenos);
+    await scope.register(rutasPasaporte);
   });
 
   return app;

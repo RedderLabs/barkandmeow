@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, desc, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
-import { inbox, owners, ownerSessions, petIdentifiers, petProfiles, pets, reclamaciones } from "@barkandmeow/db";
+import { clinicApiKeys, clinics, inbox, owners, ownerSessions, petIdentifiers, petProfiles, pets, reclamaciones } from "@barkandmeow/db";
 import {
   codigoCorreoBody,
   normalizarChip,
@@ -121,7 +121,7 @@ async function sesionPendiente(reply: FastifyReply, owner: { id: string; email: 
 }
 
 /** La mascota, si es de este dueño. */
-async function mascotaDe(d: Dueno, petId: string, reply: FastifyReply) {
+export async function mascotaDe(d: Dueno, petId: string, reply: FastifyReply) {
   if (!/^[0-9a-f-]{36}$/.test(petId)) {
     reply.code(404).send({ error: "no encontrada" });
     return null;
@@ -526,17 +526,31 @@ export default async function rutasDuenos(app: FastifyInstance) {
   });
 
   /**
-   * Bandeja: notas de consulta y avisos de nivel 0, sellados a la clave pública
-   * del dueño. Salen tal cual; se abren en su navegador con la clave que sale
-   * de su código en papel. El servidor no sabe qué dicen ni de qué clínica son.
+   * Bandeja: notas de consulta, avisos de nivel 0 e informes del software de
+   * gestión, sellados a la clave pública del dueño. Salen tal cual; se abren en
+   * su navegador con la clave que sale de su código en papel. El servidor no
+   * sabe qué dicen. De las notas y los avisos tampoco sabe de qué clínica son;
+   * de los informes sí, por la clave de API, y eso sale como `origen`.
    */
   app.get("/owners/v1/inbox", async (req, reply) => {
     const d = await duenoDe(req, reply);
     if (!d) return;
     const filas = await db
-      .select({ id: inbox.id, petId: inbox.petId, sealed: inbox.sealed, llegada: inbox.createdAt })
+      .select({
+        id: inbox.id,
+        petId: inbox.petId,
+        sealed: inbox.sealed,
+        llegada: inbox.createdAt,
+        clinica: clinics.name,
+        pais: clinics.country,
+        dominio: clinics.domain,
+        verificada: clinics.domainVerifiedAt,
+        firmaPub: clinicApiKeys.firmaPub,
+      })
       .from(inbox)
       .innerJoin(pets, eq(pets.id, inbox.petId))
+      .leftJoin(clinics, eq(clinics.id, inbox.clinicId))
+      .leftJoin(clinicApiKeys, eq(clinicApiKeys.id, inbox.apiKeyId))
       .where(and(eq(pets.ownerId, d.ownerId), ne(pets.estado, "retirada")))
       .orderBy(desc(inbox.createdAt))
       .limit(BANDEJA_MAX);
@@ -547,6 +561,16 @@ export default async function rutasDuenos(app: FastifyInstance) {
         petId: f.petId,
         sellado: f.sealed.toString("base64"),
         llegada: f.llegada.toISOString(),
+        origen: f.clinica
+          ? {
+              clinica: f.clinica,
+              pais: f.pais,
+              // Un dominio sin verificar no dice nada.
+              dominio: f.verificada ? f.dominio : null,
+              /** La clave de firma de la conexión que lo envió: la que tiene que firmar. */
+              firma: f.firmaPub ? f.firmaPub.toString("base64") : null,
+            }
+          : null,
       })),
     };
   });

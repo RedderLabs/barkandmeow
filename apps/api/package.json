@@ -9,7 +9,8 @@
     "test": "node --env-file-if-exists=.env --import tsx --import ./test/entorno.ts --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "reclamaciones": "tsx --env-file-if-exists=.env scripts/reclamaciones.ts",
-    "demo": "tsx --env-file-if-exists=.env scripts/demo.ts"
+    "demo": "tsx --env-file-if-exists=.env scripts/demo.ts",
+    "registro": "tsx --env-file-if-exists=.env scripts/enviar-registro.ts"
   },
   "keywords": [],
   "author": "",

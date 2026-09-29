@@ -10,6 +10,8 @@ export const metadata: Metadata = { title: "Consola · Bark & Meow" };
 
 type Permiso = { id: string; petId: string; level: number; expiresAt: string | null };
 type Borrador = { id: string; especie: string; caduca: string; reclamado: string | null };
+type Clave = { id: string; nombre: string; ultimoUso: string | null };
+type Envio = { id: string; petId: string; chipPista: string | null; clave: string | null; bytes: number; fecha: string };
 
 /* Iconos dibujados, trazo 1.8, heredando currentColor. */
 
@@ -32,14 +34,59 @@ function IconUnlinked({ size = 18 }: { size?: number }) {
   );
 }
 
+function IconLinked({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M10 14a4.2 4.2 0 0 0 6 0l3.5-3.5a4.2 4.2 0 0 0-6-6L12 6" />
+      <path d="M14 10a4.2 4.2 0 0 0-6 0l-3.5 3.5a4.2 4.2 0 0 0 6 6L12 18" />
+    </svg>
+  );
+}
+
+function IconSealed({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </svg>
+  );
+}
+
+const dd = (n: number) => String(n).padStart(2, "0");
+const diaHora = (iso: string) => {
+  const d = new Date(iso);
+  return `${dd(d.getDate())}/${dd(d.getMonth() + 1)} ${dd(d.getHours())}:${dd(d.getMinutes())}`;
+};
+const kb = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
+
 
 const DIA = 864e5;
 
 /** Permisos vigentes con sus días restantes y fichas preparadas sin reclamar. */
 async function cargarConsola() {
-  const [{ permisos }, { borradores }] = await Promise.all([
+  const [{ permisos }, { borradores }, { claves }, { envios }] = await Promise.all([
     apiServidor<{ permisos: Permiso[] }>("/grants/v1/mine"),
     apiServidor<{ borradores: Borrador[] }>("/clinics/v1/drafts"),
+    apiServidor<{ claves: Clave[] }>("/clinics/v1/api-keys"),
+    apiServidor<{ envios: Envio[] }>("/clinics/v1/reports"),
   ]);
   const ahora = Date.now();
   return {
@@ -50,26 +97,48 @@ async function cargarConsola() {
         dias: p.expiresAt ? Math.max(0, Math.ceil((new Date(p.expiresAt).getTime() - ahora) / DIA)) : null,
       })),
     preparadas: borradores.filter((b) => !b.reclamado && new Date(b.caduca).getTime() > ahora),
+    claves,
+    envios,
   };
 }
 
 export default async function Page() {
   const yo = await exigirSesion();
-  const { vigentes, preparadas } = await cargarConsola();
+  const { vigentes, preparadas, claves, envios } = await cargarConsola();
+  const ultimoEnvio = envios[0]?.fecha ?? null;
 
   return (
     <div className={styles.shell}>
       <AppHeader active="consola" clinica={organizacion(yo)} />
 
-      {/* El envío automático desde el software de gestión aún no existe:
-          la tira lo dice en lugar de fingir una conexión. */}
-      <div className={`${styles.link} ${styles.linkNone}`}>
-        <span className={styles.linkDot}>
-          <IconUnlinked />
-        </span>
-        <span className={styles.linkHead}>Sin software conectado</span>
-        <span>Conectar el software de gestión por API todavía no está disponible.</span>
-      </div>
+      {/* Conectado quiere decir que hay alguna clave de API viva; la tira no
+          promete más de lo que sabe: cuándo llegó el último envío. */}
+      {claves.length > 0 ? (
+        <div className={`${styles.link} ${styles.linkActive}`}>
+          <span className={styles.linkDot}>
+            <IconLinked />
+          </span>
+          <span className={styles.linkHead}>Software conectado</span>
+          <span>
+            {claves.length === 1 ? claves[0].nombre : `${claves.length} claves de API`}
+            {ultimoEnvio ? ` · último envío ${diaHora(ultimoEnvio)}` : " · sin envíos todavía"}
+          </span>
+          <Link href="/conexion" className={styles.linkMeta}>
+            Gestionar
+          </Link>
+        </div>
+      ) : (
+        <div className={`${styles.link} ${styles.linkNone}`}>
+          <span className={styles.linkDot}>
+            <IconUnlinked />
+          </span>
+          <span className={styles.linkHead}>Sin software conectado</span>
+          <span>Conectad vuestro software de gestión para enviar los informes a los dueños.</span>
+          <Link href="/conexion" className={styles.linkMeta}>
+            Conectar
+          </Link>
+        </div>
+      )}
 
       <div className={`${styles.counters} ${styles.counters2}`}>
         <div className={styles.counter}>
@@ -101,20 +170,54 @@ export default async function Page() {
 
           <div className={styles.sectionHead}>
             <h1 className={styles.sectionTitle}>Registro de envíos</h1>
+            {envios.length > 0 && <span className={styles.sectionMeta}>Últimos {envios.length}</span>}
           </div>
-          <div className={styles.empty}>
-            <h2 className={styles.emptyTitle}>Todavía no has enviado nada</h2>
-            <p className={styles.emptyBody}>
-              El envío de informes cifrados a la ficha del dueño aún no está disponible en esta
-              versión. Mientras tanto podéis activar las mascotas de vuestros pacientes: sin
-              activación, un chip no responde en Bark & Meow.
-            </p>
-            <div className={styles.emptyActions}>
-              <Button asChild>
-                <Link href="/activar">Activar una mascota</Link>
-              </Button>
+          {envios.length === 0 ? (
+            <div className={styles.empty}>
+              <h2 className={styles.emptyTitle}>Todavía no habéis enviado nada</h2>
+              <p className={styles.emptyBody}>
+                {claves.length > 0
+                  ? "Los informes que envíe vuestro software de gestión aparecerán aquí. Solo llegan a los dueños que os dieron acceso permanente."
+                  : "Conectad vuestro software de gestión con una clave de API y los informes de la consulta llegarán cifrados a la bandeja del dueño. Solo a los que os dieron acceso permanente."}
+              </p>
+              <div className={styles.emptyActions}>
+                {claves.length === 0 && (
+                  <Button asChild>
+                    <Link href="/conexion">Conectar el software</Link>
+                  </Button>
+                )}
+                <Button asChild variant={claves.length === 0 ? "outline" : "default"}>
+                  <Link href="/activar">Activar una mascota</Link>
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className={styles.log}>
+              {envios.map((e) => (
+                <div key={e.id} className={styles.row}>
+                  <time className={styles.rowTime} dateTime={e.fecha}>
+                    {diaHora(e.fecha)}
+                  </time>
+                  <div className={styles.rowBody}>
+                    {/* El servidor no sabe el nombre ni lo que dice el informe. */}
+                    <span className={styles.rowTitle}>
+                      Informe · chip ···{e.chipPista ?? "····"}
+                    </span>
+                    <span className={styles.rowChip}>
+                      {e.clave ?? "Clave retirada"} · {kb(e.bytes)}
+                    </span>
+                    <span className={styles.sealed}>
+                      <span className={styles.sealedIcon}>
+                        <IconSealed />
+                      </span>
+                      Sellado para el dueño: ni Bark & Meow ni esta consola pueden leerlo.
+                    </span>
+                  </div>
+                  <span className={`${styles.state} ${styles.stateSealed}`}>En su bandeja</span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <aside className={styles.aside}>

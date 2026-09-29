@@ -49,14 +49,14 @@ barkandmeow.app {
 	handle {
 		root * /srv/barkandmeow/vet/out
 
-		# Nivel 1 y 2: la exportación estática tiene una sola página por nivel;
-		# el id lo lee el navegador de la ruta y la clave del fragmento #, que
-		# nunca llega hasta aquí.
-		@ficha path_regexp ^/(e|s)/[0-9a-zA-Z-]+/?$
+		# Nivel 1 y 2 y el pasaporte de viaje (p): la exportación estática tiene
+		# una sola página por nivel; el id lo lee el navegador de la ruta y la
+		# clave del fragmento #, que nunca llega hasta aquí.
+		@ficha path_regexp ^/(e|s|p)/[0-9a-zA-Z-]+/?$
 		rewrite @ficha /{re.1}.html
 
 		# Ni el fragmento ni la página deben filtrarse a terceros, ni guardarse.
-		@nivel path_regexp ^/(e|s)(\.html|/.*)?$
+		@nivel path_regexp ^/(e|s|p)(\.html|/.*)?$
 		header @nivel {
 			Cache-Control "no-store"
 			X-Frame-Options "DENY"

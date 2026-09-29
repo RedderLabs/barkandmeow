@@ -131,6 +131,24 @@ export const avisoBody = z.object({
   sellado: sellado(8 * 1024),
 });
 
+/* ── Software de gestión conectado por API ────────────────── */
+
+export const apiKeyCreateBody = z.object({
+  nombre: z.string().trim().min(1).max(60),
+  /** Clave pública Ed25519 de la conexión. La secreta se genera y se queda en
+      el navegador del administrador, que la entrega al software una vez. */
+  firmaPub: base64.refine((s) => s.length === 44, "32 bytes"),
+});
+
+/** Buscar, entre los pacientes con nivel 3, el de un chip que el software ya conoce. */
+export const pacienteBuscarBody = z.object({ identificador });
+
+/** Informe sellado en el software de la clínica para la clave pública del dueño. */
+export const informeBody = z.object({
+  petId: z.string().uuid(),
+  sellado: sellado(64 * 1024),
+});
+
 /* ── Registro de mascotas y activación en clínica ─────────── */
 
 /** El dueño registra el chip desde su app o su portal: queda pendiente. */

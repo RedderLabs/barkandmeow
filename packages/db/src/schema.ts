@@ -166,7 +166,8 @@ export const blobs = pgTable(
       .references(() => pets.id, { onDelete: "cascade" })
       .notNull(),
     kind: text("kind")
-      .$type<"record" | "emergency" | "document" | "share">()
+      /* passport: el pasaporte de viaje del dueño, cifrado con su clave. */
+      .$type<"record" | "emergency" | "document" | "share" | "passport">()
       .notNull(),
     /* Fase actual: el bloque cifrado vive en Postgres. Cuando entre Garage S3,
        el contenido se muda y `s3Key` pasa a ser el puntero. */
@@ -176,7 +177,11 @@ export const blobs = pgTable(
     expiresAt: timestamp("expires_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("blobs_pet_kind_ix").on(t.petId, t.kind)],
+  (t) => [
+    index("blobs_pet_kind_ix").on(t.petId, t.kind),
+    // Un solo pasaporte por mascota: dos navegadores que lo crean a la vez no lo duplican.
+    uniqueIndex("blobs_passport_uq").on(t.petId).where(sql`${t.kind} = 'passport'`),
+  ],
 );
 
 export const clinics = pgTable(
@@ -293,8 +298,64 @@ export const inbox = pgTable("inbox", {
     .references(() => pets.id, { onDelete: "cascade" })
     .notNull(),
   sealed: bytea("sealed").notNull(),
+  /* Solo en los informes que llegan del software de gestión: la clínica que
+     los envió, según la clave de API. El contenido lo escribe la clínica; el
+     remitente lo pone el servidor, y es lo que el dueño ve como origen. */
+  clinicId: uuid("clinic_id").references(() => clinics.id, { onDelete: "set null" }),
+  /** La clave con que llegó: su clave de firma es la que tiene que firmar. */
+  apiKeyId: uuid("api_key_id").references(() => clinicApiKeys.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/* Clave de API con la que el software de gestión de una clínica envía
+   informes (decidido 2026-09-29). La crea un administrador; el token solo se
+   muestra al crearla y aquí se guarda su hash. No abre ninguna ficha: sirve
+   para enviar informes sellados a los dueños que dieron el nivel 3. */
+export const clinicApiKeys = pgTable(
+  "clinic_api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clinicId: uuid("clinic_id")
+      .references(() => clinics.id, { onDelete: "cascade" })
+      .notNull(),
+    nombre: text("nombre").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    /** Los primeros caracteres del token, para reconocerlo sin guardarlo. */
+    prefijo: text("prefijo").notNull(),
+    /* Clave pública Ed25519 con la que el software firma lo que envía. La
+       secreta la genera el navegador del administrador y no pasa por aquí.
+       Se conserva al retirar la clave: lo firmado antes sigue comprobándose. */
+    firmaPub: bytea("firma_pub"),
+    creadaPor: uuid("creada_por").references(() => clinicMembers.id, { onDelete: "set null" }),
+    ultimoUso: timestamp("ultimo_uso"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("clinic_api_keys_token_uq").on(t.tokenHash),
+    index("clinic_api_keys_clinic_ix").on(t.clinicId),
+  ],
+);
+
+/* Registro de envíos de la clínica: qué clave envió un informe a qué mascota
+   y cuándo. Sin contenido. Sobrevive a que el dueño borre el mensaje de su
+   bandeja, para que la clínica sepa qué envió. */
+export const envios = pgTable(
+  "envios",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    clinicId: uuid("clinic_id")
+      .references(() => clinics.id, { onDelete: "cascade" })
+      .notNull(),
+    apiKeyId: uuid("api_key_id").references(() => clinicApiKeys.id, { onDelete: "set null" }),
+    petId: uuid("pet_id")
+      .references(() => pets.id, { onDelete: "cascade" })
+      .notNull(),
+    bytes: integer("bytes").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("envios_clinic_ix").on(t.clinicId, t.createdAt)],
+);
 
 /* Ficha preparada por la clínica para un dueño que todavía no usa Bark & Meow.
    Cifrada con la clave de la clínica y caducada a 90 días. No responde a

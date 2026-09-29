@@ -11,7 +11,11 @@
 //!   con `crypto_box_seal` de libsodium. Notas del veterinario y avisos: quien
 //!   escribe no puede volver a leerlos; solo el dueño.
 //!
-//! En los tres, los datos asociados atan el bloque a su identificador: el
+//! Además, **firmas** Ed25519 (RFC 8032) para los registros que certifica una
+//! clínica: vacunas, desparasitaciones, análisis e informes. El sellado dice
+//! quién puede leer; la firma, quién lo escribió.
+//!
+//! En los tres formatos, los datos asociados atan el bloque a su identificador: el
 //! servidor no puede cambiar la ficha de una placa por la de otra sin que el
 //! descifrado falle.
 //!
@@ -186,6 +190,33 @@ pub fn derivar(semilla: &[u8], info: &[u8]) -> [u8; 32] {
     clave
 }
 
+/* ── Firmas Ed25519 ─────────────────────────────────────────
+   La clínica firma el registro antes de sellarlo para el dueño. La firma va
+   con el registro cuando el dueño lo comparte en un viaje: quien lo recibe
+   comprueba que lo escribió esa clínica y que nadie lo cambió después, ni
+   siquiera el dueño. */
+
+pub const FIRMA: usize = 64;
+
+/// Clave pública Ed25519 de una semilla de 32 bytes.
+pub fn publica_firma(semilla: &[u8; 32]) -> [u8; 32] {
+    ed25519_dalek::SigningKey::from_bytes(semilla).verifying_key().to_bytes()
+}
+
+pub fn firmar(semilla: &[u8; 32], mensaje: &[u8]) -> [u8; FIRMA] {
+    use ed25519_dalek::Signer;
+    ed25519_dalek::SigningKey::from_bytes(semilla).sign(mensaje).to_bytes()
+}
+
+/// Comprueba en modo estricto: sin claves débiles ni firmas maleables.
+pub fn verificar(publica: &[u8; 32], mensaje: &[u8], firma: &[u8]) -> Result<(), Error> {
+    let firma: [u8; FIRMA] = firma.try_into().map_err(|_| Error::Formato)?;
+    let clave = ed25519_dalek::VerifyingKey::from_bytes(publica).map_err(|_| Error::Formato)?;
+    clave
+        .verify_strict(mensaje, &ed25519_dalek::Signature::from_bytes(&firma))
+        .map_err(|_| Error::Autenticacion)
+}
+
 /* ── Interfaz WASM ───────────────────────────────────────────
    Sin wasm-bindgen: funciones C planas sobre la memoria lineal. Quien llama
    reserva, copia la entrada, llama, y lee el resultado de `bm_salida_ptr`
@@ -273,6 +304,22 @@ mod wasm {
     }
 
     #[unsafe(no_mangle)]
+    pub unsafe extern "C" fn bm_publica_firma(semilla: *const u8) -> i32 {
+        unsafe { entregar(Ok(publica_firma(fijo(semilla)).to_vec())) }
+    }
+
+    #[unsafe(no_mangle)]
+    pub unsafe extern "C" fn bm_firmar(semilla: *const u8, m: *const u8, m_n: usize) -> i32 {
+        unsafe { entregar(Ok(firmar(fijo(semilla), trozo(m, m_n)).to_vec())) }
+    }
+
+    /// Devuelve 0 si la firma vale; un Error si no.
+    #[unsafe(no_mangle)]
+    pub unsafe extern "C" fn bm_verificar(publica: *const u8, m: *const u8, m_n: usize, f: *const u8, f_n: usize) -> i32 {
+        unsafe { entregar(verificar(fijo(publica), trozo(m, m_n), trozo(f, f_n)).map(|_| Vec::new())) }
+    }
+
+    #[unsafe(no_mangle)]
     pub unsafe extern "C" fn bm_sellar(destino: *const u8, efimera: *const u8, t: *const u8, t_n: usize) -> i32 {
         unsafe { entregar(Ok(sellar(fijo(destino), fijo(efimera), trozo(t, t_n)))) }
     }
@@ -351,6 +398,31 @@ mod tests {
             0xb8, 0xa1, 0x1f, 0x5c, 0x5e, 0xe1, 0x87, 0x9e, 0xc3, 0x45, 0x4e, 0x5f, 0x3c, 0x73, 0x8d, 0x2d,
         ];
         assert_eq!(derivar(&[0x0bu8; 22], b""), esperado);
+    }
+
+    /// RFC 8032, 7.1, TEST 1 (mensaje vacío).
+    #[test]
+    fn firma_coincide_con_rfc8032() {
+        let h = |s: &str| (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect::<Vec<u8>>();
+        let semilla: [u8; 32] = h("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60").try_into().unwrap();
+        let publica: [u8; 32] = h("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a").try_into().unwrap();
+        let esperada = h("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b");
+        assert_eq!(publica_firma(&semilla), publica);
+        assert_eq!(firmar(&semilla, b"").to_vec(), esperada);
+        assert_eq!(verificar(&publica, b"", &esperada), Ok(()));
+    }
+
+    #[test]
+    fn firma_rechaza_otro_mensaje_otra_clave_o_manipulada() {
+        let s = azar::<32>();
+        let p = publica_firma(&s);
+        let mut f = firmar(&s, b"{\"tipo\":\"vacuna\"}");
+        assert_eq!(verificar(&p, b"{\"tipo\":\"vacuna\"}", &f), Ok(()));
+        assert_eq!(verificar(&p, b"{\"tipo\":\"otra\"}", &f), Err(Error::Autenticacion));
+        assert_eq!(verificar(&publica_firma(&azar()), b"{\"tipo\":\"vacuna\"}", &f), Err(Error::Autenticacion));
+        assert_eq!(verificar(&p, b"x", &f[..63]), Err(Error::Formato));
+        f[0] ^= 1;
+        assert_eq!(verificar(&p, b"{\"tipo\":\"vacuna\"}", &f), Err(Error::Autenticacion));
     }
 
     /// Interoperabilidad: lo que sella crypto_box (la implementación de
