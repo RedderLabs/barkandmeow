@@ -8,13 +8,15 @@ adaptive
 
 Bark & Meow tiene tres superficies sobre dos familias de plataforma. `apps/mobile` es React Native bare para iOS y Android (el dueño). `apps/vet` y `apps/clinic` son web (el veterinario y la clínica). Cada una sigue las convenciones de su plataforma; el sistema de tokens es compartido.
 
+**Dónde se usa cada superficie** (decidido 2026-09-27). La web del veterinario (`apps/vet`: `/chip`, `/e`, `/s`) y el SaaS (`/clinica`) se usan **solo desde la clínica veterinaria**, en el ordenador del mostrador o de la consulta; se diseñan para monitor, y la versión estrecha queda como red de seguridad (una placa también se puede escanear con el móvil del veterinario). El dueño usa **su propio dispositivo**: la app móvil y un **portal web del dueño**.
+
 ## Users
 
-- **El dueño de la mascota (custodio).** Tiene las claves y decide quién ve qué. Usa la app móvil. Situación típica: de viaje, en una urgencia, con prisa y a veces sin cobertura.
+- **El dueño de la mascota (custodio).** Tiene las claves y decide quién ve qué. Usa la app móvil y el portal web del dueño, donde gestiona el perfil público de la mascota. Situación típica: de viaje, en una urgencia, con prisa y a veces sin cobertura.
 - **El veterinario de guardia, en otra ciudad o país.** No conoce al animal ni a Bark & Meow. Necesita alergias, medicación y antecedentes en segundos, en su idioma, sin instalar nada ni crear cuenta. Llega por QR, NFC o tecleando el número de chip.
 - **El veterinario habitual.** Acceso permanente concedido por el dueño. Ve lo que pasó fuera y sube sus propios informes.
 - **La clínica como organización** (decidido 2026-09-26). Cuenta, equipo y panel propio en el SaaS: gestiona sus pacientes con permiso de nivel 3 y conecta su software de gestión por API para enviar informes.
-- **Quien encuentra al animal perdido.** Solo quiere contactar con el dueño. Llega por el QR o NFC de la placa.
+- **Quien encuentra al animal perdido.** Solo quiere contactar con el dueño. Llega por el QR o NFC de la placa, o un veterinario lo busca por el número de chip. Ve el perfil público: foto, bio y teléfonos de contacto.
 
 ## Product Purpose
 
@@ -40,11 +42,20 @@ El segundo diferencial es la federación: Bark & Meow publica un protocolo abier
 
 ## Capabilities and Constraints
 
-**Niveles de acceso.** 0 Localizar (número de chip: solo "existe ficha" y avisar al dueño) · 1 Emergencia (placa QR/NFC, clave en el fragmento de la URL: alergias, crónicas, medicación, rabia, contacto) · 2 Historial (enlace temporal de 24 h, 72 h o 7 días, revocable) · 3 Veterinario habitual (permanente, revocable, puede subir informes).
+**Niveles de acceso.** 0 Localizar (número de chip: "existe ficha", el perfil público si el dueño lo ha publicado, y avisar al dueño) · 1 Emergencia (placa QR/NFC, clave en el fragmento de la URL: alergias, crónicas, medicación, rabia, contacto) · 2 Historial (enlace temporal de 24 h, 72 h o 7 días, revocable) · 3 Veterinario habitual (permanente, revocable, puede subir informes).
 
 **Criptografía.** Núcleo en Rust compilado a WASM, compartido por app y web. XChaCha20-Poly1305 simétrico, documentos en bloques de 1 MB. Par X25519 y Ed25519 del dueño en Keychain/Keystore. El fragmento `#` de la URL nunca llega al servidor. Las notas del veterinario van en sobre sellado X25519 a la clave pública del dueño: escribe pero no lee.
 
 **El SaaS de clínicas no rompe lo anterior** (decidido 2026-09-26). La cuenta identifica a la organización y a su equipo; no es una llave a los datos. Cada paciente requiere permiso de nivel 3 del dueño, y lo que la clínica sube va cifrado a la clave pública del dueño. Bark & Meow almacena bloques que no puede abrir. `apps/api` no depende de `packages/crypto` a propósito: si alguien añade descifrado en el servidor, el grafo de dependencias lo delata en la revisión.
+
+**Portal del dueño y perfil público** (decidido 2026-09-27).
+
+- **Un registro activo por chip, activado en clínica** (decidido 2026-09-27). El número de chip no es secreto, así que registrarlo no basta. El dueño lo registra desde su app o su portal y el registro queda **pendiente**: no responde a ninguna consulta ni reserva el chip, y puede haber varios pendientes del mismo chip. Se **activa** en cualquier clínica activa, que lee el chip con el animal delante y teclea el código de activación que el dueño ve en su app. Solo el registro activo es único.
+- **Reclamación.** Si el chip ya está activo a nombre de otra persona, la clínica abre una reclamación con el chip leído, el código del reclamante y la documentación comprobada. El registro actual queda congelado (deja de mostrar su perfil público) y, si su titular no la impugna en **14 días**, el chip pasa al reclamante. La impugnación se hará desde el portal del dueño; hasta entonces se atiende a mano.
+- **Entrar exige tres cosas:** el número de chip (identifica, no autoriza), una **clave que elige el dueño**, y una confirmación por un segundo canal: el código o QR que muestra la app del móvil, o un código enviado por SMS o email al contacto registrado. El chip solo nunca abre nada: es un dato que cualquier lector veterinario lee y que aparece en pasaportes y facturas.
+- **Portal construido** (27/09/2026): `apps/portal`, en `barkandmeow.app/mi-mascota`. El segundo factor es, por ahora, un código por **correo**: el SMS necesita un proveedor contratado y la app aún no existe. La clave del dueño sale de un código de recuperación de 8 bloques generado en su navegador (el documento de arquitectura habla de 24 palabras: pendiente de unificar). El portal no lee ni edita datos clínicos.
+- **Perfil público** (foto de la mascota, bio y teléfonos de contacto en caso de pérdida). Incluye también el nombre de la mascota, para que quien la encuentre pueda llamarla. Lo edita el dueño en el portal o en la app. Lo ven los tres: quien escanea la placa, quien consulta el número de chip (nivel 0) y el veterinario dentro de la ficha (niveles 1 y 2). **Esto cambia el nivel 0**, que antes nunca mostraba el contacto del dueño.
+- **Cómo encaja con el cifrado:** el perfil público va sin cifrar porque su función es ser visible; es la misma excepción que el resumen opcional dentro del QR. El dueño elige qué publica. La ficha clínica sigue cifrada con las claves de la app: la clave del portal identifica al dueño ante el servidor pero no descifra la ficha, así que el portal no puede leer ni editar datos clínicos.
 
 **Estructurado antes que texto libre,** para poder traducir y comparar entre países: ATCvet para principios activos, VeNom para diagnósticos, catálogo propio para especies y razas. Medicamentos siempre por principio activo, nunca por marca comercial. El texto libre se muestra en su idioma original con aviso; la traducción automática es opcional, marcada como tal, y se hace en el navegador del lector.
 
@@ -64,7 +75,7 @@ El segundo diferencial es la federación: Bark & Meow publica un protocolo abier
 
 ## Brand Commitments
 
-- **Nombre: Bark & Meow.** En la interfaz aparece en Fraunces, en color `accent`.
+- **Nombre y logotipo: Bark & Meow.** (Actualizado 2026-09-27.) En la interfaz aparece siempre el logotipo, nunca el nombre escrito como texto: el símbolo de `logos/bark_and_meow_logo_vector.svg` (cabeza con oreja de gato, oreja de perro y placa de salud) y «Bark & Meow» en Fraunces, con «Bark» y «Meow» en tinta y el «&» en cursiva en color `accent`, como en `logos/logo_horizontal_*.png`.
 - **Tres fuentes de licencia SIL OFL** (Fraunces, IBM Plex Sans, IBM Plex Mono), empaquetadas con la app y la web. **Prohibido cargar Google Fonts en producción.** Las pantallas del lienzo sí las cargan desde Google Fonts; eso es un artefacto del lienzo, no el objetivo.
 - **Sin emojis en la interfaz.** Las banderas de país, cuando hagan falta, van como SVG.
 - **Aviso de responsabilidad:** Bark & Meow es información aportada por el dueño, no un registro oficial. Debe quedar claro en la interfaz.

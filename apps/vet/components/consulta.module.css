@@ -1,0 +1,242 @@
+/* Nivel 0 — consulta por microchip. Pantalla terminal del veterinario:
+   sin navegación, sin cuentas, sobre blanco a sangre. Densidad de móvil
+   (cuerpo 14px) porque se abre desde un teléfono o desde el mostrador con un
+   lector Bluetooth que escribe como un teclado. */
+
+.pantalla {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mismo ancho de contenido que /e, /s y la portada (--contenido). */
+.cuerpo {
+  flex: 1;
+  padding: var(--s-page) var(--relleno);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+  min-width: 0;
+}
+
+.titulo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.lateral {
+  min-width: 0;
+}
+
+/* ── Campo de chip: el protagonista del nivel 0 ────────────── */
+
+.consulta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+
+.ayuda {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Resultado ──────────────────────────────────────────────── */
+
+.resultado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+}
+.resultado:empty {
+  display: none;
+}
+
+.estado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.giro {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: girar 700ms linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bloque {
+  padding: 16px;
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  animation: aparecer 180ms var(--ease) both;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.bloqueTitulo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.bloqueTitulo svg {
+  flex-shrink: 0;
+  margin-top: -1px;
+}
+
+.bloqueTexto {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.bloqueExiste {
+  background: var(--accent-soft);
+}
+.bloqueExiste .bloqueTitulo {
+  color: var(--accent-ink);
+}
+.bloqueExiste .bloqueTexto {
+  color: var(--accent-soft-ink);
+}
+
+/* «No hay ficha» no es una alarma: sobre blanco, la tarjeta es su hairline. */
+.bloqueNeutro {
+  border: 1px solid var(--line);
+}
+.bloqueNeutro .bloqueTitulo {
+  color: var(--ink);
+}
+.bloqueNeutro .bloqueTitulo svg {
+  color: var(--muted);
+}
+.bloqueNeutro .bloqueTexto {
+  color: var(--ink-soft);
+}
+
+/* Error: motivo y salida en dos líneas. Un error que no dice cómo salir de
+   él está a medias. Rojo suave, nunca el relleno a sangre de las alergias. */
+.bloqueError {
+  background: var(--alert-soft);
+  border: 1px solid var(--alert-soft-line);
+}
+.errorMotivo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--alert-ink);
+}
+.errorSalida {
+  font-size: 14px;
+  color: var(--alert-soft-ink);
+}
+
+/* ── Avisar al dueño ────────────────────────────────────────── */
+
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+
+.etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+
+.faltaDato {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--alert-ink);
+}
+
+.nota {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ── Pie: el aviso de responsabilidad, siempre visible ─────── */
+
+.pie {
+  padding: var(--s-md) var(--relleno) var(--s-page);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.pie::before {
+  content: "";
+  display: block;
+  margin-bottom: var(--s-md);
+  border-top: 1px solid var(--divider);
+}
+
+/* Monitor: la consulta a la izquierda, a 560px (un número de 15 dígitos no
+   necesita más), y avisar al dueño en la columna de 360px de la derecha,
+   ambas contra los bordes del ancho compartido. */
+@media (min-width: 1024px) {
+  .cuerpo {
+    display: grid;
+    grid-template-columns: minmax(0, 560px) 360px;
+    justify-content: space-between;
+    align-items: start;
+    gap: 32px;
+    padding-top: 32px;
+    padding-bottom: 40px;
+  }
+  .titulo {
+    font-size: 26px;
+  }
+  .lateral {
+    position: sticky;
+    top: 92px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-panel);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloque {
+    animation: none;
+  }
+  .giro {
+    animation-duration: 2s;
+  }
+}

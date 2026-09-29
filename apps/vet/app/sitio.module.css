@@ -1,0 +1,380 @@
+.page {
+  min-height: 100dvh;
+}
+
+.bar {
+  height: 64px;
+  padding: 0 var(--relleno);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-lg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+.brandLogo {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Tamaño del logotipo: 44px en teléfono, 52px desde 720px. La proporción
+   entre símbolo y texto es la de logos/logo_horizontal_*.png y no se toca. */
+.brandLogo {
+  height: 44px;
+  width: auto;
+}
+@media (min-width: 720px) {
+  .brandLogo {
+    height: 52px;
+  }
+}
+
+.brandDomain {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.barLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--s-xs);
+}
+.barLink {
+  white-space: nowrap;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s-md);
+  border-radius: var(--r-small);
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+.barLink:hover {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+
+.hero {
+  padding: 72px var(--relleno) 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 56px;
+  align-items: start;
+}
+
+.headline {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.4vw, 52px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  max-width: 16ch;
+}
+.headlineQuiet {
+  color: var(--muted);
+}
+
+.sub {
+  margin-top: var(--s-xl);
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 54ch;
+}
+
+.heroActions {
+  margin-top: var(--s-section);
+  display: flex;
+  gap: var(--s-md);
+  flex-wrap: wrap;
+}
+
+/* La caja de consulta repite el gesto del nivel 0: es lo que un veterinario
+   ya sabe hacer, puesto donde se ve desde el primer viewport. */
+.lookup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  padding: var(--s-section);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+.lookupTitle {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+/* Botón debajo, no al lado: los 15 dígitos tienen que verse enteros. */
+.lookupRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-sm);
+}
+
+.lookupNote {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ── Secciones ────────────────────────────────────────────── */
+
+.section {
+  padding: 56px var(--relleno);
+}
+.sectionAlt {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.h2 {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 600;
+  line-height: 1.15;
+  max-width: 22ch;
+}
+.lead {
+  margin-top: var(--s-md);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+/* Escalera de niveles: filas, no tarjetas. El orden es la información. */
+.ladder {
+  margin-top: var(--s-section);
+  border-top: 1px solid var(--line);
+}
+.rung {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) minmax(0, 1.1fr) 132px;
+  gap: var(--s-xl);
+  padding: var(--s-xl) 0;
+  border-bottom: 1px solid var(--divider);
+  align-items: baseline;
+}
+.rungLevel {
+  font-family: var(--font-data);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--r-badge);
+  justify-self: start;
+  white-space: nowrap;
+}
+.lvl0 {
+  background: var(--owner-soft);
+  color: var(--owner);
+}
+.lvl1 {
+  background: var(--alert-soft);
+  color: var(--alert-ink);
+}
+.lvl2 {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.lvl3 {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.rungWhat {
+  font-size: 16px;
+  font-weight: 600;
+}
+.rungSees {
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+.rungLife {
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* Bloques de audiencia: dos, asimétricos, no cuatro iguales. */
+.audience {
+  margin-top: var(--s-section);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+}
+.pane {
+  background: var(--surface);
+  padding: var(--s-section);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+.paneTitle {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+.paneBody {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.paneList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-sm);
+}
+.paneItem {
+  display: flex;
+  gap: var(--s-md);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.tick {
+  flex-shrink: 0;
+  color: var(--accent);
+  margin-top: 2px;
+}
+.paneActions {
+  margin-top: auto;
+  padding-top: var(--s-md);
+  display: flex;
+  gap: var(--s-md);
+  flex-wrap: wrap;
+}
+
+/* El mecanismo, en tres pasos numerados porque la secuencia importa. */
+.steps {
+  margin-top: var(--s-section);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-section);
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-sm);
+  padding-top: var(--s-md);
+  border-top: 2px solid var(--accent);
+}
+.stepN {
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: var(--accent-ink);
+}
+.stepTitle {
+  font-size: 17px;
+  font-weight: 600;
+}
+.stepBody {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.honest {
+  margin-top: var(--s-section);
+  padding: var(--s-xl);
+  border: 1px solid var(--warn-line);
+  background: var(--warn-soft);
+  border-radius: var(--r-card);
+  color: var(--warn-ink);
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 72ch;
+}
+
+.faq {
+  margin-top: var(--s-section);
+  border-top: 1px solid var(--line);
+  max-width: 78ch;
+}
+
+.footer {
+  padding: 40px var(--relleno) 56px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.footerLogo {
+  display: block;
+  margin-bottom: var(--s-sm);
+}
+
+.footerInner {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-section);
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-section);
+    padding-top: 48px;
+  }
+  .audience,
+  .steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rung {
+    grid-template-columns: 100px minmax(0, 1fr);
+    gap: var(--s-md);
+  }
+  .rungSees,
+  .rungLife {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .brandDomain {
+    display: none;
+  }
+  /* En un teléfono los saltos dentro de la página no caben; se queda la marca
+     y la acción que importa. */
+  .barAnchor {
+    display: none;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sectionInner {
+  min-width: 0;
+}

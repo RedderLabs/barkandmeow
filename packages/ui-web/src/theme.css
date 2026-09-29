@@ -1,0 +1,134 @@
+/* Tema de shadcn/ui para todo Bark & Meow.
+   Lo importan las webs después de "tailwindcss" y de sus tokens generados:
+     @import "tailwindcss";
+     @import "./tokens.generated.css";
+     @import "@barkandmeow/ui-web/theme.css";
+
+   Los componentes viven en este paquete, así que Tailwind tiene que escanearlo
+   desde cada app: eso hace el @source. */
+
+@source "./components";
+
+/* ── Ancho de contenido compartido ─────────────────────────────
+   Un solo ancho para todo lo que ve el veterinario, en vet (portada, /chip,
+   /e, /s) y en clínica (consola, equipo, registro): cabeceras, tiras y
+   rejillas se alinean al mismo borde en cualquier monitor. `--relleno` es el
+   padding lateral que centra ese ancho sin envoltorios; se resuelve contra el
+   ancho del elemento que lo usa. */
+
+:root {
+  --contenido: 1280px;
+  --margen: var(--s-page);
+  --relleno: max(var(--margen), calc((100% - var(--contenido)) / 2));
+}
+@media (min-width: 720px) {
+  :root {
+    --margen: 32px;
+  }
+}
+
+/* ── Puente a Tailwind y shadcn/ui ─────────────────────────────
+   shadcn llama --muted y --accent a cosas distintas de las nuestras: su
+   --muted es un fondo y el nuestro un color de texto. Por eso NO se redefinen
+   esos nombres; se aliasan las utilidades a los tokens de Bark & Meow, que
+   siguen siendo la fuente. Cambiar un token en diseno/tokens.json cambia los
+   componentes, y nunca al revés. */
+
+@theme inline {
+  --color-background: var(--ground);
+  --color-foreground: var(--ink);
+
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-on);
+  --color-secondary: var(--ground);
+  --color-secondary-foreground: var(--ink);
+
+  --color-muted: var(--ground);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent-soft);
+  --color-accent-foreground: var(--accent-ink);
+
+  --color-destructive: var(--alert);
+  --color-destructive-foreground: var(--alert-on);
+
+  --color-border: var(--line);
+  --color-input: var(--field-line);
+  --color-ring: var(--accent);
+
+  /* Nombres propios del sistema, para no pelear con los de shadcn. */
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --color-divider: var(--divider);
+  --color-field-line: var(--field-line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-brand: var(--accent);
+  --color-brand-hover: var(--accent-hover);
+  --color-brand-press: var(--accent-press);
+  --color-brand-ink: var(--accent-ink);
+  --color-alert: var(--alert);
+  --color-alert-ink: var(--alert-ink);
+  --color-alert-soft: var(--alert-soft);
+  --color-alert-ghost-line: var(--alert-ghost-line);
+
+  --radius-sm: var(--r-badge);
+  --radius-md: var(--r-small);
+  --radius-lg: var(--r-control);
+  --radius-xl: var(--r-card);
+  --radius-2xl: var(--r-panel);
+
+  --font-sans: var(--font-text);
+  --font-mono: var(--font-data);
+  --font-serif: var(--font-display);
+
+  --ease-sistema: var(--ease);
+}
+
+/* ── Movimiento de los componentes ─────────────────────────────
+   Sin tw-animate-css: cuatro keyframes propios bastan. Entrada corta con
+   salida exponencial; la reducción de movimiento la aplica cada web. */
+
+@keyframes bm-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes bm-sale {
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes bm-velo-entra {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes bm-velo-sale {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes bm-acordeon-abre {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes bm-acordeon-cierra {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}

@@ -1,7 +1,10 @@
+import { sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -17,10 +20,62 @@ export const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => "bytea",
 });
 
+/* Cuenta del portal del dueño (decidido 2026-09-27). Entra con el número de
+   chip, su contraseña y un código que le llega por correo. Su clave X25519
+   sale de un código de recuperación en papel, generado en su navegador: el
+   servidor solo guarda la pública, a la que se sellan notas y avisos. */
+export const owners = pgTable("owners", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  pubKey: bytea("pub_key").notNull(),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  emailCodeHash: text("email_code_hash"),
+  emailCodeExpiresAt: timestamp("email_code_expires_at"),
+  emailCodeAttempts: integer("email_code_attempts").notNull().default(0),
+  emailCodeSentAt: timestamp("email_code_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [uniqueIndex("owners_email_uq").on(t.email)]);
+
+/* Sesión del dueño. «pendiente»: contraseña correcta, falta el código del
+   correo; no abre nada hasta confirmarlo. */
+export const ownerSessions = pgTable("owner_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: uuid("owner_id")
+    .references(() => owners.id, { onDelete: "cascade" })
+    .notNull(),
+  tokenHash: text("token_hash").notNull(),
+  estado: text("estado").$type<"pendiente" | "abierta">().notNull(),
+  codeHash: text("code_hash"),
+  codeAttempts: integer("code_attempts").notNull().default(0),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [uniqueIndex("owner_sessions_token_uq").on(t.tokenHash)]);
+
+/* Estado del registro (decidido 2026-09-27). Un chip lo puede registrar
+   cualquiera, así que un registro nace «pendiente» y no responde a ninguna
+   consulta hasta que una clínica verificada lee el chip con el animal delante
+   y lo activa con el código de activación que el dueño lleva en su app.
+   «congelada»: hay una reclamación abierta contra este registro. «retirada»:
+   perdió una reclamación; se conserva para el historial. */
 export const pets = pgTable("pets", {
   id: uuid("id").defaultRandom().primaryKey(),
   ownerPubKey: bytea("owner_pub_key").notNull(),
   pushToken: text("push_token"),
+  estado: text("estado")
+    .$type<"pendiente" | "activa" | "congelada" | "retirada">()
+    .notNull()
+    .default("activa"),
+  activationCodeHash: text("activation_code_hash"),
+  activationExpiresAt: timestamp("activation_expires_at"),
+  activationAttempts: integer("activation_attempts").notNull().default(0),
+  activatedAt: timestamp("activated_at"),
+  activatedByClinicId: uuid("activated_by_clinic_id"),
+  /** Cuenta del portal del dueño, si la mascota se dio de alta desde ahí. */
+  ownerId: uuid("owner_id"),
+  /** Últimos 4 dígitos del chip, para que el dueño distinga sus mascotas. El
+      número completo nunca se guarda: solo su HMAC en pet_identifiers. */
+  chipPista: text("chip_pista"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -35,9 +90,73 @@ export const petIdentifiers = pgTable(
       .notNull(),
     kind: text("kind").$type<"iso" | "nonISO" | "ring" | "tattoo">().notNull(),
     idIndex: bytea("id_index").notNull(),
+    /* Solo el identificador de un registro activo es único y responde a
+       búsquedas. Los pendientes no reservan nada: registrar primero el chip de
+       una mascota ajena no bloquea a su dueño. */
+    activo: boolean("activo").notNull().default(true),
   },
-  (t) => [uniqueIndex("pet_identifiers_index_uq").on(t.idIndex)],
+  (t) => [
+    uniqueIndex("pet_identifiers_activo_uq").on(t.idIndex).where(sql`${t.activo}`),
+    index("pet_identifiers_index_ix").on(t.idIndex),
+  ],
 );
+
+/* Reclamación de un chip ya activado por otra persona. La abre una clínica
+   verificada con el animal delante y el código de activación del reclamante.
+   El registro actual queda congelado; si en 14 días su titular no la
+   impugna, el chip pasa al reclamante. */
+export const reclamaciones = pgTable(
+  "reclamaciones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** El registro activo que se reclama. */
+    petId: uuid("pet_id")
+      .references(() => pets.id, { onDelete: "cascade" })
+      .notNull(),
+    /** El registro pendiente de quien reclama. */
+    reclamantePetId: uuid("reclamante_pet_id")
+      .references(() => pets.id, { onDelete: "cascade" })
+      .notNull(),
+    clinicId: uuid("clinic_id")
+      .references(() => clinics.id)
+      .notNull(),
+    estado: text("estado")
+      .$type<"abierta" | "impugnada" | "a-favor-reclamante" | "a-favor-titular">()
+      .notNull()
+      .default("abierta"),
+    plazo: timestamp("plazo").notNull(),
+    resueltaAt: timestamp("resuelta_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("reclamaciones_estado_ix").on(t.estado, t.plazo)],
+);
+
+/* Perfil público de la mascota: foto, bio y teléfonos para caso de pérdida.
+   Es la única excepción a «nada en claro»: su función es que lo vea quien
+   encuentre al animal (placa, número de chip, ficha del veterinario). Lo
+   escribe el dueño desde su app o su portal, elige qué publica, y hasta que
+   no lo publica no sale en ninguna respuesta. Decidido el 2026-09-27. */
+export const petProfiles = pgTable("pet_profiles", {
+  petId: uuid("pet_id")
+    .primaryKey()
+    .references(() => pets.id, { onDelete: "cascade" }),
+  publicado: boolean("publicado").notNull().default(false),
+  /** Cómo se llama: a quien lo encuentra le sirve para llamarlo. */
+  nombre: text("nombre").notNull().default(""),
+  bio: text("bio").notNull().default(""),
+  telefonos: jsonb("telefonos")
+    .$type<{ etiqueta: string; numero: string }[]>()
+    .notNull()
+    .default([]),
+  /* La foto se sirve por un id propio y aleatorio: la URL no delata el petId. */
+  fotoId: uuid("foto_id"),
+  /* La foto vive en el almacén de objetos (B2), en `fotoKey`. `foto` queda
+     para las subidas anteriores al almacén, que se siguen sirviendo. */
+  fotoKey: text("foto_key"),
+  foto: bytea("foto"),
+  fotoTipo: text("foto_tipo").$type<"image/jpeg" | "image/png" | "image/webp">(),
+  actualizado: timestamp("actualizado").defaultNow().notNull(),
+}, (t) => [uniqueIndex("pet_profiles_foto_uq").on(t.fotoId)]);
 
 export const blobs = pgTable(
   "blobs",
@@ -67,13 +186,18 @@ export const clinics = pgTable(
     name: text("name").notNull(),
     country: text("country").notNull(),
     healthRegistry: text("health_registry"),
+    address: text("address"),
     domain: text("domain"),
     domainVerifiedAt: timestamp("domain_verified_at"),
     domainToken: text("domain_token"),
     pubKey: bytea("pub_key").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [uniqueIndex("clinics_domain_uq").on(t.domain)],
+  /* Sin unicidad: un registro sin verificar no reserva el dominio (si no,
+     cualquiera bloquearía vet.es registrándose con admin@vet.es y sin
+     confirmar nunca), y varias sedes de una misma organización pueden
+     verificarse cada una con su correo. */
+  (t) => [index("clinics_domain_ix").on(t.domain)],
 );
 
 export const clinicMembers = pgTable(
@@ -91,6 +215,15 @@ export const clinicMembers = pgTable(
     /* Solo los administradores reciben la clave de la clínica envuelta. */
     wrappedClinicKey: bytea("wrapped_clinic_key"),
     inviteTokenHash: text("invite_token_hash"),
+    /* Una invitación sin aceptar caduca: si no, ocupa el correo para siempre. */
+    inviteExpiresAt: timestamp("invite_expires_at"),
+    /* Verificación del correo por código. El código solo se guarda como hash,
+       caduca y admite pocos intentos. */
+    emailVerifiedAt: timestamp("email_verified_at"),
+    emailCodeHash: text("email_code_hash"),
+    emailCodeExpiresAt: timestamp("email_code_expires_at"),
+    emailCodeAttempts: integer("email_code_attempts").notNull().default(0),
+    emailCodeSentAt: timestamp("email_code_sent_at"),
     acceptedAt: timestamp("accepted_at"),
     revokedAt: timestamp("revoked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

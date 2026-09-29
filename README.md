@@ -12,8 +12,8 @@ Los datos viven cifrados con la clave del dueño. **El servidor guarda bloques q
 
 ```
 apps/
-  clinic/     SaaS de la clínica: consola, equipo, registro y presentación  (4510)
-  vet/        Web del veterinario de guardia, sin cuentas, export estático  (3000)
+  clinic/     SaaS de la clínica, bajo /clinica: consola, equipo, registro   (4520, interno)
+  vet/        Web del veterinario de guardia, sin cuentas, export estático  (4510, puerta única)
   api/        Fastify: índice de chips, permisos, bloques cifrados          (4601)
   mobile/     App del dueño en React Native                    (sin crear)
 packages/
@@ -42,6 +42,8 @@ pnpm --filter @barkandmeow/db db:migrate
 pnpm dev
 ```
 
+Se entra siempre por **http://localhost:4510**: `/` es la presentación, `/chip` la consulta por microchip del veterinario (nivel 0) y `/clinica` el SaaS de la clínica. En desarrollo, `apps/vet` reenvía `/clinica` a `apps/clinic` (4520), que tiene `basePath: "/clinica"`; en producción el proxy hace el mismo reparto. La API acepta la consulta de chip desde los orígenes de `VET_ORIGINS`. Para que la consulta de chip responda, la API necesita `PEPPER_URL` o `CHIP_PEPPER_LOCAL`.
+
 ## Comandos
 
 | Comando | Qué hace |
@@ -52,7 +54,7 @@ pnpm dev
 | `pnpm typecheck` | `tsc --noEmit` en todo el workspace |
 | `pnpm docs:build` | Regenera el .docx y el .pdf desde el markdown |
 
-**El sistema visual no se edita en CSS.** Se edita `diseno/tokens.json` y se corre `pnpm tokens`, que reescribe `apps/clinic/app/tokens.generated.css` y el objeto TypeScript para la app nativa.
+**El sistema visual no se edita en CSS.** Se edita `diseno/tokens.json` y se corre `pnpm tokens`, que reescribe `apps/clinic/app/tokens.generated.css`, `apps/vet/app/tokens.generated.css` y el objeto TypeScript para la app nativa.
 
 ## Estado
 

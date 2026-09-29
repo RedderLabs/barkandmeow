@@ -1,0 +1,884 @@
+/* Niveles 1 y 2 de la web del veterinario.
+   Nivel 1: columna de teléfono sobre blanco a sangre, cabe sin scroll.
+   Nivel 2: mostrador de escritorio sobre hueso, tres columnas, cuerpo 15px. */
+
+/* ══ Piezas comunes ═══════════════════════════════════════════ */
+
+.dato {
+  font-family: var(--font-data);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Identidad ─────────────────────────────────────────────── */
+
+.identidad {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nombre {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  font-variation-settings: "opsz" 72;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.rasgos {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.chip {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chipEtiqueta {
+  text-transform: uppercase;
+}
+
+/* ── Bloque de alergias: relleno a sangre, en ambos modos ─── */
+
+.alergias {
+  background: var(--alert);
+  color: var(--alert-on);
+  border-radius: var(--r-panel);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alergiasTitulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.alergiasLista {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.alergia {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Varias alergias: un único bloque, separadas por una hairline del propio
+   blanco. Sigue habiendo un solo grito en pantalla. */
+.alergia + .alergia {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(255 255 255 / 0.28);
+}
+
+.sustancia {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.reaccion {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.atc {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+/* ── Filas de constantes ───────────────────────────────────── */
+
+.filas {
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.fila {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.fila + .fila {
+  border-top: 1px solid var(--divider);
+}
+.fila dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.fila dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.caducada {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn-ink);
+}
+.caducada svg {
+  flex-shrink: 0;
+}
+
+.procedencia {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.procedencia svg {
+  flex-shrink: 0;
+}
+
+/* ── Ficha de ejemplo ──────────────────────────────────────── */
+
+.ejemplo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px dashed var(--field-line);
+  border-radius: var(--r-control);
+  background: var(--quote-ground);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.ejemploEtiqueta {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Abriendo ──────────────────────────────────────────────── */
+
+.abriendo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* El candado respira mientras se descifra: la única animación de espera,
+   y dice dónde ocurre el trabajo (en este navegador, no en el servidor). */
+.abriendoIcono {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  flex-shrink: 0;
+  animation: respirar 1.4s var(--ease) infinite alternate;
+}
+
+@keyframes respirar {
+  from {
+    opacity: 0.55;
+  }
+}
+
+/* ── Fallo ─────────────────────────────────────────────────── */
+
+.fallo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+}
+
+.falloBloque {
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--alert-soft);
+  border: 1px solid var(--alert-soft-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.falloMotivo {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--alert-ink);
+}
+.falloSalida {
+  font-size: 14px;
+  color: var(--alert-soft-ink);
+}
+
+.acciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+
+.faltaDato {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--alert-ink);
+}
+
+.pie {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ══ Nivel 1: urgencia ═══════════════════════════════════════ */
+
+.urgencia {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.urgenciaCuerpo {
+  flex: 1;
+  padding: var(--s-page) var(--relleno);
+}
+
+.ficha,
+.fichaPrincipal,
+.fichaLateral {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-lg);
+}
+
+/* El momento de la pantalla: la ficha aparece de golpe y la alergia se
+   descorre de arriba abajo, en 240 ms. Nada se retrasa: a los 0 ms ya se lee. */
+.fichaPrincipal > *,
+.fichaLateral {
+  animation: aparecer 200ms var(--ease) both;
+}
+.ficha .alergias {
+  animation: descorrer 240ms var(--ease) both;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes descorrer {
+  from {
+    clip-path: inset(0 0 100% 0 round var(--r-panel));
+  }
+  to {
+    clip-path: inset(0 0 0 0 round var(--r-panel));
+  }
+}
+
+.sinTelefono {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.como {
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--quote-ground);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.como[hidden] {
+  display: none;
+}
+
+.urgenciaPie {
+  padding: var(--s-md) var(--relleno) var(--s-page);
+}
+.urgenciaPie::before {
+  content: "";
+  display: block;
+  margin-bottom: var(--s-md);
+  border-top: 1px solid var(--divider);
+}
+
+/* Un error nunca se estira a todo el monitor: se lee como una ficha. */
+.urgenciaCuerpo > .fallo,
+.mostradorAviso > .fallo {
+  max-width: 560px;
+}
+
+/* Monitor de la clínica: la ficha a la izquierda y las acciones en una
+   columna de 360px a la derecha, la misma que ocupa la nota en el nivel 2.
+   Todo sube un paso: se lee a distancia de mostrador. */
+@media (min-width: 1024px) {
+  .urgenciaCuerpo {
+    padding-top: 32px;
+    padding-bottom: 40px;
+  }
+  .ficha {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 32px;
+    align-items: start;
+  }
+  .fichaPrincipal {
+    gap: var(--s-xl);
+  }
+  .fichaLateral {
+    position: sticky;
+    top: 92px;
+  }
+  .fichaPrincipal .nombre {
+    font-size: 40px;
+  }
+  .fichaPrincipal .rasgos {
+    font-size: 16px;
+  }
+  .fichaPrincipal .chip {
+    font-size: 14px;
+  }
+  .fichaPrincipal .alergias {
+    padding: 20px 24px;
+    gap: 8px;
+  }
+  .fichaPrincipal .sustancia {
+    font-size: 26px;
+  }
+  .fichaPrincipal .reaccion {
+    font-size: 16px;
+  }
+  .fichaPrincipal .atc {
+    font-size: 13px;
+  }
+}
+
+/* Con el ancho completo, las constantes se leen de izquierda a derecha, una
+   celda por dato. Por debajo, la dosis no cabe en su celda y se apilan. */
+@media (min-width: 1280px) {
+  .filasEnFila {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  .filasEnFila .fila {
+    padding: 16px 18px;
+  }
+  .filasEnFila .fila + .fila {
+    border-top: 0;
+    border-left: 1px solid var(--divider);
+  }
+  .filasEnFila .fila dd {
+    font-size: 17px;
+  }
+}
+
+/* ══ Nivel 2: mostrador ══════════════════════════════════════ */
+
+.mostrador {
+  min-height: 100dvh;
+  background: var(--ground);
+  font-size: 15px;
+}
+
+.cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-data);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* La última hora se ve en ámbar y con reloj: doble canal, nunca rojo. */
+.cuentaPoco {
+  color: var(--warn-ink);
+}
+
+.mostradorAviso {
+  padding: 32px var(--relleno);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+}
+
+.mostradorRejilla {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "identidad"
+    "historial"
+    "nota"
+    "pie";
+  gap: 28px;
+  padding: var(--s-page) var(--relleno);
+}
+
+.colIdentidad {
+  grid-area: identidad;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-lg);
+  min-width: 0;
+}
+.colHistorial {
+  grid-area: historial;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-lg);
+  min-width: 0;
+}
+.colNota {
+  grid-area: nota;
+  min-width: 0;
+}
+.pieMostrador {
+  grid-area: pie;
+  padding-top: var(--s-md);
+  border-top: 1px solid var(--line);
+}
+
+.colIdentidad .nombre {
+  font-size: 30px;
+}
+.colIdentidad .rasgos {
+  font-size: 15px;
+}
+.colIdentidad .chip {
+  font-size: 13px;
+}
+
+.notaLateral {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.historialCabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tituloPanel {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variation-settings: "opsz" 48;
+}
+
+.recuento {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.vacio {
+  padding: 24px 16px;
+  border: 1px dashed var(--field-line);
+  border-radius: var(--r-card);
+  text-align: center;
+  color: var(--muted);
+}
+
+.registros {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-lg);
+}
+
+.registro {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.registroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.registroTitulo {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.registroTexto {
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.registroDato {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+/* Procedencia: esquina superior derecha de cada registro, nunca suelta.
+   El pardo del dueño es más apagado que el azul de la clínica a propósito. */
+.origen {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--r-badge);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.origenClinica {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.origenDueno {
+  background: var(--owner-soft);
+  color: var(--owner);
+}
+.origenVeterinario {
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  padding: 2px 7px;
+}
+
+.documento {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.enlaceDoc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+.enlaceDoc:hover {
+  color: var(--accent-hover);
+  text-decoration-thickness: 2px;
+}
+.enlaceDoc:disabled {
+  cursor: progress;
+  color: var(--muted);
+}
+
+.huella {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.huellaOk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-ink);
+}
+
+.docAviso {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.original {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.originalAviso {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.cita {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-control);
+  background: var(--quote-ground);
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--ink);
+  max-width: 68ch;
+}
+
+.traduccion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 14px;
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.traduccionAviso {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Nota de la consulta ───────────────────────────────────── */
+
+.panelNota {
+  align-self: start;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panelNota label {
+  font-weight: 600;
+}
+
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+
+.avisoCaducado {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-control);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  font-size: 14px;
+  color: var(--warn-ink);
+}
+.avisoCaducado svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hecho {
+  padding: 16px;
+  border-radius: var(--r-card);
+  background: var(--accent-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hechoTitulo {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+.hechoTitulo svg {
+  flex-shrink: 0;
+}
+.sellado {
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--accent-soft-ink);
+}
+.hechoEjemplo {
+  background: var(--quote-ground);
+  border: 1px dashed var(--field-line);
+}
+.hechoEjemplo .hechoTitulo {
+  color: var(--ink);
+}
+.hechoEjemplo .sellado {
+  color: var(--muted);
+}
+
+/* Tableta y mostrador pequeño: identidad a la izquierda, historial y nota
+   apilados a la derecha. */
+@media (min-width: 760px) {
+  .mostradorRejilla {
+    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-areas:
+      "identidad historial"
+      "identidad nota"
+      "pie pie";
+    gap: 24px;
+    padding: 28px var(--relleno);
+  }
+  .colIdentidad {
+    align-self: start;
+    position: sticky;
+    top: 92px;
+  }
+}
+
+/* El mostrador de la clínica: tres columnas, la nota anclada a la derecha. */
+@media (min-width: 1180px) {
+  .mostradorRejilla {
+    grid-template-columns: 300px minmax(0, 1fr) 360px;
+    grid-template-areas:
+      "identidad historial nota"
+      "pie pie pie";
+  }
+  .panelNota {
+    position: sticky;
+    top: 92px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fichaPrincipal > *,
+  .fichaLateral,
+  .ficha .alergias,
+  .abriendoIcono {
+    animation: none;
+  }
+}
+
+/* ══ Perfil público: foto, bio y teléfonos ════════════════════
+   Lo publica el dueño para quien encuentre al animal. No es dato clínico:
+   va en tarjeta de hairline, sin el peso de las alergias. */
+
+.identidadFila {
+  display: flex;
+  align-items: center;
+  gap: var(--s-lg);
+  min-width: 0;
+}
+
+.foto {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--ground);
+  border: 1px solid var(--line);
+}
+
+.perfil {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+
+.perfilCabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+}
+
+.perfilTitulo {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.perfilNota {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.perfilBio {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 68ch;
+}
+
+.telefonos {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--divider);
+}
+
+.telefono {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  min-height: var(--tap);
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--ink);
+  text-decoration: none;
+}
+.telefono:hover {
+  color: var(--accent-ink);
+}
+.telefono .dato {
+  margin-left: auto;
+  font-size: 15px;
+}
+.telefono svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.telefonoEtiqueta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.perfilNombre {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}

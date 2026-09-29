@@ -1,5 +1,6 @@
-/* Piezas compartidas por las superficies de apps/clinic.
-   Cuando exista packages/ui-web, esto se muda ahí tal cual. */
+/* Maquetación compartida de las superficies de apps/clinic: cabecera, rejillas,
+   paneles y listas. Los controles (botones, campos, selects, casillas) son los
+   componentes de shadcn de src/components, no clases de aquí. */
 
 .shell {
   min-height: 100dvh;
@@ -10,7 +11,7 @@
 .header {
   height: 64px;
   flex-shrink: 0;
-  padding: 0 32px;
+  padding: 0 var(--relleno);
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -26,12 +27,23 @@
   min-width: 0;
 }
 
+/* Contenedor del logotipo (marca/Logotipo.tsx), enlace o no. */
 .wordmark {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--accent);
+  display: flex;
+  flex-shrink: 0;
+  border-radius: var(--r-small);
   text-decoration: none;
+}
+.wordmark svg,
+svg.wordmark {
+  height: 44px;
+  width: auto;
+}
+@media (min-width: 720px) {
+  .wordmark svg,
+  svg.wordmark {
+    height: 52px;
+  }
 }
 
 .badge {
@@ -67,6 +79,7 @@
   color: var(--muted);
   font-size: 14px;
   text-decoration: none;
+  white-space: nowrap;
   transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .navLink:hover {
@@ -80,15 +93,44 @@
 
 /* ── Columna de lectura, para tareas lineales ─────────────── */
 
+/* Página de lectura (registro): el formulario a 720px contra el borde
+   izquierdo del ancho compartido y, en monitor, una columna de 360px a la
+   derecha, la misma que usan la consola y la web del veterinario. */
 .reading {
   flex-grow: 1;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 40px var(--s-page) 64px;
+  padding: 40px var(--relleno) 64px;
   display: flex;
   flex-direction: column;
   gap: var(--s-section);
+}
+.readingMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-section);
+  min-width: 0;
+}
+@media (min-width: 1080px) {
+  .reading {
+    display: grid;
+    grid-template-columns: minmax(0, 720px) 360px;
+    grid-template-areas:
+      "main aside"
+      "actions aside";
+    justify-content: space-between;
+    align-items: start;
+    column-gap: 32px;
+  }
+  .readingMain {
+    grid-area: main;
+  }
+  .readingAside {
+    grid-area: aside;
+    position: sticky;
+    top: var(--s-section);
+  }
+  .readingActions {
+    grid-area: actions;
+  }
 }
 
 .pageTitle {
@@ -109,7 +151,7 @@
 
 .grid {
   flex-grow: 1;
-  padding: var(--s-section) 32px 32px;
+  padding: var(--s-section) var(--relleno) 32px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--s-section);
@@ -184,23 +226,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s-md);
-}
-
-.input,
-.select {
-  height: 48px;
-  padding: 0 var(--s-lg);
-  border: 1px solid var(--field-line);
-  border-radius: var(--r-control);
-  background: var(--surface);
-  font-size: 16px;
-  font-weight: 400;
-}
-.select {
-  padding-right: var(--s-md);
-}
-.mono {
-  font-family: var(--font-data);
+  /* Si una etiqueta parte línea, los campos siguen a la misma altura. */
+  align-items: end;
 }
 
 .hint {
@@ -211,90 +238,7 @@
 
 /* ── Botones ──────────────────────────────────────────────── */
 
-.primary {
-  min-height: 52px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 var(--s-xl);
-  border: none;
-  border-radius: var(--r-card);
-  background: var(--accent);
-  color: var(--accent-on);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease);
-}
-.primary:hover {
-  background: var(--accent-hover);
-}
-.primary:active {
-  background: var(--accent-press);
-}
-.primary:disabled {
-  background: var(--divider);
-  color: var(--muted);
-  cursor: not-allowed;
-}
-
-.secondary {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 var(--s-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
-}
-.secondary:hover {
-  background: var(--ground);
-  border-color: var(--field-line);
-}
-
-.danger {
-  min-height: 36px;
-  padding: 0 var(--s-md);
-  border: 1px solid var(--alert-ghost-line);
-  border-radius: var(--r-small);
-  background: var(--surface);
-  color: var(--alert-ink);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease);
-}
-.danger:hover {
-  background: var(--alert-soft);
-}
-
 /* Acción menor y neutra dentro de un bloque: copiar, reenviar, deshacer. */
-.ghost {
-  min-height: 36px;
-  flex-shrink: 0;
-  padding: 0 var(--s-md);
-  border: 1px solid var(--line);
-  border-radius: var(--r-small);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
-}
-.ghost:hover {
-  background: var(--ground);
-  border-color: var(--field-line);
-}
 
 .actions {
   display: flex;
@@ -410,13 +354,6 @@
   font-weight: 400;
   line-height: 1.5;
 }
-.check input {
-  width: 20px;
-  height: 20px;
-  margin-top: 2px;
-  flex-shrink: 0;
-  accent-color: var(--accent);
-}
 
 @media (max-width: 1080px) {
   .grid {
@@ -425,12 +362,8 @@
 }
 
 @media (max-width: 720px) {
-  .header {
-    padding-left: var(--s-page);
-    padding-right: var(--s-page);
-  }
   .grid {
-    padding: var(--s-xl) var(--s-page) var(--s-page);
+    padding: var(--s-xl) var(--relleno) var(--s-page);
   }
   .fieldRow,
   .recovery {
@@ -444,4 +377,86 @@
 /* Separación entre bloques apilados dentro de una columna. */
 .stacked {
   margin-bottom: var(--s-section);
+}
+
+/* Teléfono estrecho con navegación (consola, equipo): el logotipo y los
+   enlaces no dejan sitio a la insignia; la navegación ya dice dónde se está. */
+@media (max-width: 420px) {
+  .header:has(nav) .badge {
+    display: none;
+  }
+  /* Logotipo y tres destinos en 390 px: cada enlace cede aire, no su línea. */
+  .header:has(nav) {
+    gap: var(--s-sm);
+  }
+  .header:has(nav) .nav {
+    gap: 0;
+  }
+  .header:has(nav) .navLink {
+    padding: 0 6px;
+  }
+}
+
+/* ── Formularios con estado (registro) ─────────────────────── */
+
+/* El <form> no rompe la rejilla de .reading: sus hijos son los de la rejilla. */
+.formContents {
+  display: contents;
+}
+
+.fieldError {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--alert-ink);
+}
+
+/* Error: motivo y salida en dos líneas, sobre rojo suave, nunca a sangre. */
+.alertBlock {
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--alert-soft);
+  border: 1px solid var(--alert-soft-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--alert-soft-ink);
+}
+.alertBlock strong {
+  color: var(--alert-ink);
+}
+
+.okBlock {
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--accent-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--accent-soft-ink);
+}
+.okBlock strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-ink);
+}
+
+/* Estado neutro o pendiente (ámbar con texto, nunca rojo). */
+.pendingBlock {
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  font-size: 14px;
+  color: var(--warn-ink);
+}
+
+/* Confirmar el papel: dos bloques del código, tecleados. */
+.confirmRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-md);
+  align-items: end;
 }

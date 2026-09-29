@@ -1,0 +1,273 @@
+/* Entrar y dar de alta: la puerta del portal.
+   Mismo sistema que el resto (hueso, blanco, hairline, Fraunces, mono, sin
+   sombras), con sus recursos más fuertes a pleno: el titular en la escala de
+   portada, el campo de chip destacado y la placa del collar del logotipo. */
+
+.acceso {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  padding: 28px var(--relleno) 48px;
+  align-content: start;
+}
+
+/* ── La portada: titular y placa ─────────────────────────── */
+
+.portada {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.portadaTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.titular {
+  font-family: var(--font-display);
+  /* El paso de portada del sistema: solo aquí y en la presentación pública. */
+  font-size: clamp(34px, 4.4vw, 52px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  font-variation-settings: "opsz" 144;
+  text-wrap: balance;
+  max-width: 14ch;
+}
+.titularQuieto {
+  color: var(--muted);
+}
+
+.entradilla {
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 44ch;
+}
+
+/* ── La placa ───────────────────────────────────────────── */
+
+.placa {
+  margin: 0;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Cuelga de la anilla: se balancea al llegar y se queda quieta. El único
+   movimiento de la pantalla. */
+.placaColgante {
+  position: relative;
+  transform-origin: 50% 7%;
+  animation: balanceo 1.6s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes balanceo {
+  0% {
+    transform: rotate(-9deg);
+  }
+  35% {
+    transform: rotate(5deg);
+  }
+  62% {
+    transform: rotate(-2.2deg);
+  }
+  82% {
+    transform: rotate(0.8deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.placaSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.placaAnilla {
+  fill: none;
+  stroke: var(--field-line);
+  stroke-width: 2.4;
+}
+.placaEslabon {
+  fill: var(--field-line);
+}
+.placaDisco {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.placaFilete {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 0.9;
+}
+.placaTexto {
+  font-family: var(--font-data);
+  font-size: 5.4px;
+  letter-spacing: 0.1em;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.placaSimbolo {
+  position: absolute;
+  left: 50%;
+  top: 59.7%;
+  width: 40%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+}
+.placaSimbolo svg {
+  width: 100%;
+  height: auto;
+}
+
+/* ── La tarjeta del formulario ──────────────────────────── */
+
+.tarjeta {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.tarjetaTitulo {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.tarjetaNota {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Separador con texto: «¿Primera vez?» entre dos hairlines. */
+.separador {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.separador::before,
+.separador::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--divider);
+}
+
+/* ── Progreso del alta: tres tramos ─────────────────────── */
+
+.pasos {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.paso {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.paso::before {
+  content: "";
+  height: 4px;
+  border-radius: 999px;
+  background: var(--divider);
+  transition: background-color 240ms var(--ease);
+}
+.pasoHecho::before,
+.pasoActual::before {
+  background: var(--accent);
+}
+.pasoActual {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Móvil: la placa pequeña, junto al titular ──────────── */
+
+@media (max-width: 719px) {
+  .portada {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 16px;
+  }
+  /* En el teléfono, titular y placa comparten fila; la entradilla va debajo. */
+  .portadaTexto {
+    display: contents;
+  }
+  .portada .titular {
+    font-size: 32px;
+    grid-column: 1;
+  }
+  .portada .placa {
+    grid-column: 2;
+    grid-row: 1;
+    width: 104px !important;
+  }
+  .portada .entradilla {
+    grid-column: 1 / -1;
+    font-size: 15px;
+  }
+}
+
+/* ── Monitor: portada a la izquierda, tarjeta a la derecha ─ */
+
+@media (min-width: 1024px) {
+  .acceso {
+    grid-template-columns: minmax(0, 1fr) 440px;
+    gap: 64px;
+    align-items: center;
+    align-content: center;
+    min-height: calc(100dvh - 64px);
+    padding-top: 40px;
+  }
+  .portada {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px 48px;
+  }
+  .portadaTexto {
+    grid-column: 1;
+  }
+  .portada .placa {
+    grid-column: 2;
+  }
+  .tarjeta {
+    padding: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placaColgante {
+    animation: none;
+  }
+}

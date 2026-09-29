@@ -8,7 +8,7 @@
 
 .link {
   flex-shrink: 0;
-  padding: var(--s-md) 32px;
+  padding: var(--s-md) var(--relleno);
   display: flex;
   align-items: center;
   gap: var(--s-md);
@@ -57,7 +57,7 @@
 
 .counters {
   flex-shrink: 0;
-  margin: var(--s-section) 32px 0;
+  margin: var(--s-section) var(--relleno) 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   background: var(--surface);
@@ -96,7 +96,7 @@
 
 .grid {
   flex-grow: 1;
-  padding: var(--s-section) 32px 32px;
+  padding: var(--s-section) var(--relleno) 32px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--s-section);
@@ -248,24 +248,6 @@
   }
 }
 
-.retry {
-  min-height: 36px;
-  margin-top: var(--s-sm);
-  align-self: flex-start;
-  padding: 0 var(--s-md);
-  border: 1px solid var(--alert-ghost-line);
-  border-radius: var(--r-small);
-  background: var(--surface);
-  color: var(--alert-ink);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease);
-}
-.retry:hover {
-  background: var(--alert-soft);
-}
-
 /* ── Columna derecha ──────────────────────────────────────── */
 
 .aside {
@@ -348,56 +330,6 @@
   color: var(--accent-ink);
 }
 
-.primary {
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 var(--s-lg);
-  border: none;
-  border-radius: var(--r-card);
-  background: var(--accent);
-  color: var(--accent-on);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease);
-}
-.primary:hover {
-  background: var(--accent-hover);
-}
-.primary:active {
-  background: var(--accent-press);
-}
-.primary:disabled {
-  background: var(--divider);
-  color: var(--muted);
-  cursor: not-allowed;
-}
-
-.secondary {
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 0 var(--s-lg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--t-state) var(--ease),
-    border-color var(--t-state) var(--ease);
-}
-.secondary:hover {
-  background: var(--ground);
-  border-color: var(--field-line);
-}
-
 /* ── Estado vacío: clínica sin software conectado ─────────── */
 
 .empty {
@@ -446,18 +378,8 @@
 }
 
 @media (max-width: 720px) {
-  .link {
-    padding-left: var(--s-page);
-    padding-right: var(--s-page);
-  }
-  .counters,
   .grid {
-    margin-left: var(--s-page);
-    margin-right: var(--s-page);
-  }
-  .grid {
-    padding: var(--s-xl) 0 var(--s-page);
-    margin: 0 var(--s-page);
+    padding: var(--s-xl) var(--relleno) var(--s-page);
   }
   .row {
     grid-template-columns: 52px minmax(0, 1fr);
@@ -468,4 +390,19 @@
   .linkMeta {
     display: none;
   }
+}
+
+/* Aviso pendiente (ámbar con texto, nunca rojo). */
+.pendingNote {
+  padding: 14px 16px;
+  border-radius: var(--r-card);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  font-size: 14px;
+  color: var(--warn-ink);
+}
+
+/* Consola real: dos contadores, los dos con datos del servidor. */
+.counters2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }

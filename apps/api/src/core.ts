@@ -1,6 +1,9 @@
 import {
+  createCipheriv,
+  createDecipheriv,
   createHash,
   createHmac,
+  randomInt,
   randomBytes,
   scrypt as scryptCb,
   timingSafeEqual,
@@ -22,6 +25,17 @@ export const env = {
   sessionDays: Number(process.env.SESSION_DAYS ?? 30),
   /** Suelo de tiempo de la respuesta del nivel 0, en ms. */
   lookupBudgetMs: Number(process.env.LOOKUP_BUDGET_MS ?? 120),
+  /** Dónde vive el SaaS de clínicas: los enlaces de los correos apuntan aquí. */
+  clinicWebUrl: (process.env.CLINIC_WEB_URL ?? "http://localhost:4510/clinica").replace(/\/$/, ""),
+  /** El portal del dueño: los correos al titular de un chip enlazan aquí. */
+  portalWebUrl: (process.env.PORTAL_WEB_URL ?? "http://localhost:4510/mi-mascota").replace(/\/$/, ""),
+  /** Secreto de los tokens de aviso del nivel 0. */
+  avisoSecret: process.env.AVISO_SECRET ?? "",
+  /** Orígenes de la web del veterinario que pueden consultar el nivel 0. */
+  vetOrigins: (process.env.VET_ORIGINS ?? "http://localhost:4510,http://127.0.0.1:4510")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
 };
 
 const cliente = crearCliente(env.databaseUrl);
@@ -86,6 +100,57 @@ export function numeroComparacion(
   return String(n).padStart(6, "0");
 }
 
+/* ── Token de aviso del nivel 0 ───────────────────────────────
+   La web del veterinario no tiene sesión. Para avisar al dueño después de una
+   consulta, el nivel 0 entrega un token: el petId y su caducidad cifrados con
+   AES-256-GCM. No se guarda nada. Si no hay ficha se entrega un señuelo de la
+   misma longitud, que al canjearse se descarta en silencio. */
+
+const AVISO_VIGENCIA_MS = 30 * 60 * 1000;
+const AVISO_BYTES = 12 + 16 + 4 + 16; // iv + uuid + caducidad + etiqueta
+let avisoLocalAvisado = false;
+
+function claveAviso(): Buffer {
+  if (!env.avisoSecret) {
+    // En producción, un secreto conocido permitiría falsificar tokens de aviso.
+    if (process.env.NODE_ENV === "production")
+      throw new Error("falta AVISO_SECRET: obligatorio en producción (ver .env.example)");
+    if (!avisoLocalAvisado) {
+      avisoLocalAvisado = true;
+      console.warn("[aviso] sin AVISO_SECRET: se usa un secreto de desarrollo.");
+    }
+  }
+  return createHash("sha256").update(env.avisoSecret || "aviso_dev_no_usar_en_produccion").digest();
+}
+
+export function firmarAviso(petId: string, ahora = Date.now()): string {
+  const iv = randomBytes(12);
+  const claro = Buffer.alloc(20);
+  Buffer.from(petId.replace(/-/g, ""), "hex").copy(claro, 0);
+  claro.writeUInt32BE(Math.floor((ahora + AVISO_VIGENCIA_MS) / 1000), 16);
+  const c = createCipheriv("aes-256-gcm", claveAviso(), iv);
+  const cifrado = Buffer.concat([c.update(claro), c.final()]);
+  return Buffer.concat([iv, cifrado, c.getAuthTag()]).toString("base64url");
+}
+
+export const senueloAviso = () => randomBytes(AVISO_BYTES).toString("base64url");
+
+/** El petId del token, o null si es un señuelo, está manipulado o caducó. */
+export function leerAviso(token: string, ahora = Date.now()): string | null {
+  const b = Buffer.from(token, "base64url");
+  if (b.length !== AVISO_BYTES) return null;
+  try {
+    const d = createDecipheriv("aes-256-gcm", claveAviso(), b.subarray(0, 12));
+    d.setAuthTag(b.subarray(32));
+    const claro = Buffer.concat([d.update(b.subarray(12, 32)), d.final()]);
+    if (claro.readUInt32BE(16) * 1000 < ahora) return null;
+    const h = claro.subarray(0, 16).toString("hex");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Contraseñas y sesiones ───────────────────────────────── */
 
 export async function hashPassword(clave: string): Promise<string> {
@@ -124,4 +189,65 @@ export const hashToken = (t: string) =>
 export async function gastarPresupuesto(desde: number, ms: number) {
   const resto = ms - (Date.now() - desde);
   if (resto > 0) await new Promise((r) => setTimeout(r, resto));
+}
+
+/* ── Correo ───────────────────────────────────────────────────
+   SMTP por nodemailer. En desarrollo, la bandeja de pruebas de Mailtrap
+   (sandbox.smtp.mailtrap.io:2525; nada sale a destinatarios reales); en
+   producción, Resend (smtp.resend.com:465, usuario "resend", la API key como
+   contraseña). Sin SMTP_HOST no hay a dónde enviar y el envío falla. Los
+   tests sustituyen el cartero y leen el código sin pasar por la red. */
+
+export type Carta = { para: string; asunto: string; texto: string };
+export type Cartero = (c: Carta) => Promise<void>;
+
+let transporte: import("nodemailer").Transporter | null = null;
+let cartero: Cartero = async (c) => {
+  if (!transporte) {
+    const host = process.env.SMTP_HOST;
+    if (!host) throw new Error("correo sin configurar: falta SMTP_HOST (ver .env.example)");
+    const port = Number(process.env.SMTP_PORT ?? 587);
+    const nodemailer = await import("nodemailer");
+    transporte = nodemailer.createTransport({
+      host,
+      port,
+      // 465 es TLS desde el primer byte; el resto negocia STARTTLS.
+      secure: port === 465,
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" } : undefined,
+    });
+  }
+  await transporte.sendMail({
+    from: process.env.MAIL_FROM ?? "Bark & Meow <no-responder@barkandmeow.app>",
+    to: c.para,
+    subject: c.asunto,
+    text: c.texto,
+  });
+};
+
+export const enviarCorreo = (c: Carta) => cartero(c);
+
+export function usarCartero(c: Cartero) {
+  cartero = c;
+}
+
+/* ── Código de verificación del correo ────────────────────────
+   8 caracteres sin los que se confunden al copiarlos (0/O, 1/I/L, U): unos
+   38 bits. Con 15 minutos y 5 intentos, adivinarlo es inviable. */
+
+const ALFABETO_CODIGO = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+export function nuevoCodigoCorreo(): string {
+  return Array.from({ length: 8 }, () => ALFABETO_CODIGO[randomInt(ALFABETO_CODIGO.length)]).join("");
+}
+
+/** Normaliza lo tecleado: sin guiones ni espacios, en mayúsculas. */
+export const normalizarCodigoCorreo = (s: string) => s.toUpperCase().replace(/[\s-]/g, "");
+
+export const hashCodigoCorreo = (memberId: string, codigo: string) =>
+  createHash("sha256").update(`${memberId}:${codigo}`).digest("hex");
+
+export function mismoHash(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
 }

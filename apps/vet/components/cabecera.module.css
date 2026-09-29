@@ -1,0 +1,101 @@
+/* Cabecera común de la web del veterinario. 64px, blanco, hairline inferior;
+   el contenido se alinea al ancho compartido (--contenido) con --relleno. */
+
+.cabecera {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-height: 64px;
+  padding: 6px var(--relleno);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-width: 0;
+}
+
+/* El logotipo de packages/ui-web: símbolo y texto en trazos. */
+.logotipo {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Tamaño del logotipo: 44px en teléfono, 52px desde 720px. La proporción
+   entre símbolo y texto es la de logos/logo_horizontal_*.png y no se toca. */
+.logotipo {
+  height: 44px;
+  width: auto;
+}
+@media (min-width: 720px) {
+  .logotipo {
+    height: 52px;
+  }
+}
+
+
+.herramientas {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.nivel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--r-badge);
+  font-family: var(--font-data);
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* Nivel 0 no abre datos: sin color, solo la hairline. */
+.nivel0 {
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.nivel1 {
+  background: var(--alert-soft);
+  color: var(--alert-ink);
+}
+.nivel2 {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.nivelCaducado {
+  padding: 3px 7px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-ink);
+}
+
+.detalle {
+  white-space: pre;
+}
+
+/* En un teléfono estrecho, la insignia se queda con lo esencial. */
+@media (max-width: 420px) {
+  .detalle {
+    display: none;
+  }
+}
+@media (max-width: 360px) {
+  .logotipo {
+    height: 38px;
+  }
+}

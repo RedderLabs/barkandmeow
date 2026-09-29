@@ -1,0 +1,22 @@
+# Fuera del grafo de graphify (sintaxis de .gitignore).
+
+# Copias viejas y exportaciones: el contenido vive en barkandmeow-arquitectura.md.
+pdf/
+barkandmeow-arquitectura.pdf
+barkandmeow-arquitectura.docx
+
+# Licencias de fuentes, iconos y logos: no aportan relaciones.
+**/public/fonts/
+**/app/apple-icon.png
+**/app/icon.svg
+logos/
+
+# Stubs que regenera next dev.
+apps/*/AGENTS.md
+apps/*/CLAUDE.md
+
+# Capturas de las pantallas: su fuente está en diseno/fuente-lienzo/*.dc.html.
+pantallas/
+
+# Tokens generados.
+**/tokens.generated.css

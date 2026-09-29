@@ -1,0 +1,1 @@
+ALTER TABLE "pet_profiles" ADD COLUMN "foto_key" text;

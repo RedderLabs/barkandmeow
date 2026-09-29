@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ui from "./ui.module.css";
+import { Logotipo } from "./marca/Logotipo";
 
 export function IconKey({ size = 18 }: { size?: number }) {
   return (
@@ -73,7 +74,7 @@ export function IconInvite({ size = 20 }: { size?: number }) {
   );
 }
 
-type Surface = "consola" | "equipo";
+type Surface = "consola" | "activar" | "equipo";
 
 /* Un paquete compartido no puede saber de qué clínica se trata: la recibe.
    Antes importaba los datos de demostración de apps/clinic, que era una
@@ -90,12 +91,13 @@ export function AppHeader({
   return (
     <header className={ui.header}>
       <div className={ui.brand}>
-        <Link href="/" className={ui.wordmark}>
-          Bark & Meow
+        <Link href="/" className={ui.wordmark} aria-label="Bark & Meow · Consola">
+          <Logotipo alto={40} titulo="" />
         </Link>
         <span className={ui.badge}>CLÍNICA</span>
         <span className={ui.clinicName}>
-          {clinica.nombre} · {clinica.ciudad}, {clinica.pais}
+          {clinica.nombre} · {clinica.ciudad ? `${clinica.ciudad}, ` : ""}
+          {clinica.pais}
         </span>
       </div>
       <nav className={ui.nav}>
@@ -106,11 +108,21 @@ export function AppHeader({
           Consola
         </Link>
         <Link
+          href="/activar"
+          className={`${ui.navLink} ${active === "activar" ? ui.navLinkActive : ""}`}
+        >
+          Activar
+        </Link>
+        <Link
           href="/equipo"
           className={`${ui.navLink} ${active === "equipo" ? ui.navLinkActive : ""}`}
         >
           Equipo
         </Link>
+        {/* Un enlace normal, no de Next: la ruta de salida es del servidor. */}
+        <a href="/clinica/salir" className={ui.navLink}>
+          Salir
+        </a>
       </nav>
     </header>
   );

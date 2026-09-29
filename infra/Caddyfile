@@ -1,0 +1,82 @@
+# Proxy de producción de Bark & Meow (homelab, detrás de Cloudflare).
+#
+# Un solo origen público para lo que ve el veterinario, igual que en
+# desarrollo: la web estática de apps/vet en la raíz, /e/<id> y /s/<id> sobre
+# su página única, y /clinica reenviada al SaaS de apps/clinic. La API va en su
+# propio origen, con CORS limitado a esta web (VET_ORIGINS en apps/api).
+#
+# Los logs no guardan rutas ni IP: una ruta /e/<id> identifica una placa.
+
+{
+	# Sin log de accesos global.
+	log {
+		output discard
+	}
+
+	# La IP del cliente la da Cloudflare en CF-Connecting-IP, y solo se cree si
+	# la petición llega de Cloudflare (rangos de https://www.cloudflare.com/ips/,
+	# revísalos de vez en cuando) o de la red local, por si entra por
+	# cloudflared. Cualquier otro que mande la cabecera no cambia su IP.
+	servers {
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32 private_ranges
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
+(cabeceras) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+barkandmeow.app {
+	import cabeceras
+
+	# El SaaS de clínicas (next start con basePath /clinica).
+	handle /clinica* {
+		reverse_proxy 127.0.0.1:4520
+	}
+
+	# El portal del dueño (next start con basePath /mi-mascota).
+	handle /mi-mascota* {
+		reverse_proxy 127.0.0.1:4530
+	}
+
+	handle {
+		root * /srv/barkandmeow/vet/out
+
+		# Nivel 1 y 2: la exportación estática tiene una sola página por nivel;
+		# el id lo lee el navegador de la ruta y la clave del fragmento #, que
+		# nunca llega hasta aquí.
+		@ficha path_regexp ^/(e|s)/[0-9a-zA-Z-]+/?$
+		rewrite @ficha /{re.1}.html
+
+		# Ni el fragmento ni la página deben filtrarse a terceros, ni guardarse.
+		@nivel path_regexp ^/(e|s)(\.html|/.*)?$
+		header @nivel {
+			Cache-Control "no-store"
+			X-Frame-Options "DENY"
+			Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.barkandmeow.app; img-src 'self' https://api.barkandmeow.app data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+		}
+
+		# El núcleo criptográfico lleva la huella en el nombre: caché eterna.
+		@wasm path /crypto/*.wasm
+		header @wasm Cache-Control "public, max-age=31536000, immutable"
+
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+}
+
+api.barkandmeow.app {
+	import cabeceras
+	reverse_proxy 127.0.0.1:4601 {
+		# Una sola IP, la ya validada: la API confía solo en este salto
+		# (TRUST_PROXY) y con ella cuenta los límites por IP.
+		header_up X-Forwarded-For {client_ip}
+	}
+}

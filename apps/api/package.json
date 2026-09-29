@@ -4,26 +4,30 @@
   "description": "",
   "main": "src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "test": "node --import tsx --test test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "test": "node --env-file-if-exists=.env --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "reclamaciones": "tsx --env-file-if-exists=.env scripts/reclamaciones.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
+    "@barkandmeow/db": "workspace:*",
+    "@barkandmeow/schema": "workspace:*",
     "@fastify/cookie": "^11.1.2",
     "@fastify/rate-limit": "^11.2.0",
     "drizzle-orm": "^0.44.7",
     "fastify": "^5.12.5",
-    "zod": "^4.6.5",
-    "@barkandmeow/db": "workspace:*",
-    "@barkandmeow/schema": "workspace:*"
+    "nodemailer": "^7.0.13",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "@types/nodemailer": "^8.0.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

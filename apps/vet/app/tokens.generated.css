@@ -1,0 +1,102 @@
+/* GENERADO por packages/tokens desde diseno/tokens.json.
+   No editar a mano: los cambios se pierden en la siguiente generación. */
+
+/* PROVISIONAL
+   · dark-derived: Los valores oscuros de line, divider, field-line, ink-soft, los accent-* suaves, los alert-* suaves, info-soft, owner, owner-soft y quote-ground se derivaron al implementar, no venían del diseño original.
+*/
+
+:root {
+  --ground: #F4F1EA;
+  --surface: #FFFFFF;
+  --line: #DDD7CB;
+  --divider: #EEE9DF;
+  --field-line: #C8C1B3;
+  --ink: #1B2420;
+  --ink-soft: #3E4643;
+  --muted: #5A625E;
+  --accent: #1D6B57;
+  --accent-hover: #154F40;
+  --accent-press: #0E362C;
+  --accent-soft: #E3EFE9;
+  --accent-ink: #154F40;
+  --accent-soft-ink: #2F5A4E;
+  --accent-on: #FFFFFF;
+  --alert: #B4380E;
+  --alert-soft: #FBE9E0;
+  --alert-ink: #9A2F0B;
+  --alert-soft-line: #F0C4AE;
+  --alert-ghost-line: #C9A796;
+  --alert-soft-ink: #5A3A2C;
+  --alert-on: #FFFFFF;
+  --warn: #8A5300;
+  --warn-soft: #FAEFD9;
+  --warn-line: #E0C691;
+  --warn-ink: #6F4200;
+  --info: #1F4F8F;
+  --info-soft: #E6ECF5;
+  --owner: #5A4A2E;
+  --owner-soft: #F1EEE6;
+  --quote-ground: #F7F5F0;
+
+  --r-badge: 6px;
+  --r-small: 10px;
+  --r-control: 12px;
+  --r-card: 14px;
+  --r-panel: 16px;
+
+  --s-xs: 6px;
+  --s-sm: 8px;
+  --s-md: 12px;
+  --s-lg: 14px;
+  --s-xl: 18px;
+  --s-page: 20px;
+  --s-section: 24px;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-text: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --tap: 44px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-state: 120ms;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+  --ground: #141A18;
+  --surface: #1D2522;
+  --line: #2E3A35;
+  --divider: #26302C;
+  --field-line: #45534D;
+  --ink: #ECE8DF;
+  --ink-soft: #C9D1CC;
+  --muted: #A3ABA7;
+  --accent: #5FBF9F;
+  --accent-hover: #7FD0B5;
+  --accent-press: #4AA787;
+  --accent-soft: #1B3A31;
+  --accent-ink: #9FD9C5;
+  --accent-soft-ink: #A8DCC9;
+  --accent-on: #0E1412;
+  --alert: #C2410C;
+  --alert-soft: #3A1A0D;
+  --alert-ink: #F2946A;
+  --alert-soft-line: #6B3119;
+  --alert-ghost-line: #834025;
+  --alert-soft-ink: #F0B79A;
+  --alert-on: #FFFFFF;
+  --warn: #E8B765;
+  --warn-soft: #352A13;
+  --warn-line: #6B5426;
+  --warn-ink: #F0C98A;
+  --info: #8DB4EA;
+  --info-soft: #1A2739;
+  --owner: #C9B78F;
+  --owner-soft: #2B2619;
+  --quote-ground: #222B27;
+
+    color-scheme: dark;
+  }
+}

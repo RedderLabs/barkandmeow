@@ -1,34 +1,17 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import styles from "./console.module.css";
 import { AppHeader } from "@barkandmeow/ui-web/parts";
-import {
-  clinica,
-  conexionActiva,
-  conexionNinguna,
-  contadores,
-  envios,
-  permisos,
-  type Envio,
-} from "@/lib/demo";
+import { Button } from "@barkandmeow/ui-web/components/button";
+import { CustodiaClave } from "@/components/Custodia";
+import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+
+export const metadata: Metadata = { title: "Consola · Bark & Meow" };
+
+type Permiso = { id: string; petId: string; level: number; expiresAt: string | null };
+type Borrador = { id: string; especie: string; caduca: string; reclamado: string | null };
 
 /* Iconos dibujados, trazo 1.8, heredando currentColor. */
-
-function IconLink({ size = 18 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M10 13a5 5 0 0 0 7.5.5l2-2A5 5 0 0 0 12.5 4.5l-1 1" />
-      <path d="M14 11a5 5 0 0 0-7.5-.5l-2 2A5 5 0 0 0 11.5 19.5l1-1" />
-    </svg>
-  );
-}
 
 function IconUnlinked({ size = 18 }: { size?: number }) {
   return (
@@ -49,238 +32,125 @@ function IconUnlinked({ size = 18 }: { size?: number }) {
   );
 }
 
-function IconSeal({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="9.5" r="5.5" />
-      <path d="M12 7.5v4M10.5 9.5h3" />
-      <path d="M8.5 14.5 7 21l5-2 5 2-1.5-6.5" />
-    </svg>
-  );
+
+const DIA = 864e5;
+
+/** Permisos vigentes con sus días restantes y fichas preparadas sin reclamar. */
+async function cargarConsola() {
+  const [{ permisos }, { borradores }] = await Promise.all([
+    apiServidor<{ permisos: Permiso[] }>("/grants/v1/mine"),
+    apiServidor<{ borradores: Borrador[] }>("/clinics/v1/drafts"),
+  ]);
+  const ahora = Date.now();
+  return {
+    vigentes: permisos
+      .filter((p) => !p.expiresAt || new Date(p.expiresAt).getTime() > ahora)
+      .map((p) => ({
+        ...p,
+        dias: p.expiresAt ? Math.max(0, Math.ceil((new Date(p.expiresAt).getTime() - ahora) / DIA)) : null,
+      })),
+    preparadas: borradores.filter((b) => !b.reclamado && new Date(b.caduca).getTime() > ahora),
+  };
 }
 
-function IconAlert({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3 21.5 20h-19z" />
-      <path d="M12 10v4M12 17.5v.5" />
-    </svg>
-  );
-}
-
-function IconSend({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 3 10.5 13.5" />
-      <path d="M21 3l-6.5 18-4-8-8-4z" />
-    </svg>
-  );
-}
-
-function FilaEnvio({ envio }: { envio: Envio }) {
-  const fallido = envio.estado === "fallido";
-
-  return (
-    <li className={`${styles.row} ${fallido ? styles.rowFailed : ""}`}>
-      <span className={styles.rowTime}>{envio.hora}</span>
-
-      <div className={styles.rowBody}>
-        <span className={styles.rowTitle}>
-          {envio.tipo} · {envio.paciente}
-        </span>
-        <span className={styles.rowChip}>CHIP {envio.chip}</span>
-
-        {envio.estado === "sellado" && (
-          <p className={styles.sealed}>
-            <span className={styles.sealedIcon}>
-              <IconSeal />
-            </span>
-            Sellado para el dueño · sin vista previa
-          </p>
-        )}
-
-        {fallido && (
-          <>
-            <p className={styles.reason}>{envio.motivo}</p>
-            <p className={styles.recovery}>{envio.recuperacion}</p>
-            <button type="button" className={styles.retry}>
-              Pedir permiso al dueño
-            </button>
-          </>
-        )}
-      </div>
-
-      {envio.estado === "sellado" && (
-        <span className={`${styles.state} ${styles.stateSealed}`}>Entregado</span>
-      )}
-      {envio.estado === "en-cola" && (
-        <span className={`${styles.state} ${styles.stateQueued}`}>
-          Cifrando
-          <span className={styles.pending} aria-hidden="true" />
-        </span>
-      )}
-      {fallido && (
-        <span className={`${styles.state} ${styles.stateFailed}`}>
-          <IconAlert />
-          No entregado
-        </span>
-      )}
-    </li>
-  );
-}
-
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ conexion?: string }>;
-}) {
-  const { conexion: param } = await searchParams;
-  const sinConexion = param === "ninguna";
-  const conexion = sinConexion ? conexionNinguna : conexionActiva;
+export default async function Page() {
+  const yo = await exigirSesion();
+  const { vigentes, preparadas } = await cargarConsola();
 
   return (
     <div className={styles.shell}>
-      <AppHeader active="consola" clinica={clinica} />
+      <AppHeader active="consola" clinica={organizacion(yo)} />
 
-      <div
-        className={`${styles.link} ${
-          sinConexion ? styles.linkNone : styles.linkActive
-        }`}
-      >
+      {/* El envío automático desde el software de gestión aún no existe:
+          la tira lo dice en lugar de fingir una conexión. */}
+      <div className={`${styles.link} ${styles.linkNone}`}>
         <span className={styles.linkDot}>
-          {sinConexion ? <IconUnlinked /> : <IconLink />}
+          <IconUnlinked />
         </span>
-        <span className={styles.linkHead}>
-          {sinConexion
-            ? "Sin software conectado"
-            : `${conexion.software} ${conexion.version} conectado`}
-        </span>
-        <span>{conexion.detalle}</span>
-        {!sinConexion && (
-          <span className={styles.linkMeta}>
-            Última sincronización {conexion.ultimaSync}
-          </span>
-        )}
+        <span className={styles.linkHead}>Sin software conectado</span>
+        <span>Conectar el software de gestión por API todavía no está disponible.</span>
       </div>
 
-      {!sinConexion && (
-        <div className={styles.counters}>
-          {contadores.map((c) => (
-            <div key={c.etiqueta} className={styles.counter}>
-              <span className={styles.counterLabel}>{c.etiqueta}</span>
-              <span className={styles.counterValue}>{c.valor}</span>
-            </div>
-          ))}
+      <div className={`${styles.counters} ${styles.counters2}`}>
+        <div className={styles.counter}>
+          <span className={styles.counterLabel}>Permisos vigentes</span>
+          <span className={styles.counterValue}>{vigentes.length}</span>
         </div>
-      )}
+        <div className={styles.counter}>
+          <span className={styles.counterLabel}>Fichas preparadas sin dueño</span>
+          <span className={styles.counterValue}>{preparadas.length}</span>
+        </div>
+      </div>
 
       <main className={styles.grid}>
-        <section>
+        <section className="flex flex-col gap-4">
+          {!yo.clinicaActiva && (
+            <div className={styles.pendingNote} role="status">
+              La clínica aún no está activa: confirma el correo del administrador para
+              activar mascotas e invitar al equipo. <Link href="/verificar">Confirmar el correo</Link>
+            </div>
+          )}
+
+          {yo.role === "admin" && (
+            <CustodiaClave
+              clinicId={yo.clinicId}
+              pubKeyClinica={yo.clinica.pubKey}
+              claveEnvuelta={yo.claveEnvuelta}
+            />
+          )}
+
           <div className={styles.sectionHead}>
             <h1 className={styles.sectionTitle}>Registro de envíos</h1>
-            {!sinConexion && (
-              <span className={styles.sectionMeta}>Hoy · {envios.length} envíos</span>
-            )}
           </div>
-
-          {sinConexion ? (
-            <div className={styles.empty}>
-              <h2 className={styles.emptyTitle}>Todavía no has enviado nada</h2>
-              <p className={styles.emptyBody}>
-                Puedes trabajar sin conectar tu software: escribe el informe aquí y
-                sale cifrado a la ficha del dueño, igual que si viniera del programa
-                de gestión. Conectarlo solo evita el paso de escribirlo dos veces.
-              </p>
-              <div className={styles.emptyActions}>
-                <button type="button" className={styles.primary}>
-                  <IconSend />
-                  Escribir un informe
-                </button>
-                <button type="button" className={styles.secondary}>
-                  Conectar mi software
-                </button>
-              </div>
+          <div className={styles.empty}>
+            <h2 className={styles.emptyTitle}>Todavía no has enviado nada</h2>
+            <p className={styles.emptyBody}>
+              El envío de informes cifrados a la ficha del dueño aún no está disponible en esta
+              versión. Mientras tanto podéis activar las mascotas de vuestros pacientes: sin
+              activación, un chip no responde en Bark & Meow.
+            </p>
+            <div className={styles.emptyActions}>
+              <Button asChild>
+                <Link href="/activar">Activar una mascota</Link>
+              </Button>
             </div>
-          ) : (
-            <ul className={styles.log}>
-              {envios.map((e) => (
-                <FilaEnvio key={e.id} envio={e} />
-              ))}
-            </ul>
-          )}
+          </div>
         </section>
 
         <aside className={styles.aside}>
           <div className={styles.panel}>
             <h2 className={styles.panelTitle}>Permisos de nivel 3</h2>
-            <div className={styles.grantList}>
-              {permisos.map((p) => (
-                <div key={p.id} className={styles.grant}>
-                  <div>
-                    <div className={styles.grantName}>{p.paciente}</div>
-                    <div className={styles.grantChip}>CHIP {p.chip}</div>
-                  </div>
-                  {p.diasRestantes === null ? (
-                    <span className={`${styles.tag} ${styles.tagPermanent}`}>
-                      PERMANENTE
-                    </span>
-                  ) : p.diasRestantes <= 1 ? (
-                    <span className={`${styles.tag} ${styles.tagSoon}`}>
-                      CADUCA EN {p.diasRestantes} DÍA
-                    </span>
-                  ) : (
-                    <span className={`${styles.tag} ${styles.tagOk}`}>
-                      {p.diasRestantes} DÍAS
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
+            {vigentes.length === 0 ? (
+              <p className={styles.panelNote}>
+                Todavía ningún dueño os ha dado acceso permanente. Se concede desde su app,
+                comparando con vosotros un número de seis dígitos.
+              </p>
+            ) : (
+              <div className={styles.grantList}>
+                {vigentes.map(({ dias, ...p }) => {
+                  return (
+                    <div key={p.id} className={styles.grant}>
+                      <div>
+                        {/* El servidor no sabe el nombre: está cifrado para el dueño. */}
+                        <div className={styles.grantName}>Mascota</div>
+                        <div className={styles.grantChip}>ID {p.petId.slice(0, 8)}</div>
+                      </div>
+                      {dias === null ? (
+                        <span className={`${styles.tag} ${styles.tagPermanent}`}>PERMANENTE</span>
+                      ) : dias <= 1 ? (
+                        <span className={`${styles.tag} ${styles.tagSoon}`}>CADUCA EN {dias} DÍA</span>
+                      ) : (
+                        <span className={`${styles.tag} ${styles.tagOk}`}>{dias} DÍAS</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <p className={styles.panelNote}>
-              Un permiso caducado convierte cualquier envío en un error. El dueño
-              puede retirarlo cuando quiera, y entonces dejas de ver la ficha.
-            </p>
-          </div>
-
-          <div className={styles.panel}>
-            <h2 className={styles.panelTitle}>Enviar informe</h2>
-            <p className={styles.panelNote}>
-              Se cifra en este navegador contra la clave del dueño. Ni Bark & Meow ni la
-              clínica pueden volver a abrirlo: el dueño decide si lo añade a la
+              El dueño puede retirar un permiso cuando quiera, y entonces dejáis de ver la
               ficha.
             </p>
-            <button type="button" className={styles.primary}>
-              <IconSend />
-              Escribir un informe
-            </button>
           </div>
         </aside>
       </main>

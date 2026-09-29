@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@barkandmeow/ui-web/components/sonner";
 
 export const metadata: Metadata = {
   title: "Consola de conexión · Bark & Meow",
@@ -12,7 +12,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body>
         {children}
         <Toaster position="bottom-right" />

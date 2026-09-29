@@ -282,7 +282,9 @@ Las otras dos densidades son de producto. Las superficies de móvil (app del due
 
 **Móvil (390 × 844).** Padding de página 20px. Columna vertical con gaps de 14–18px entre bloques. La navegación inferior ocupa 76px fijos con cuatro columnas iguales, y el contenido que la lleva reduce el padding inferior a 0 para que la barra apoye en el borde. Rejilla de dos columnas (`repeat(2, minmax(0, 1fr))`, gap 10px) para las tarjetas de resumen, y de tres para los selectores de duración.
 
-**Escritorio (1280 × 900, historial del veterinario).** Cabecera fija de 64px con padding lateral de 32px, fondo blanco y hairline inferior. Debajo, rejilla de tres columnas `300px minmax(0, 1fr) 360px` con gap de 24px y padding de 28px/32px: identidad y constantes a la izquierda, historial cronológico en el centro, formulario de nota de la visita a la derecha, anclado con `align-self: start`. Es la única pantalla del sistema pensada para un ordenador de mostrador; las otras dos del veterinario son verticales porque se abren desde un móvil.
+**Escritorio (1280 × 900, historial del veterinario).** Cabecera fija de 64px con padding lateral de 32px, fondo blanco y hairline inferior. Debajo, rejilla de tres columnas `300px minmax(0, 1fr) 360px` con gap de 24px y padding de 28px/32px: identidad y constantes a la izquierda, historial cronológico en el centro, formulario de nota de la visita a la derecha, anclado con `align-self: start`.
+
+**Ancho único de la web del veterinario** (decidido 2026-09-27). Todo lo que ve el veterinario —portada, `/chip`, `/e` y `/s` en apps/vet, y consola, equipo y registro en `/clinica`— comparte un contenido de **1280 px**, con margen lateral de 20 px por debajo de 720 px y de 32 px por encima (`--contenido`, `--margen` y `--relleno` en `packages/ui-web/src/theme.css`, que importan las dos apps). En el registro de clínica, el formulario ocupa 720 px a la izquierda y «Lo que esta cuenta no hace» va en la columna de 360 px de la derecha. La cabecera común (`CabeceraVet`) y el cuerpo se alinean al mismo borde en cualquier monitor. Desde 1024 px, `/chip` y `/e` dejan de ser una columna de teléfono: el contenido va a la izquierda y la acción en una columna de 360 px a la derecha, la misma que ocupa la nota en `/s`. En `/e` las constantes pasan a una fila de celdas desde 1280 px. En un teléfono las tres siguen siendo una columna vertical.
 
 **Ritmo.** La escala de espaciado real es 6 / 8 / 10 / 12 / 14 / 16 / 18 / 20 / 24 / 28 / 32. El padding interno de tarjeta es 14px en móvil y 16px en bloques destacados; el de las filas dentro de una tarjeta, 12px 14px.
 
@@ -338,7 +340,7 @@ Dos familias distintas que no deben mezclarse.
 
 - **Style:** fondo blanco, borde de 1px #C8C1B3, radio 12px, 48px de alto, padding lateral de 14px, texto de 16px para que iOS no haga zoom al enfocar.
 - **Campo de chip (destacado):** 52px de alto, borde de 2px verde, Plex Mono 18px con `letter-spacing: 0.04em`. Es el campo protagonista del nivel 0 y se ve desde el otro lado del mostrador.
-- **Select:** 44px (40px en la cabecera de escritorio), radio 10px, hairline, contenido en Plex Mono. El selector de idioma es un select nativo a propósito: lo entiende cualquiera y funciona sin JavaScript.
+- **Select:** el Select de shadcn de `packages/ui-web`: 48px en formularios y 44px (`size="sm"`) en cabeceras, hairline, sin sombra, cada opción de 44px mínimos. En el selector de idioma, contenido en Plex Mono.
 - **Textarea:** mismo trazo y radio, padding 12px 14px, `resize: none`.
 - **Checkbox:** 20 × 20px con `accent-color: #1D6B57`, dentro de una fila de 44px mínimos de alto.
 - **Error:** la fila o el bloque toma fondo `alert-soft`, y debajo van dos líneas separadas: el motivo en `alert-ink` y la recuperación en `alert-soft-ink`. Un error que no dice cómo salir de él está a medias. *El estado de error del propio campo (trazo e icono dentro del input) sigue sin construirse.*
@@ -349,6 +351,14 @@ Dos familias distintas que no deben mezclarse.
 - **App del dueño:** barra inferior de 76px, fondo blanco, hairline superior, cuatro columnas iguales. Cada pestaña apila icono de 22px sobre etiqueta de 12px. Activa en verde con peso 600; en reposo en `muted` con peso normal. El peso además del color cumple la Regla del Doble Canal.
 - **Web del veterinario:** no hay navegación. Cada nivel es una pantalla terminal, con el wordmark y el selector de idioma como única cabecera. La ausencia de navegación es la función: el veterinario llega por un enlace y no tiene dónde perderse.
 - **Cabecera de escritorio:** 64px, blanco, hairline inferior; wordmark e insignia de nivel a la izquierda, cuenta atrás en mono y selector de idioma a la derecha.
+
+### Logotipo
+Fuente única: `logos/bark_and_meow_logo_vector.svg`. `packages/ui-web/scripts/logotipo.py` lo convierte, junto con Fraunces, en `packages/ui-web/src/marca/logotipo.generated.ts` y en el `app/icon.svg` de cada web. Se regenera cuando cambia el SVG de `logos/`; nunca se redibuja a mano ni se sustituye por texto.
+- **Componente:** `<Logotipo />` de `@barkandmeow/ui-web/marca`. Variante `horizontal` (símbolo y «Bark & Meow») en todas las cabeceras; variante `simbolo` para espacios cuadrados.
+- **Texto en trazos:** no depende de que cargue ninguna fuente, así que se ve idéntico en la web, en los iconos y en la app futura.
+- **Color:** el símbolo conserva sus verdes y su hueso en cualquier tema. El texto usa `--logo-tinta` (por defecto `ink`) para «Bark» y «Meow», y `--logo-acento` (por defecto `accent`) para el «&». Claro y oscuro funcionan solos; un tema futuro solo redefine esas dos variables.
+- **Tamaño:** 44 px de alto en teléfono y 52 px desde 720 px. La proporción entre símbolo y texto es la de `logos/logo_horizontal_*.png` y no se toca.
+- **Iconos:** `app/icon.svg` (favicon) y `app/apple-icon.png` (180 × 180, símbolo sobre hueso) en `apps/vet` y `apps/clinic`. La app móvil usará el mismo SVG de `logos/`.
 
 ### Bloque de alergias (componente firma)
 

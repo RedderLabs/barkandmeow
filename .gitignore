@@ -14,3 +14,11 @@ dist/
 # Artefactos locales
 .DS_Store
 Thumbs.db
+
+# Rust
+target/
+
+# Auditorías y credenciales de demo, solo en local
+audit/
+audit.txt
+demo.txt

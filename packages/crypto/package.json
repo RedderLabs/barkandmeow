@@ -1,0 +1,18 @@
+{
+  "name": "@barkandmeow/crypto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Núcleo criptográfico de Bark & Meow (Rust → WASM) y su envoltorio para JavaScript.",
+  "license": "AGPL-3.0-only",
+  "main": "./js/index.ts",
+  "types": "./js/index.ts",
+  "exports": {
+    ".": "./js/index.ts",
+    "./wasm": "./wasm/bm_crypto.wasm"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs --test && node --test js/prueba.test.ts"
+  }
+}

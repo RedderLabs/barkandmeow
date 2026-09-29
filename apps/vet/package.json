@@ -3,15 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "node ../../packages/crypto/copiar.mjs && next dev --port 4510",
+    "build": "node ../../packages/crypto/copiar.mjs && next build",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "ficha:prueba": "node --env-file=../api/.env scripts/ficha-de-prueba.mts"
   },
   "dependencies": {
+    "@barkandmeow/i18n": "workspace:*",
+    "@barkandmeow/ui-web": "workspace:*",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "@barkandmeow/crypto": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,7 +25,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "postgres": "^3.4.7"
   },
   "packageManager": "pnpm@11.9.0"
 }

@@ -1,6 +1,8 @@
 /* Genera el sistema visual desde diseno/tokens.json, que es la fuente única.
    Salidas:
-     - apps/clinic/app/tokens.generated.css   variables CSS para la web
+     - apps/clinic/app/tokens.generated.css   variables CSS para las webs
+     - apps/vet/app/tokens.generated.css
+     - apps/portal/app/tokens.generated.css
      - packages/tokens/dist/tokens.ts         objeto TypeScript para la app nativa
    Nada de lo generado se edita a mano: se edita tokens.json y se vuelve a correr. */
 
@@ -87,6 +89,8 @@ export type Modo = keyof Pick<Tokens, "light" | "dark">;
 
 const salidas = [
   [join(raiz, "apps", "clinic", "app", "tokens.generated.css"), css],
+  [join(raiz, "apps", "vet", "app", "tokens.generated.css"), css],
+  [join(raiz, "apps", "portal", "app", "tokens.generated.css"), css],
   [join(aqui, "dist", "tokens.css"), css],
   [join(aqui, "dist", "tokens.ts"), ts],
 ];

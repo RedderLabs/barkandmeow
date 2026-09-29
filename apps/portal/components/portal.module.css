@@ -1,0 +1,448 @@
+/* Portal del dueño. Densidad de móvil (cuerpo 14–15px): se usa en su propio
+   teléfono. Mismo sistema que el resto: hueso, blanco, hairline, sin sombras. */
+
+/* ── Código de activación: se enseña en la clínica, de un vistazo ── */
+
+.activacion {
+  padding: 18px;
+  border-radius: var(--r-panel);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.activacionEtiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-soft-ink);
+}
+.activacionCodigo {
+  font-family: var(--font-data);
+  font-size: clamp(30px, 9vw, 40px);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--accent-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.activacionNota {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--accent-soft-ink);
+}
+
+/* ── Ficha de una mascota en el panel ─────────────────────── */
+
+.ficha {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+@media (min-width: 560px) {
+  .ficha {
+    padding: 22px 24px;
+  }
+}
+
+.fichaCabecera {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "foto identidad"
+    "foto insignia";
+  column-gap: 16px;
+  row-gap: 8px;
+  align-items: center;
+}
+.fichaCabecera > :first-child {
+  grid-area: foto;
+}
+.fichaIdentidad {
+  grid-area: identidad;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  align-self: end;
+}
+.fichaInsignia {
+  grid-area: insignia;
+  align-self: start;
+}
+/* Con sitio, la insignia se va a la derecha: se lee antes que nada. */
+@media (min-width: 560px) {
+  .fichaCabecera {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "foto identidad insignia";
+  }
+  .fichaIdentidad {
+    align-self: center;
+  }
+  .fichaInsignia {
+    align-self: center;
+  }
+}
+
+.foto {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--ground);
+  border: 1px solid var(--line);
+}
+.fotoGrande {
+  width: 72px;
+  height: 72px;
+}
+.fotoVacia {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+/* Sin foto, la inicial en el serif del nombre: una portada, no un hueco. */
+.fotoInicial {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--accent-soft-ink);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.nombre {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.chip {
+  font-family: var(--font-data);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.correo {
+  font-weight: 500;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+/* Un número o una fecha dentro de una frase: mono, en su sitio. */
+.dato {
+  font-family: var(--font-data);
+  font-size: 0.93em;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--r-badge);
+  border: 1px solid transparent;
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.estadoListo {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.estadoAviso {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn-ink);
+}
+
+/* ── Los pasos: qué hace falta para que te llamen ─────────── */
+
+.pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pasosEtiqueta {
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pasosLista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.paso {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-areas: "icono texto accion";
+  column-gap: 12px;
+  row-gap: 12px;
+  align-items: center;
+  min-height: 60px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.paso:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.pasoAmplio {
+  grid-template-areas:
+    "icono texto texto"
+    ". accion accion";
+}
+.pasoIcono {
+  grid-area: icono;
+  align-self: start;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.paso_hecho {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+/* Lo pendiente es un hueco por rellenar: el aro vacío de una casilla. */
+.paso_falta {
+  border: 1.5px solid var(--warn-line);
+  background: var(--surface);
+}
+.paso_aviso {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.pasoTexto {
+  grid-area: texto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 3px;
+}
+.pasoTitulo {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.pasoDetalle {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.pasoAccion {
+  grid-area: accion;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.fichaPie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--divider);
+}
+@media (max-width: 479px) {
+  .fichaPie > * {
+    flex: 1 1 100%;
+  }
+}
+
+/* ── Sin mascotas todavía ─────────────────────────────────── */
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+.vacio > figure {
+  align-self: center;
+}
+@media (min-width: 560px) {
+  .vacio {
+    flex-direction: row;
+    align-items: center;
+    gap: 28px;
+  }
+}
+.vacioTexto {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 52ch;
+}
+
+.filaEtiqueta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── Vista previa del perfil público: como lo verá quien lo encuentre ── */
+
+.previa {
+  padding: 16px;
+  border: 1px dashed var(--field-line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.previaEtiqueta {
+  font-family: var(--font-data);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.previaBio {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.telefono {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--tap);
+  border-top: 1px solid var(--divider);
+  font-size: 14px;
+}
+.telefonoNumero {
+  font-family: var(--font-data);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.telefonoFila {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+/* En el teléfono el número necesita el ancho: «Quitar» baja a su propia fila. */
+@media (max-width: 480px) {
+  .telefonoFila {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .telefonoFila > button {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+.contador {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+}
+
+/* ── Bandeja: notas de consulta y avisos ──────────────────── */
+
+.bandeja {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mensaje {
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Un aviso es urgente: alguien tiene a la mascota. Tono de aviso, sin rojo. */
+.mensajeAviso {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+}
+.mensajeCabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.mensajeTipo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-data);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mensajeAviso .mensajeTipo {
+  color: var(--warn-ink);
+}
+.mensajeFecha {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.mensajeTitulo {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.mensajeTexto {
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.nota {
+  border-top: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+}
+.notaFila {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.notaValor {
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

@@ -1,6 +1,6 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq, gt, inArray, lt } from "drizzle-orm";
 import { accessLog, grantRequests, grants, petIdentifiers, pets } from "@barkandmeow/db";
 import {
   chipLookupBody,
@@ -10,8 +10,18 @@ import {
   normalizarChip,
   origenChip,
 } from "@barkandmeow/schema";
-import { db, env, gastarPresupuesto, indexar, numeroComparacion } from "../core.js";
+import {
+  db,
+  env,
+  firmarAviso,
+  gastarPresupuesto,
+  indexar,
+  numeroComparacion,
+  senueloAviso,
+} from "../core.js";
 import { sesionDe } from "./clinics.js";
+import { duenoDe } from "./duenos.js";
+import { perfilPublico } from "./ficha.js";
 
 /** La petición de alta caduca pronto: el número está en pantalla mientras tanto. */
 const VENTANA_MS = 10 * 60 * 1000;
@@ -20,7 +30,7 @@ const VENTANA_MS = 10 * 60 * 1000;
    nivel 0 fuese más larga cuando hay ficha, un observador de red sabría qué
    chips existen sin descifrar nada. Todas las respuestas se rellenan al mismo
    tamaño, y cuando no hay ficha van señuelos con la forma correcta. */
-const RESPUESTA_BYTES = 512;
+const RESPUESTA_BYTES = 4096;
 
 function padear<T extends Record<string, unknown>>(obj: T) {
   const sinPad = JSON.stringify({ ...obj, pad: "" });
@@ -54,7 +64,8 @@ export default async function rutasChip(app: FastifyInstance) {
       .select({ petId: pets.id, ownerPubKey: pets.ownerPubKey })
       .from(petIdentifiers)
       .innerJoin(pets, eq(pets.id, petIdentifiers.petId))
-      .where(eq(petIdentifiers.idIndex, idx))
+      // Solo registros activados en clínica: un pendiente no existe para nadie.
+      .where(and(eq(petIdentifiers.idIndex, idx), eq(petIdentifiers.activo, true)))
       .limit(1);
 
     const encontrado = filas[0] ?? null;
@@ -70,8 +81,19 @@ export default async function rutasChip(app: FastifyInstance) {
        el tráfico, no. */
     let requestId: string = uuidSenuelo();
     let sas: string = sasSenuelo();
+    /* Para avisar al dueño desde la web sin sesión: token y clave pública con
+       la que sellar el aviso. Con señuelos si no hay ficha. */
+    let aviso = senueloAviso();
+    let ownerPubKey = randomBytes(32).toString("base64");
+    let perfil = null as Awaited<ReturnType<typeof perfilPublico>>;
+    if (encontrado) {
+      aviso = firmarAviso(encontrado.petId);
+      ownerPubKey = encontrado.ownerPubKey.toString("base64");
+      perfil = await perfilPublico(encontrado.petId);
+    }
 
-    if (encontrado && sesion && parsed.data.vetPubKey) {
+    // Una clínica sin correo verificado no abre peticiones de alta.
+    if (encontrado && sesion?.clinicaActiva && parsed.data.vetPubKey) {
       const vetPubKey = Buffer.from(parsed.data.vetPubKey, "base64");
       const [peticion] = await db
         .insert(grantRequests)
@@ -97,7 +119,7 @@ export default async function rutasChip(app: FastifyInstance) {
     await gastarPresupuesto(t0, env.lookupBudgetMs);
 
     return reply.send(
-      padear({ existe: !!encontrado, origen, requestId, sas }),
+      padear({ existe: !!encontrado, origen, requestId, sas, aviso, ownerPubKey, perfil }),
     );
   });
 
@@ -105,6 +127,8 @@ export default async function rutasChip(app: FastifyInstance) {
   app.post("/grants/v1/request", async (req, reply) => {
     const sesion = await sesionDe(req);
     if (!sesion) return reply.code(401).send({ error: "sin sesión" });
+    if (!sesion.clinicaActiva)
+      return reply.code(403).send({ error: "verifica el correo de la clínica primero", motivo: "correo-sin-verificar" });
 
     const parsed = grantRequestBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "cuerpo inválido" });
@@ -117,7 +141,8 @@ export default async function rutasChip(app: FastifyInstance) {
       .select({ petId: pets.id, ownerPubKey: pets.ownerPubKey })
       .from(petIdentifiers)
       .innerJoin(pets, eq(pets.id, petIdentifiers.petId))
-      .where(eq(petIdentifiers.idIndex, idx))
+      // Solo registros activados en clínica: un pendiente no existe para nadie.
+      .where(and(eq(petIdentifiers.idIndex, idx), eq(petIdentifiers.activo, true)))
       .limit(1);
 
     if (!filas.length) {
@@ -166,23 +191,32 @@ export default async function rutasChip(app: FastifyInstance) {
 
   /**
    * La app del dueño aprueba: sube K envuelta para la clave del veterinario.
-   * El servidor guarda bytes que no puede abrir.
+   * El servidor guarda bytes que no puede abrir. Solo el dueño de la mascota,
+   * con su sesión abierta: la clínica que pidió el acceso conoce el requestId
+   * y no puede aprobárselo a sí misma.
    */
   app.post("/grants/v1/approve", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
     const parsed = grantApproveBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "cuerpo inválido" });
 
     const filas = await db
-      .select()
+      .select({ id: grantRequests.id, petId: grantRequests.petId, clinicId: grantRequests.clinicId })
       .from(grantRequests)
+      .innerJoin(pets, eq(pets.id, grantRequests.petId))
       .where(
         and(
           eq(grantRequests.id, parsed.data.requestId),
+          eq(pets.ownerId, d.ownerId),
+          // Con una reclamación abierta el titular puede no ser el dueño real.
+          eq(pets.estado, "activa"),
           eq(grantRequests.state, "pending"),
           gt(grantRequests.expiresAt, new Date()),
         ),
       )
       .limit(1);
+    // Misma respuesta si la petición es de otra mascota: no se confirma que exista.
     if (!filas.length)
       return reply.code(410).send({ error: "petición caducada o ya resuelta" });
 
@@ -205,14 +239,25 @@ export default async function rutasChip(app: FastifyInstance) {
     return reply.code(201).send({ grantId: g.id, level: 3 });
   });
 
+  /** Solo el dueño de la mascota retira el nivel 3. */
   app.post("/grants/v1/revoke", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
     const parsed = grantRevokeBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "cuerpo inválido" });
 
     const r = await db
       .update(grants)
       .set({ revokedAt: new Date() })
-      .where(eq(grants.id, parsed.data.grantId))
+      .where(
+        and(
+          eq(grants.id, parsed.data.grantId),
+          inArray(
+            grants.petId,
+            db.select({ id: pets.id }).from(pets).where(eq(pets.ownerId, d.ownerId)),
+          ),
+        ),
+      )
       .returning({ id: grants.id });
     if (!r.length) return reply.code(404).send({ error: "no encontrado" });
 
@@ -240,18 +285,15 @@ export default async function rutasChip(app: FastifyInstance) {
     return { permisos: vivos, total: vivos.length };
   });
 
-  /** Caducar peticiones vencidas. Lo llama un cron; idempotente. */
-  app.post("/grants/v1/sweep", async (_req, reply) => {
-    const r = await db
-      .update(grantRequests)
-      .set({ state: "expired" })
-      .where(
-        and(
-          eq(grantRequests.state, "pending"),
-          lt(grantRequests.expiresAt, new Date()),
-        ),
-      )
-      .returning({ id: grantRequests.id });
-    return reply.send({ caducadas: r.length });
-  });
+  /* Sin ruta de barrido: lo hace el cron interno (iniciarCron en index.ts). */
+}
+
+/** Caduca las peticiones de alta vencidas. La llama el cron interno. */
+export async function caducarPeticiones(): Promise<number> {
+  const r = await db
+    .update(grantRequests)
+    .set({ state: "expired" })
+    .where(and(eq(grantRequests.state, "pending"), lt(grantRequests.expiresAt, new Date())))
+    .returning({ id: grantRequests.id });
+  return r.length;
 }

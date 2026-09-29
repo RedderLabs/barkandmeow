@@ -8,6 +8,62 @@
       "when": 1790444004548,
       "tag": "0000_harsh_silk_fever",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790489081670,
+      "tag": "0001_perfil_publico",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790492444828,
+      "tag": "0002_direccion_clinica",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790493718521,
+      "tag": "0003_verificacion_correo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790494540689,
+      "tag": "0004_dominio_sin_reserva",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790496746111,
+      "tag": "0005_activacion_en_clinica",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790498713314,
+      "tag": "0006_portal_dueno",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790567590955,
+      "tag": "0007_foto_en_almacen",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790653966390,
+      "tag": "0008_invitacion_caduca",
+      "breakpoints": true
     }
   ]
 }

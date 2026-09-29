@@ -1,6 +1,33 @@
 [package]
-name = "crypto"
+name = "bm_crypto"
 version = "0.1.0"
 edition = "2024"
+description = "Núcleo criptográfico de Bark & Meow: compartido por la app del dueño y la web del veterinario."
+license = "AGPL-3.0-only"
+
+[lib]
+# cdylib para el .wasm de la web; rlib para los tests y la app nativa.
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# Sin features por defecto: nada de getrandom dentro del .wasm. La
+# aleatoriedad la pone quien llama (crypto.getRandomValues en el navegador,
+# el sistema en la app).
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "stream"] }
+crypto_box = { version = "0.9", default-features = false, features = ["salsa20"] }
+blake2 = { version = "0.10", default-features = false }
+hkdf = { version = "0.12", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+
+[dev-dependencies]
+getrandom = "0.2"
+# Solo en los tests: la implementación de referencia de crypto_box_seal para
+# comprobar que el sellado es compatible con libsodium.
+crypto_box = { version = "0.9", features = ["seal", "salsa20", "std"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
