@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { evaluarViaje, type RegistroEvaluable } from "@barkandmeow/schema";
+import { aCalendario, evaluarViaje, recordatoriosViaje, type RegistroEvaluable } from "@barkandmeow/schema";
 
 /* Las reglas del viaje, sin red ni base: solo fechas. */
 
@@ -59,5 +59,34 @@ describe("requisitos de viaje", () => {
   it("para otras especies no inventa reglas", () => {
     const r = evaluarViaje({ ...perro, especie: "rabbit" }, [], "ue", new Date("2026-10-15T10:00"));
     assert.deepEqual(r.map((x) => x.clave), ["especie"]);
+  });
+});
+
+describe("recordatorios del viaje", () => {
+  const ahora = new Date("2026-09-29T12:00");
+
+  it("avisa de renovar la rabia 30 días antes y de la franja de la tenia", () => {
+    const r = recordatoriosViaje(perro, [rabia("2026-01-10", "2027-01-10")], "ue-equinococo", new Date("2026-10-15T10:00"), "Kira", ahora);
+    const renovar = r.find((x) => x.clave === "rabia-renovar")!;
+    assert.equal(renovar.inicio.toDateString(), new Date("2026-12-11T00:00").toDateString());
+    const tenia = r.find((x) => x.clave === "equinococo")!;
+    assert.equal(tenia.inicio.getTime(), new Date("2026-10-10T10:00").getTime());
+    assert.equal(tenia.fin!.getTime(), new Date("2026-10-14T10:00").getTime());
+    assert.ok(r.some((x) => x.clave === "viaje"));
+  });
+
+  it("si la tenia ya está dada a tiempo, no la recuerda", () => {
+    const r = recordatoriosViaje(perro, [rabia("2026-01-10", "2027-01-10"), tenia("2026-10-12", "09:00")], "ue-equinococo", new Date("2026-10-15T10:00"), "Kira", ahora);
+    assert.equal(r.find((x) => x.clave === "equinococo"), undefined);
+  });
+
+  it("el calendario es iCalendar válido: CRLF, líneas de 75 octetos y texto escapado", () => {
+    const r = recordatoriosViaje(perro, [rabia("2026-01-10", "2027-01-10")], "ue-equinococo", new Date("2026-10-15T10:00"), "Kira, la de casa", ahora);
+    const ics = aCalendario(r, ahora);
+    assert.ok(ics.startsWith("BEGIN:VCALENDAR\r\n") && ics.endsWith("END:VCALENDAR\r\n"));
+    assert.equal(ics.split("BEGIN:VEVENT").length - 1, r.length);
+    for (const linea of ics.split("\r\n")) assert.ok(new TextEncoder().encode(linea).length <= 75, linea);
+    assert.match(ics.replace(/\r\n /g, ""), /Kira\\, la de casa/);
+    assert.match(ics, /DTSTART;VALUE=DATE:20261211/);
   });
 });

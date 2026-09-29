@@ -607,7 +607,9 @@ No sustituye al pasaporte europeo: es de papel y lo sella un veterinario autoriz
 - El pasaporte se guarda **cifrado con una clave que sale del código en papel del dueño** (`GET/PUT /owners/v1/pets/{id}/passport`, con versión para no pisar cambios de otro navegador). El servidor no ve nada.
 - **Requisitos por destino** (`packages/schema/src/viajes.ts`): otro país de la UE; Irlanda, Finlandia, Malta, Noruega e Irlanda del Norte (tenia, perros, entre 24 y 120 h antes de llegar); Gran Bretaña; y fuera de la UE con vuelta (análisis de anticuerpos, 30 días tras la vacuna, 3 meses de espera si no se hizo antes de salir). Lo certificado por una clínica cuenta antes que lo declarado. Cada destino enlaza su fuente oficial y la pantalla enseña la fecha de revisión (29/09/2026).
 - **Enseñarlo en el viaje:** un enlace temporal (24 h, 72 h o 7 días, revocable) con la clave en el fragmento y su QR, generado en el navegador. Abre `/p/{id}` en la web del veterinario, en su idioma: el chip para compararlo con el lector, cada registro con su firma comprobada allí mismo y la clínica que firmó según el directorio público, y lo declarado aparte.
-- Pendiente: recordatorios de plazos y guardar escaneado el pasaporte de papel como documento original.
+- **Recordatorios de plazos** en un archivo de calendario (`.ics`) que se genera en el navegador: renovar la rabia 30 días antes de que caduque, la franja de la tenia, el fin de los 21 días de espera y la víspera del viaje. El servidor no puede avisar por su cuenta porque no sabe nada del pasaporte, y así tampoco hace falta.
+- Un mismo registro firmado que llega dos veces (un reintento del software de gestión) cuenta una.
+- Pendiente: guardar escaneado el pasaporte de papel como documento original.
 
 **Urgencias en destino**
 

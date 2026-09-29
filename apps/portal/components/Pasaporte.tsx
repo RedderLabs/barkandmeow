@@ -6,8 +6,10 @@ import { cargarCripto, deBase64, firmaValida, type Cripto } from "@barkandmeow/c
 import {
   DESTINOS,
   REVISADO,
+  aCalendario,
   declarado,
   evaluarViaje,
+  recordatoriosViaje,
   registroClinico,
   type Declarado,
   type Destino,
@@ -36,7 +38,7 @@ import { listarEnlaces, retirarEnlace, type Enlace } from "@/lib/api";
 import { leerClave } from "@/lib/claves";
 import { CRYPTO_WASM_URL } from "@/lib/crypto-url";
 import { fecha } from "@/lib/fecha";
-import { abrirPasaporte, compartir, esConflicto, evaluables, guardar, nuevosDeLaBandeja, resumenRegistro } from "@/lib/pasaporte";
+import { abrirPasaporte, compartir, esConflicto, evaluables, guardar, nuevosDeLaBandeja, resumenRegistro, sinRepetidos } from "@/lib/pasaporte";
 import s from "./portal.module.css";
 
 /* Pasaporte de viaje: la copia digital del pasaporte europeo, con lo que
@@ -82,10 +84,13 @@ export function Pasaporte({
       const c = await cripto();
       let { datos, version } = await abrirPasaporte(c, secreta, petId);
       // Lo que envió la clínica y espera en la bandeja entra en el pasaporte.
-      const nuevos = await nuevosDeLaBandeja(c, secreta, petId, chipPista, datos);
-      if (nuevos.length) {
-        datos = { ...datos, certificados: [...datos.certificados, ...nuevos] };
+      const limpio = sinRepetidos(datos);
+      const nuevos = await nuevosDeLaBandeja(c, secreta, petId, chipPista, limpio ?? datos);
+      if (limpio || nuevos.length) {
+        datos = { ...(limpio ?? datos), certificados: [...(limpio ?? datos).certificados, ...nuevos] };
         version = await guardar(c, secreta, petId, datos, version);
+      }
+      if (nuevos.length) {
         toast(nuevos.length === 1 ? "Un registro nuevo de tu clínica" : `${nuevos.length} registros nuevos de tu clínica`, {
           description: "Firmados por la clínica y guardados en el pasaporte.",
         });
@@ -142,7 +147,7 @@ export function Pasaporte({
 
   return (
     <>
-      <Viaje estado={estado} />
+      <Viaje estado={estado} nombre={nombre} />
       <Registros estado={estado} cambiar={cambiar} />
       <Datos datos={estado.datos} cambiar={cambiar} chipPista={chipPista} />
       <Compartir petId={petId} nombre={nombre} estado={estado} />
@@ -167,7 +172,7 @@ function enUnaSemana() {
   return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}T10:00`;
 }
 
-function Viaje({ estado }: { estado: Listo }) {
+function Viaje({ estado, nombre }: { estado: Listo; nombre: string }) {
   const ids = useId();
   const [destino, setDestino] = useState<Destino>("ue");
   const [llegada, setLlegada] = useState(enUnaSemana);
@@ -177,13 +182,31 @@ function Viaje({ estado }: { estado: Listo }) {
     return evaluarViaje(estado.datos, evaluables(estado.c, estado.datos), destino, d);
   }, [estado, destino, llegada]);
   const faltan = requisitos.filter((r) => r.estado === "falta").length;
+  const recordatorios = useMemo(() => {
+    const d = new Date(llegada);
+    if (Number.isNaN(d.getTime())) return [];
+    return recordatoriosViaje(estado.datos, evaluables(estado.c, estado.datos), destino, d, nombre);
+  }, [estado, destino, llegada, nombre]);
+
+  /* El calendario se genera aquí y se descarga: ni el servidor sabe las fechas
+     ni hace falta darle permiso a nadie para escribir en tu calendario. */
+  function descargarRecordatorios() {
+    const ics = aCalendario(recordatorios);
+    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `viaje-${(nombre || "mascota").toLowerCase().replace(/[^a-z0-9ñáéíóúü]+/g, "-")}.ics`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("Recordatorios descargados", { description: "Ábrelo para añadirlos a tu calendario." });
+  }
 
   return (
     <section className={ui.panel} aria-labelledby={`${ids}-t`}>
       <h2 id={`${ids}-t`} className={ui.panelTitle}>
         Preparar un viaje
       </h2>
-      <div className={ui.fieldRow}>
+      <div className={s.viajeCampos}>
         <div className={ui.field}>
           <Label htmlFor={`${ids}-destino`}>Destino</Label>
           <select
@@ -238,6 +261,21 @@ function Viaje({ estado }: { estado: Listo }) {
           </li>
         ))}
       </ul>
+
+      {recordatorios.length > 0 && (
+        <div className={s.recordatorios}>
+          <ul className={s.recordatoriosLista}>
+            {recordatorios.map((r) => (
+              <li key={r.clave}>
+                <span className={s.dato}>{fecha(r.inicio.toISOString())}</span> · {r.titulo}
+              </li>
+            ))}
+          </ul>
+          <Button type="button" variant="outline" size="md" className="self-start" onClick={descargarRecordatorios}>
+            Añadir al calendario
+          </Button>
+        </div>
+      )}
 
       <p className={ui.panelNote}>
         Es una ayuda para preparar el viaje, no un certificado: en la frontera vale el pasaporte

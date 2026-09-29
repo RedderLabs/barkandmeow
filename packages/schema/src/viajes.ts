@@ -1,5 +1,5 @@
-import { esParteA } from "./species.js";
-import type { PasaporteDueno, RegistroDesparasitacion, RegistroTitulacion, RegistroVacuna } from "./pasaporte.js";
+import { esParteA } from "./species";
+import type { PasaporteDueno, RegistroDesparasitacion, RegistroTitulacion, RegistroVacuna } from "./pasaporte";
 
 /* Requisitos de viaje para perros, gatos y hurones que salen de España sin
    fines comerciales.
@@ -35,8 +35,8 @@ export const DESTINOS: Record<Destino, { nombre: string; detalle: string; fuente
     fuentes: [UE, MAPA],
   },
   "ue-equinococo": {
-    nombre: "Irlanda, Finlandia, Malta, Noruega o Irlanda del Norte",
-    detalle: "Piden además tratamiento contra la tenia a los perros",
+    nombre: "Irlanda, Finlandia, Malta o Noruega",
+    detalle: "También Irlanda del Norte. Piden además tratamiento contra la tenia a los perros",
     fuentes: [
       UE,
       {
@@ -258,4 +258,129 @@ export function evaluarViaje(
   }
 
   return r;
+}
+
+/* ── Recordatorios ─────────────────────────────────────────────
+   Las fechas que el dueño no puede dejar pasar. Se convierten en un archivo
+   de calendario en su navegador: el servidor no sabe nada del pasaporte, así
+   que tampoco podría avisar él. */
+
+export type Recordatorio = {
+  clave: string;
+  titulo: string;
+  descripcion: string;
+  inicio: Date;
+  /** Sin fin: un día entero. Con fin: una franja con hora. */
+  fin?: Date;
+};
+
+export function recordatoriosViaje(
+  pasaporte: Pick<PasaporteDueno, "especie" | "chip" | "numeroPasaporte">,
+  registros: RegistroEvaluable[],
+  destino: Destino,
+  llegada: Date,
+  nombre: string,
+  ahora = new Date(),
+): Recordatorio[] {
+  const quien = nombre || "tu mascota";
+  const r: Recordatorio[] = [];
+  const requisitos = evaluarViaje(pasaporte, registros, destino, llegada);
+  const estado = (clave: string) => requisitos.find((x) => x.clave === clave)?.estado;
+
+  const vacunas = registros.filter(
+    (x): x is Extract<RegistroEvaluable, { registro: RegistroVacuna }> =>
+      x.registro.tipo === "vacuna" && x.registro.enfermedad === "rabia",
+  );
+  const ultima = mejor(vacunas, (v) => v.registro.validaHasta);
+  if (ultima) {
+    const caduca = dia(ultima.registro.validaHasta);
+    const aviso = new Date(caduca.getTime() - 30 * DIA);
+    if (aviso.getTime() > ahora.getTime())
+      r.push({
+        clave: "rabia-renovar",
+        titulo: `Renovar la vacuna de la rabia de ${quien}`,
+        descripcion: `Caduca el ${fechaCorta(caduca)}. Si se renueva antes, no hay espera para viajar; si caduca, tras la nueva vacuna hay que esperar 21 días.`,
+        inicio: aviso,
+      });
+    if (estado("rabia") === "aviso") {
+      const desde = new Date(dia(ultima.registro.fecha).getTime() + 21 * DIA);
+      if (desde.getTime() > ahora.getTime())
+        r.push({
+          clave: "rabia-espera",
+          titulo: `${quien} ya puede viajar`,
+          descripcion: "Han pasado 21 días desde la vacuna de la rabia.",
+          inicio: desde,
+        });
+    }
+  }
+
+  if (estado("equinococo") === "falta") {
+    const desde = new Date(llegada.getTime() - 120 * 3600_000);
+    const hasta = new Date(llegada.getTime() - 24 * 3600_000);
+    if (hasta.getTime() > ahora.getTime())
+      r.push({
+        clave: "equinococo",
+        titulo: `Tratamiento contra la tenia de ${quien}`,
+        descripcion: `Entre el ${fechaHora(desde)} y el ${fechaHora(hasta)}, un veterinario tiene que darle praziquantel y anotarlo en el pasaporte europeo.`,
+        inicio: desde,
+        fin: hasta,
+      });
+  }
+
+  const vispera = new Date(llegada.getTime() - DIA);
+  if (vispera.getTime() > ahora.getTime())
+    r.push({
+      clave: "viaje",
+      titulo: `Viaje de ${quien}: lleva el pasaporte europeo`,
+      descripcion: `Llegada a ${DESTINOS[destino].nombre} el ${fechaHora(llegada)}. En la frontera vale el pasaporte de papel.`,
+      inicio: new Date(vispera.getFullYear(), vispera.getMonth(), vispera.getDate()),
+    });
+
+  return r;
+}
+
+/** Los recordatorios en formato iCalendar (RFC 5545), con aviso incluido. */
+export function aCalendario(recordatorios: Recordatorio[], ahora = new Date()): string {
+  const utc = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const soloDia = (d: Date) =>
+    `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const escapar = (t: string) =>
+    t.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  // Líneas de más de 75 octetos se parten con un espacio al principio.
+  const plegar = (linea: string) => {
+    const bytes = new TextEncoder().encode(linea);
+    if (bytes.length <= 75) return linea;
+    const trozos: string[] = [];
+    let actual = "";
+    for (const ch of linea) {
+      if (new TextEncoder().encode(actual + ch).length > (trozos.length ? 74 : 75)) {
+        trozos.push(actual);
+        actual = "";
+      }
+      actual += ch;
+    }
+    trozos.push(actual);
+    return trozos.join("\r\n ");
+  };
+  const lineas = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bark & Meow//Pasaporte de viaje//ES", "CALSCALE:GREGORIAN"];
+  for (const x of recordatorios) {
+    lineas.push(
+      "BEGIN:VEVENT",
+      `UID:${x.clave}-${x.inicio.getTime()}@barkandmeow.app`,
+      `DTSTAMP:${utc(ahora)}`,
+      ...(x.fin
+        ? [`DTSTART:${utc(x.inicio)}`, `DTEND:${utc(x.fin)}`]
+        : [`DTSTART;VALUE=DATE:${soloDia(x.inicio)}`, `DTEND;VALUE=DATE:${soloDia(new Date(x.inicio.getTime() + DIA))}`]),
+      `SUMMARY:${escapar(x.titulo)}`,
+      `DESCRIPTION:${escapar(x.descripcion)}`,
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapar(x.titulo)}`,
+      x.fin ? "TRIGGER:-PT12H" : "TRIGGER:-PT15H",
+      "END:VALARM",
+      "END:VEVENT",
+    );
+  }
+  lineas.push("END:VCALENDAR");
+  return lineas.map(plegar).join("\r\n") + "\r\n";
 }

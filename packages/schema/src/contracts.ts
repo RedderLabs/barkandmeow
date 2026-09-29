@@ -1,7 +1,7 @@
 import { z } from "zod";
-export { dominioDeCorreo } from "./correo.js";
-import { identificador } from "./identifiers.js";
-import { codigoEspecie } from "./species.js";
+export { dominioDeCorreo } from "./correo";
+import { identificador } from "./identifiers";
+import { codigoEspecie } from "./species";
 
 /* Contratos de la API. El servidor valida con esto y nunca ve nada en claro:
    todo lo que lleva contenido clínico viaja como bytes opacos en base64. */

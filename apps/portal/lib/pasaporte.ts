@@ -82,6 +82,8 @@ export async function nuevosDeLaBandeja(
 ): Promise<Certificado[]> {
   const { mensajes } = await leerBandeja();
   const ya = new Set(datos.certificados.map((x) => x.id));
+  // El mismo registro firmado dos veces (un reintento del software) cuenta una.
+  const textos = new Set(datos.certificados.map((x) => x.registro));
   const nuevos: Certificado[] = [];
   for (const m of mensajes) {
     if (m.petId !== petId || !m.origen || ya.has(m.id)) continue;
@@ -95,7 +97,8 @@ export async function nuevosDeLaBandeja(
     }
     if (!f.success) continue;
     const r = comprobar(c, f.data, m.origen, chipPista);
-    if (!r.valido || r.registro.tipo === "informe") continue;
+    if (!r.valido || r.registro.tipo === "informe" || textos.has(f.data.registro)) continue;
+    textos.add(f.data.registro);
     nuevos.push({
       id: m.id,
       registro: f.data.registro,
@@ -158,4 +161,11 @@ export function resumenRegistro(r: { tipo: string } & Record<string, unknown>): 
       detalle: partes([`${r.resultado} UI/ml`, f(r.fechaMuestra) && `muestra del ${f(r.fechaMuestra)}`, r.laboratorio]),
     };
   return { titulo: "Registro", detalle: "" };
+}
+
+/** Quita los certificados repetidos (mismo texto firmado). null si no había ninguno. */
+export function sinRepetidos(datos: PasaporteDueno): PasaporteDueno | null {
+  const vistos = new Set<string>();
+  const certificados = datos.certificados.filter((x) => !vistos.has(x.registro) && !!vistos.add(x.registro));
+  return certificados.length === datos.certificados.length ? null : { ...datos, certificados };
 }

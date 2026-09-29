@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { codigoEspecie } from "./species.js";
+import { codigoEspecie } from "./species";
 
 /* Pasaporte de viaje (decidido 2026-09-29).
 
