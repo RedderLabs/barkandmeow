@@ -69,7 +69,7 @@ sequenceDiagram
 
 | Nivel | Qué hace falta | Qué se ve | Caduca |
 | --- | --- | --- | --- |
-| 0 — Localizar | Número de chip | "Existe ficha" + botón para avisar al dueño | — |
+| 0 — Localizar | Número de chip | "Existe ficha", el perfil público si el dueño lo publicó (foto, bio, teléfonos) + botón para avisar al dueño | — |
 | 1 — Emergencia | Placa QR/NFC (clave en la URL) | Alergias, enfermedades crónicas, medicación actual, vacuna de la rabia, contacto | No; se rota al cambiar la placa |
 | 2 — Historial | Enlace temporal generado por el dueño | Todo: visitas, analíticas, documentos originales | 24 h, 72 h o 7 días; revocable |
 | 3 — Veterinario habitual | Acceso permanente concedido por el dueño, pedido desde el SaaS de la clínica y aprobado con número de comparación | Todo + subir informes | Hasta que el dueño lo retire |
@@ -162,7 +162,7 @@ El número de comparación no se guarda: las dos partes lo derivan de datos que 
 
 ## La clínica como organización: alta, equipo y claves
 
-**Alta de la clínica.** Se registra con nombre, dirección, país, número de registro sanitario y un dominio. El dominio se comprueba con un TXT en DNS, el mismo procedimiento que el alta de un nodo federado. Hasta que el dominio está verificado la clínica puede entrar y preparar cosas, pero **no aparece como clínica verificada en el aviso que recibe el dueño**, y ese aviso es justo lo que hace creíble una petición de nivel 3.
+**Alta de la clínica.** Se registra con nombre, dirección, país y número de registro sanitario; el dominio no se pregunta. (Decidido el 27/09/2026.) El administrador recibe un código de 8 caracteres en su correo, que caduca a los 15 minutos y admite 5 intentos: hasta confirmarlo la clínica no puede invitar al equipo, preparar fichas ni pedir accesos. Si el correo es del dominio de la clínica (nombre@clinica.es), confirmarlo **verifica también el dominio**, porque solo alguien de esa organización recibe correo ahí, y el aviso que recibe el dueño dice «clínica verificada · clinica.es». Con un correo gratuito (Gmail, Hotmail…) el correo queda confirmado pero la clínica **no aparece como verificada**, y ese sello es justo lo que hace creíble una petición de nivel 3.
 
 **Tres roles.**
 
@@ -293,11 +293,17 @@ Núcleo criptográfico en Rust compilado a WASM, compartido por la app (vía JSI
 - El fragmento `#` de una URL nunca se envía al servidor, así que el servidor guarda bloques que no puede abrir.
 - Revocar borra la copia cifrada del servidor, pero no lo que el veterinario ya descargó. La app lo dice al compartir.
 
+**Registro del chip en dos pasos** (decidido el 27/09/2026)
+
+- El dueño registra el chip desde su app: el registro queda pendiente, con un código de activación que solo ve él. Un pendiente no responde al nivel 0 ni reserva el chip.
+- Una clínica activa lo activa leyendo el chip con el animal delante y tecleando ese código. Solo un registro activo por chip.
+- Si el chip ya está activo, la clínica abre una reclamación: el registro actual queda congelado y, sin impugnación en 14 días, el chip pasa al reclamante.
+
 **Protección del número de chip**
 
 - El servidor no guarda el número en claro: guarda `HMAC-SHA256(pepper, chip)`, con el `pepper` en un servicio separado.
 - Límite de consultas por IP y respuestas de igual tamaño y tiempo exista o no la ficha, para que nadie pueda recorrer números.
-- Los avisos al dueño usan un token de notificación push; nunca se muestra su teléfono ni su email en el nivel 0.
+- Los avisos al dueño van sellados en el navegador del veterinario para la clave pública del dueño y esperan en su bandeja; el aviso push al móvil está pendiente. El nivel 0 nunca muestra el email del dueño, y solo muestra teléfonos si el dueño los publicó en su perfil público (decidido 2026-09-27: el perfil público es visible por placa, por número de chip y dentro de la ficha).
 
 **Registro de accesos**
 
