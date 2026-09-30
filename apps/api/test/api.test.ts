@@ -5,6 +5,8 @@ import { crearCliente } from "@barkandmeow/db";
 import { crearApp } from "../src/index.js";
 import { cerrarDb, indexar, usarCartero, type Carta } from "../src/core.js";
 import { almacenEnMemoria, usarAlmacen } from "../src/almacen.js";
+import { usarPushero } from "../src/push.js";
+import { usarSmsista, type Sms } from "../src/sms.js";
 import { resolverReclamaciones } from "../src/routes/mascotas.js";
 
 /* Correo sin red: el cartero de los tests guarda las cartas en memoria. */
@@ -14,6 +16,19 @@ const buzon: Carta[] = [];
 usarCartero(async (c) => {
   buzon.push(c);
 });
+/* SMS y push sin red: se guardan en memoria. */
+const smsEnviados: Sms[] = [];
+usarSmsista(async (m) => {
+  smsEnviados.push(m);
+});
+const pushes: { to: string; data: { tipo: string; petId: string } }[] = [];
+const tokensCaducados = new Set<string>();
+usarPushero(async (mensajes) => {
+  pushes.push(...mensajes);
+  return mensajes.map((m) => ({ token: m.to, caducado: tokensCaducados.has(m.to) }));
+});
+const ultimoSms = (para: string) =>
+  [...smsEnviados].reverse().find((m) => m.para === para)?.texto.match(/\b([2-9A-Z]{4}-[2-9A-Z]{4})\b/)?.[1] ?? "";
 /* Almacén de objetos sin red: los tests no suben nada al bucket de B2. */
 const almacen = almacenEnMemoria();
 usarAlmacen(almacen);
@@ -1296,6 +1311,73 @@ describe("software de gestión conectado por API", () => {
     assert.equal(registro.json().envios[0].bytes, 200);
   });
 
+  it("los PDF adjuntos van sellados al almacén y solo los descarga el dueño", async () => {
+    const movil = "ExponentPushToken[movil-del-dueno-api]";
+    const reg = await app.inject({
+      method: "POST",
+      url: "/owners/v1/devices",
+      headers: { cookie: cookieDueno },
+      payload: { plataforma: "expo", token: movil },
+    });
+    assert.equal(reg.statusCode, 201);
+    pushes.length = 0;
+
+    const pdf1 = randomBytes(3000);
+    const pdf2 = randomBytes(5000);
+    const envia = await conClave("/clinics/v1/reports", token, {
+      petId: petApi,
+      sellado: b64(300),
+      adjuntos: [pdf1.toString("base64"), pdf2.toString("base64")],
+    });
+    assert.equal(envia.statusCode, 201);
+    assert.equal(envia.json().adjuntos, 2);
+    // Un push sin contenido: solo que hay algo nuevo.
+    assert.deepEqual(
+      pushes.map((m) => [m.to, m.data.tipo, m.data.petId]),
+      [[movil, "bandeja", petApi]],
+    );
+    assert.ok(!JSON.stringify(pushes).includes("Clínica"));
+
+    const bandeja = await app.inject({ method: "GET", url: "/owners/v1/inbox", headers: { cookie: cookieDueno } });
+    const m = bandeja.json().mensajes.find((x: { adjuntos: unknown[] }) => x.adjuntos.length);
+    assert.deepEqual(
+      m.adjuntos.map((a: { orden: number; bytes: number }) => [a.orden, a.bytes]),
+      [
+        [0, 3000],
+        [1, 5000],
+      ],
+    );
+    const url = `/owners/v1/inbox/${m.id}/attachments/${m.adjuntos[1].id}`;
+    const baja = await app.inject({ method: "GET", url, headers: { cookie: cookieDueno } });
+    assert.equal(baja.statusCode, 200);
+    assert.deepEqual(baja.rawPayload, pdf2);
+    assert.equal((await app.inject({ method: "GET", url })).statusCode, 401);
+
+    // Demasiados adjuntos: no entra nada.
+    const muchos = await conClave("/clinics/v1/reports", token, {
+      petId: petApi,
+      sellado: b64(100),
+      adjuntos: [b64(10), b64(10), b64(10), b64(10)],
+    });
+    assert.equal(muchos.statusCode, 400);
+
+    // Al borrar el mensaje se van también del almacén.
+    const [{ s3_key }] = await sql`SELECT s3_key FROM inbox_adjuntos WHERE id = ${m.adjuntos[0].id}`;
+    assert.ok(almacen.objetos.has(s3_key));
+    const borra = await app.inject({ method: "DELETE", url: `/owners/v1/inbox/${m.id}`, headers: { cookie: cookieDueno } });
+    assert.equal(borra.statusCode, 200);
+    assert.ok(!almacen.objetos.has(s3_key));
+  });
+
+  it("un token push caducado se borra al primer envío", async () => {
+    const movil = "ExponentPushToken[movil-del-dueno-api]";
+    tokensCaducados.add(movil);
+    await conClave("/clinics/v1/reports", token, { petId: petApi, sellado: b64(96) });
+    tokensCaducados.delete(movil);
+    const filas = await sql`SELECT 1 FROM owner_devices WHERE token = ${movil}`;
+    assert.equal(filas.length, 0);
+  });
+
   it("si el dueño retira el permiso, deja de poder enviarle", async () => {
     await sql`UPDATE grants SET revoked_at = now() WHERE pet_id = ${petApi}`;
     const envia = await conClave("/clinics/v1/reports", token, { petId: petApi, sellado: b64(96) });
@@ -1321,7 +1403,7 @@ describe("software de gestión conectado por API", () => {
     assert.notEqual(dir.json().retirada, null);
     // Lo que ya se envió sigue en el registro de la clínica.
     const registro = await app.inject({ method: "GET", url: "/clinics/v1/reports", headers: { cookie } });
-    assert.equal(registro.json().envios.length, 1);
+    assert.equal(registro.json().envios.length, 3);
   });
 });
 
@@ -1418,5 +1500,288 @@ describe("pasaporte de viaje", () => {
       payload: { id: randomUUID(), sobre: b64(40), horas: 24 * 365 },
     });
     assert.equal(r.statusCode, 400);
+  });
+});
+
+describe("segundo factor por SMS y la app móvil", () => {
+  const CHIP_SMS = "724098100008080";
+  const idSms = { tipo: "iso", valor: CHIP_SMS };
+  const correo = "sms@correo.example";
+  const clave = "clave-del-dueno-sms-larga";
+  const telefono = "+34612345678";
+  let cookieDueno = "";
+
+  const galleta = (r: { cookies: { name: string; value: string }[] }) =>
+    r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  const entrar = (headers: Record<string, string> = {}) =>
+    app.inject({ method: "POST", url: "/owners/v1/login", headers, payload: { identificador: idSms, password: clave } });
+
+  before(async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email: correo, password: clave, pubKey: b64(), mascota: { identificador: idSms, nombre: "Tor" } },
+    });
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: galleta(r) },
+      payload: { codigo: ultimoCodigo(correo) },
+    });
+    cookieDueno = galleta(v);
+  });
+
+  it("solo admite teléfonos de los prefijos permitidos", async () => {
+    const r = await app.inject({
+      method: "PUT",
+      url: "/owners/v1/phone",
+      headers: { cookie: cookieDueno },
+      payload: { telefono: "+1 555 010 9999" },
+    });
+    assert.equal(r.statusCode, 400);
+    assert.equal(r.json().motivo, "telefono");
+  });
+
+  it("el teléfono no cuenta hasta confirmarlo con el código del SMS", async () => {
+    const r = await app.inject({
+      method: "PUT",
+      url: "/owners/v1/phone",
+      headers: { cookie: cookieDueno },
+      payload: { telefono: "+34 612 34 56 78" },
+    });
+    assert.equal(r.statusCode, 202);
+    assert.match(ultimoSms(telefono), /^[2-9A-Z]{4}-[2-9A-Z]{4}$/);
+    let me = (await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: cookieDueno } })).json();
+    assert.equal(me.segundoFactor, "correo");
+    assert.equal(me.telefono.verificado, false);
+    assert.ok(!JSON.stringify(me).includes(telefono));
+
+    // Elegir SMS sin confirmar no se puede.
+    const antes = await app.inject({
+      method: "PUT",
+      url: "/owners/v1/second-factor",
+      headers: { cookie: cookieDueno },
+      payload: { canal: "sms" },
+    });
+    assert.equal(antes.statusCode, 409);
+
+    const mal = await app.inject({
+      method: "POST",
+      url: "/owners/v1/phone/verify",
+      headers: { cookie: cookieDueno },
+      payload: { codigo: "ZZZZ-ZZZZ" },
+    });
+    assert.equal(mal.json().intentosRestantes, 4);
+    const bien = await app.inject({
+      method: "POST",
+      url: "/owners/v1/phone/verify",
+      headers: { cookie: cookieDueno },
+      payload: { codigo: ultimoSms(telefono) },
+    });
+    assert.equal(bien.statusCode, 200);
+    me = (await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: cookieDueno } })).json();
+    assert.equal(me.segundoFactor, "sms");
+    assert.equal(me.telefono.verificado, true);
+  });
+
+  it("con SMS elegido, el código de entrada llega por SMS y no por correo", async () => {
+    const cartas = buzon.length;
+    const r = await entrar();
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().canal, "sms");
+    assert.equal(r.json().otroCanal, "correo");
+    assert.equal(buzon.length, cartas);
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: galleta(r) },
+      payload: { codigo: ultimoSms(telefono) },
+    });
+    assert.equal(v.statusCode, 200);
+  });
+
+  it("sin el móvil a mano, el código se puede pedir por correo", async () => {
+    const r = await entrar();
+    const pendiente = galleta(r);
+    await sql`UPDATE owners SET email_code_sent_at = now() - interval '2 minutes' WHERE email = ${correo}`;
+    const otro = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/resend",
+      headers: { cookie: pendiente },
+      payload: { canal: "correo" },
+    });
+    assert.equal(otro.statusCode, 202);
+    assert.equal(otro.json().canal, "correo");
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: galleta(otro) },
+      payload: { codigo: ultimoCodigo(correo) },
+    });
+    assert.equal(v.statusCode, 200);
+    // El código anterior, el del SMS, ya no vale.
+    const viejo = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: pendiente },
+      payload: { codigo: ultimoSms(telefono) },
+    });
+    assert.equal(viejo.statusCode, 410);
+  });
+
+  it("agotado el cupo diario de SMS, el código sale por correo", async () => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    await sql`UPDATE owners SET sms_dia = ${hoy}, sms_enviados = 99 WHERE email = ${correo}`;
+    const r = await entrar();
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().canal, "correo");
+    await sql`UPDATE owners SET sms_enviados = 0 WHERE email = ${correo}`;
+  });
+
+  it("la app recibe el token en la respuesta y entra con Bearer, sin cookies", async () => {
+    const app1 = { "x-bm-cliente": "app" };
+    const r = await entrar(app1);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.cookies.length, 0);
+    const pendiente = r.json().token;
+    assert.match(pendiente, /^[A-Za-z0-9_-]{43}$/);
+    // Con el token pendiente no se ve nada.
+    const antes = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { authorization: `Bearer ${pendiente}` } });
+    assert.equal(antes.statusCode, 401);
+
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { ...app1, authorization: `Bearer ${pendiente}` },
+      payload: { codigo: ultimoSms(telefono) },
+    });
+    assert.equal(v.statusCode, 200);
+    assert.equal(v.cookies.length, 0);
+    const abierta = v.json().token;
+    const me = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { authorization: `Bearer ${abierta}` } });
+    assert.equal(me.statusCode, 200);
+    assert.equal(me.json().mascotas[0].perfil.nombre, "Tor");
+
+    // El móvil se registra para avisos y se da de baja al salir.
+    const movil = { plataforma: "expo", token: "ExponentPushToken[movil-de-tor-0001]" };
+    const alta = await app.inject({
+      method: "POST",
+      url: "/owners/v1/devices",
+      headers: { authorization: `Bearer ${abierta}` },
+      payload: movil,
+    });
+    assert.equal(alta.statusCode, 201);
+    const malo = await app.inject({
+      method: "POST",
+      url: "/owners/v1/devices",
+      headers: { authorization: `Bearer ${abierta}` },
+      payload: { plataforma: "expo", token: "no-es-un-token" },
+    });
+    assert.equal(malo.statusCode, 400);
+    const baja = await app.inject({
+      method: "DELETE",
+      url: "/owners/v1/devices",
+      headers: { authorization: `Bearer ${abierta}` },
+      payload: movil,
+    });
+    assert.equal(baja.statusCode, 200);
+    const salir = await app.inject({ method: "POST", url: "/owners/v1/logout", headers: { authorization: `Bearer ${abierta}` } });
+    assert.equal(salir.statusCode, 200);
+    const despues = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { authorization: `Bearer ${abierta}` } });
+    assert.equal(despues.statusCode, 401);
+  });
+
+  it("quitar el teléfono devuelve el código al correo", async () => {
+    const r = await app.inject({ method: "DELETE", url: "/owners/v1/phone", headers: { cookie: cookieDueno } });
+    assert.equal(r.json().segundoFactor, "correo");
+    const e = await entrar();
+    assert.equal(e.json().canal, "correo");
+    assert.equal(e.json().otroCanal, null);
+  });
+});
+
+describe("panel del operador: reclamaciones", () => {
+  const OPS = "t".repeat(40);
+  const conOps = (method: "GET" | "POST", url: string, payload?: object, t = OPS) =>
+    app.inject({ method, url, headers: { authorization: `Bearer ${t}` }, payload });
+  let impugnada = "";
+  let enPlazo = "";
+  let titularPet = "";
+
+  before(async () => {
+    const [cl] = await sql`SELECT id FROM clinics WHERE name = 'Clínica de prueba' LIMIT 1`;
+    const [t] = await sql`INSERT INTO owners (email, password_hash, pub_key, email_verified_at)
+      VALUES ('titular-ops@correo.example', 'x', ${randomBytes(32)}, now()) RETURNING id`;
+    const [rc] = await sql`INSERT INTO owners (email, password_hash, pub_key, email_verified_at)
+      VALUES ('reclamante-ops@correo.example', 'x', ${randomBytes(32)}, now()) RETURNING id`;
+    const nuevaPet = async (ownerId: string, estado: string) =>
+      (await sql`INSERT INTO pets (owner_pub_key, owner_id, estado, chip_pista)
+        VALUES (${randomBytes(32)}, ${ownerId}, ${estado}, '4242') RETURNING id`)[0].id as string;
+    titularPet = await nuevaPet(t.id, "congelada");
+    const reclamantePet = await nuevaPet(rc.id, "pendiente");
+    impugnada = (await sql`INSERT INTO reclamaciones (pet_id, reclamante_pet_id, clinic_id, estado, plazo)
+      VALUES (${titularPet}, ${reclamantePet}, ${cl.id}, 'impugnada', now() + interval '3 days') RETURNING id`)[0].id;
+    const otraTitular = await nuevaPet(t.id, "congelada");
+    const otraReclamante = await nuevaPet(rc.id, "pendiente");
+    enPlazo = (await sql`INSERT INTO reclamaciones (pet_id, reclamante_pet_id, clinic_id, estado, plazo)
+      VALUES (${otraTitular}, ${otraReclamante}, ${cl.id}, 'abierta', now() + interval '10 days') RETURNING id`)[0].id;
+  });
+
+  after(() => {
+    delete process.env.OPS_TOKEN;
+  });
+
+  it("sin OPS_TOKEN configurado, las rutas no existen", async () => {
+    delete process.env.OPS_TOKEN;
+    assert.equal((await conOps("GET", "/ops/v1/claims")).statusCode, 404);
+  });
+
+  it("con un token equivocado responde igual que si no existiera", async () => {
+    process.env.OPS_TOKEN = OPS;
+    assert.equal((await conOps("GET", "/ops/v1/claims", undefined, "x".repeat(40))).statusCode, 404);
+    assert.equal((await app.inject({ method: "GET", url: "/ops/v1/claims" })).statusCode, 404);
+  });
+
+  it("lista la cola con lo que el operador necesita para decidir", async () => {
+    process.env.OPS_TOKEN = OPS;
+    const r = await conOps("GET", "/ops/v1/claims");
+    assert.equal(r.statusCode, 200);
+    const cola = r.json().reclamaciones;
+    const i = cola.find((x: { id: string }) => x.id === impugnada);
+    assert.equal(i.motivo, "impugnada");
+    assert.equal(i.titular.correo, "titular-ops@correo.example");
+    assert.equal(i.reclamante.correo, "reclamante-ops@correo.example");
+    assert.equal(i.clinica.nombre, "Clínica de prueba");
+    assert.equal(cola.find((x: { id: string }) => x.id === enPlazo).motivo, "en-plazo");
+  });
+
+  it("resuelve a favor del titular con una nota y avisa a las dos partes", async () => {
+    process.env.OPS_TOKEN = OPS;
+    const sinNota = await conOps("POST", `/ops/v1/claims/${impugnada}/resolve`, { aFavor: "titular", nota: "" });
+    assert.equal(sinNota.statusCode, 400);
+
+    const cartas = buzon.length;
+    const r = await conOps("POST", `/ops/v1/claims/${impugnada}/resolve`, {
+      aFavor: "titular",
+      nota: "El titular aporta la factura de implantación del chip.",
+    });
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().estado, "a-favor-titular");
+    const [p] = await sql`SELECT estado FROM pets WHERE id = ${titularPet}`;
+    assert.equal(p.estado, "activa");
+    const [rec] = await sql`SELECT nota_operador FROM reclamaciones WHERE id = ${impugnada}`;
+    assert.match(rec.nota_operador, /factura/);
+    const nuevas = buzon.slice(cartas).map((c) => c.para).sort();
+    assert.deepEqual(nuevas, ["reclamante-ops@correo.example", "titular-ops@correo.example"]);
+
+    const otra = await conOps("POST", `/ops/v1/claims/${impugnada}/resolve`, { aFavor: "reclamante", nota: "Segunda vez" });
+    assert.equal(otra.statusCode, 404);
+  });
+
+  it("no adelanta una reclamación que sigue en plazo", async () => {
+    process.env.OPS_TOKEN = OPS;
+    const r = await conOps("POST", `/ops/v1/claims/${enPlazo}/resolve`, { aFavor: "reclamante", nota: "Demasiado pronto" });
+    assert.equal(r.statusCode, 409);
+    assert.equal(r.json().motivo, "en-plazo");
   });
 });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { blobs, inbox, petProfiles, pets } from "@barkandmeow/db";
 import { avisoBody, notaBody } from "@barkandmeow/schema";
 import { db, leerAviso } from "../core.js";
+import { avisarPush } from "../push.js";
 import { almacenActual, bytesDeFoto } from "../almacen.js";
 
 /* Web del veterinario, niveles 1 y 2. El servidor entrega bloques que no puede
@@ -164,14 +165,15 @@ export default async function rutasFicha(app: FastifyInstance) {
       petId: copia.petId,
       sealed: Buffer.from(cuerpo.data.sellado, "base64"),
     });
+    await avisarPush({ tipo: "bandeja", petId: copia.petId }, req.log);
     return reply.code(201).send({ ok: true });
   });
 
   /**
    * Nivel 0: avisar al dueño. Responde igual con token real o con señuelo, así
-   * que no confirma si el chip existe. El aviso va sellado para el dueño.
-   * PENDIENTE: el envío push (APNs/FCM) todavía no existe; el aviso espera en la
-   * bandeja del dueño hasta que su app la lea.
+   * que no confirma si el chip existe. El aviso va sellado para el dueño, que
+   * recibe un push en su móvil si tiene la app. El push sale sin esperar
+   * respuesta: si la petición tardara más con token real, delataría el chip.
    */
   app.post("/chip/v1/notify", async (req, reply) => {
     const cuerpo = avisoBody.safeParse(req.body);
@@ -183,6 +185,7 @@ export default async function rutasFicha(app: FastifyInstance) {
         petId,
         sealed: Buffer.from(cuerpo.data.sellado, "base64"),
       });
+      void avisarPush({ tipo: "bandeja", petId }, req.log);
     }
     return reply.code(202).send({ recibido: true });
   });

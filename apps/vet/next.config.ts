@@ -11,7 +11,7 @@ export default function config(phase: string): NextConfig {
   const base: NextConfig = {
     // i18n y ui-web se publican como TypeScript sin compilar; ui-web trae
     // además los componentes de shadcn compartidos.
-    transpilePackages: ["@barkandmeow/i18n", "@barkandmeow/ui-web", "@barkandmeow/crypto"],
+    transpilePackages: ["@barkandmeow/i18n", "@barkandmeow/ui-web", "@barkandmeow/crypto", "@barkandmeow/schema"],
     // Raíz del monorepo explícita. El .git que heredó de create-next-app ya no
     // existe —apps/vet forma parte del repo raíz—, pero dejarla escrita evita que
     // Turbopack vuelva a inferirla mal y no encuentre next/package.json.

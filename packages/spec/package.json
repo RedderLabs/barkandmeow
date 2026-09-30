@@ -1,8 +1,19 @@
 {
   "name": "@barkandmeow/spec",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "Especificación pública de la federación y del modelo clínico. CC BY 4.0.",
+  "type": "module",
+  "description": "Especificación de la API, generada desde el catálogo de @barkandmeow/schema. CC BY 4.0.",
   "license": "CC-BY-4.0",
-  "files": ["openapi.yaml"]
+  "files": ["openapi.yaml"],
+  "scripts": {
+    "build": "tsx generar.ts"
+  },
+  "dependencies": {
+    "@barkandmeow/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "yaml": "^2.9.1"
+  }
 }

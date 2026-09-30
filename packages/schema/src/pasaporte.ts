@@ -20,6 +20,18 @@ const texto = (max: number) => z.string().trim().max(max);
 const b64 = (bytes: number) =>
   z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/).refine((s) => Math.floor((s.length * 3) / 4) - (s.match(/=/g)?.length ?? 0) === bytes, `${bytes} bytes`);
 
+/* PDF adjuntos (decidido 2026-09-30): el informe o el análisis de anticuerpos
+   pueden llevar hasta tres. Van sellados aparte; aquí, firmado, queda el
+   SHA-256 de cada PDF en claro para comprobar al abrirlo que es ese. */
+export const adjuntoFirmado = z.object({
+  nombre: texto(120),
+  tipo: z.literal("application/pdf"),
+  bytes: z.number().int().positive().max(8 * 1024 * 1024),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+export type AdjuntoFirmado = z.infer<typeof adjuntoFirmado>;
+const adjuntos = z.array(adjuntoFirmado).max(3).default([]);
+
 /** Lo común a todo registro de clínica: a qué animal y quién lo hizo. */
 const comun = {
   version: z.literal(1),
@@ -59,6 +71,7 @@ export const registroTitulacion = z.object({
   resultado: z.number().nonnegative().max(1000),
   laboratorio: texto(120),
   fechaMuestra: fecha,
+  adjuntos,
 });
 
 export const registroInforme = z.object({
@@ -69,6 +82,7 @@ export const registroInforme = z.object({
   diagnostico: texto(4000).default(""),
   tratamiento: texto(4000).default(""),
   observaciones: texto(8000).default(""),
+  adjuntos,
 });
 
 export const registroClinico = z.discriminatedUnion("tipo", [

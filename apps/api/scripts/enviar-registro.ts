@@ -1,6 +1,6 @@
 /* Hace de software de gestión: firma un registro y lo envía al dueño.
 
-     BM_API_KEY=bmk_… BM_FIRMA=bmf_… pnpm --filter @barkandmeow/api registro <registro.json>
+     BM_API_KEY=bmk_… BM_FIRMA=bmf_… pnpm --filter @barkandmeow/api registro <registro.json> [informe.pdf …]
 
    El JSON es una vacuna, una desparasitación, un análisis de anticuerpos o un
    informe (ver packages/schema/src/pasaporte.ts), con el chip del animal:
@@ -13,7 +13,12 @@
    Es la referencia para quien integre un software de gestión: habla con la
    API solo por HTTP y usa primitivas estándar que cualquier libsodium tiene:
    Ed25519 (crypto_sign_detached) para firmar y crypto_box_seal para sellar.
-   BM_API_URL cambia la dirección de la API. */
+   BM_API_URL cambia la dirección de la API.
+
+   Un informe o un análisis de anticuerpos admiten hasta tres PDF detrás del
+   JSON: cada uno va sellado aparte y el registro firmado lleva su SHA-256. */
+import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import { readFileSync } from "node:fs";
 import { registroClinico } from "@barkandmeow/schema";
 
@@ -33,6 +38,7 @@ const API = process.env.BM_API_URL ?? `http://127.0.0.1:${process.env.PORT ?? 46
 const CLAVE = process.env.BM_API_KEY ?? "";
 const FIRMA = process.env.BM_FIRMA ?? "";
 const archivo = process.argv[2];
+const pdfs = process.argv.slice(3).map((ruta) => ({ nombre: basename(ruta), bytes: readFileSync(ruta) }));
 
 if (!CLAVE || !FIRMA || !archivo) {
   console.error("Uso: BM_API_KEY=bmk_… BM_FIRMA=bmf_… pnpm --filter @barkandmeow/api registro <registro.json>");
@@ -43,7 +49,17 @@ const semilla = deBase64(FIRMA.replace(/^bmf_/, ""));
 if (!semilla || semilla.length !== 32) throw new Error("BM_FIRMA no es una clave de firma (bmf_…)");
 
 // El registro se valida aquí, antes de firmar: lo firmado ya no se corrige.
-const leido = registroClinico.safeParse(JSON.parse(readFileSync(archivo, "utf8")));
+const crudo = JSON.parse(readFileSync(archivo, "utf8"));
+if (pdfs.length) {
+  if (pdfs.some((p) => p.bytes.subarray(0, 4).toString() !== "%PDF")) throw new Error("los adjuntos tienen que ser PDF");
+  crudo.adjuntos = pdfs.map((p) => ({
+    nombre: p.nombre,
+    tipo: "application/pdf",
+    bytes: p.bytes.length,
+    sha256: createHash("sha256").update(p.bytes).digest("hex"),
+  }));
+}
+const leido = registroClinico.safeParse(crudo);
 if (!leido.success) {
   console.error("El registro no es válido:", leido.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
   process.exit(1);
@@ -87,5 +103,6 @@ const sellado = cripto.sellar(destino, new TextEncoder().encode(JSON.stringify(f
 const envio = await api<{ envioId: string }>("/clinics/v1/reports", {
   petId: paciente.petId,
   sellado: Buffer.from(sellado).toString("base64"),
+  adjuntos: pdfs.map((p) => Buffer.from(cripto.sellar(destino, p.bytes)).toString("base64")),
 });
 console.log(`${registro.tipo} firmado y enviado desde ${yo.clinica.nombre}: envío ${envio.envioId}`);

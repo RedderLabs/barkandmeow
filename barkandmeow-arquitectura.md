@@ -343,7 +343,7 @@ Núcleo criptográfico en Rust compilado a WASM, compartido por la app (vía JSI
 
 - El servidor no guarda el número en claro: guarda `HMAC-SHA256(pepper, chip)`, con el `pepper` en un servicio separado.
 - Límite de consultas por IP y respuestas de igual tamaño y tiempo exista o no la ficha, para que nadie pueda recorrer números.
-- Los avisos al dueño van sellados en el navegador del veterinario para la clave pública del dueño y esperan en su bandeja; el aviso push al móvil está pendiente. El nivel 0 nunca muestra el email del dueño, y solo muestra teléfonos si el dueño los publicó en su perfil público (decidido 2026-09-27: el perfil público es visible por placa, por número de chip y dentro de la ficha).
+- Los avisos al dueño van sellados en el navegador del veterinario para la clave pública del dueño y esperan en su bandeja. Si el dueño tiene la app, recibe un aviso push sin contenido (decidido 2026-09-30: pasa por Expo, Apple y Google, así que solo dice que hay algo nuevo; lo que dice se abre en el móvil). El nivel 0 nunca muestra el email del dueño, y solo muestra teléfonos si el dueño los publicó en su perfil público (decidido 2026-09-27: el perfil público es visible por placa, por número de chip y dentro de la ficha).
 
 **Registro de accesos**
 
@@ -420,10 +420,13 @@ El dueño puede exportar su ficha completa como un paquete cifrado (formato abie
 
 | Paquete | Contenido |
 | --- | --- |
-| `apps/mobile` | React Native bare: ficha, importación con OCR (ML Kit), compartir, notificaciones, escritura de placas NFC |
+| `apps/mobile` | React Native con Expo y development build (decidido 2026-09-30, en lugar de bare a pelo): `expo prebuild` genera las carpetas nativas y EAS compila iOS y Android en la nube, así que la versión de iOS sale sin un Mac. Primera versión: entrar con chip, contraseña y código, «Mis mascotas», bandeja que se abre en el móvil con la clave del código en papel (JavaScript puro sobre @noble, comprobado byte a byte contra el WASM de `packages/crypto`) y avisos push sin contenido. Después: ficha, importación con OCR (ML Kit), compartir y escritura de placas NFC |
 | `apps/vet` | Next.js exportado como estático: web del veterinario de guardia, sin cuentas, i18n |
-| `apps/clinic` | Next.js: SaaS de la clínica, con cuentas de organización y equipo. Consola de conexión, alta de nivel 3 y envío de informes. La cuenta identifica a la clínica; nunca es una llave a los datos |
-| `apps/api` | Fastify: bloques cifrados, índice de chips, accesos, avisos |
+| `apps/clinic` | Next.js: SaaS de la clínica, con cuentas de organización y equipo. Consola de conexión, alta de nivel 3 y envío de informes (con hasta tres PDF sellados aparte, cuyo SHA-256 va en el registro firmado; decidido 2026-09-30). La cuenta identifica a la clínica; nunca es una llave a los datos |
+| `apps/api` | Fastify: bloques cifrados, índice de chips, accesos, avisos, push (Expo) y SMS del segundo factor (Twilio) |
+| `apps/portal` | Next.js: portal del dueño. El código de entrada llega por correo o, con el teléfono confirmado, por SMS (decidido 2026-09-30) |
+| `apps/ops` | Next.js: panel del operador para resolver a mano las reclamaciones de chip impugnadas o vencidas sin cuenta, con nota obligatoria y aviso a las dos partes. No se publica: escucha en 127.0.0.1 y se entra por la red interna con `OPS_TOKEN` |
+| `apps/conector` | Node: conector con el software de gestión (ezyVet, Provet Cloud y exportaciones CSV de QVET) que corre **en la clínica** con su clave de API y su clave de firma, así que el servidor sigue sin ver nada en claro. Si algún día lo alojara Bark & Meow, rompería el cifrado de extremo a extremo: exige consentimiento firmado de la clínica y viene desactivado |
 | `packages/crypto` | Rust → WASM: cifrado, envoltura de claves, firmas |
 | `packages/schema` | Tipos del modelo clínico y catálogos (ATCvet, VeNom, especies) con traducciones |
 | `packages/db` | Esquema Drizzle |
@@ -476,7 +479,7 @@ Un solo repositorio con Turborepo y pnpm workspaces. Las apps no se importan ent
 ```text
 barkandmeow/
 ├── apps/
-│   ├── mobile/            # React Native bare (iOS + Android)
+│   ├── mobile/            # React Native con Expo, development build (iOS + Android)
 │   │   ├── src/screens/   # Ficha, Compartir, Avisos, Viaje
 │   │   ├── src/nfc/       # Escritura de placas NFC
 │   │   └── src/ocr/       # Importación de informes con ML Kit

@@ -1,14 +1,31 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, desc, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
-import { clinicApiKeys, clinics, inbox, owners, ownerSessions, petIdentifiers, petProfiles, pets, reclamaciones } from "@barkandmeow/db";
+import {
+  clinicApiKeys,
+  clinics,
+  inbox,
+  inboxAdjuntos,
+  ownerDevices,
+  owners,
+  ownerSessions,
+  petIdentifiers,
+  petProfiles,
+  pets,
+  reclamaciones,
+} from "@barkandmeow/db";
 import {
   codigoCorreoBody,
+  dispositivoBody,
+  dispositivoRetirarBody,
   normalizarChip,
   ownerLoginBody,
   ownerPetBody,
   ownerRegisterBody,
   perfilBody,
+  reenvioBody,
+  segundoFactorBody,
+  telefonoBody,
 } from "@barkandmeow/schema";
 import {
   db,
@@ -28,6 +45,8 @@ import {
 import { purgarSinVerificar } from "../limpieza.js";
 import { nuevoCodigoActivacion, registrarPendiente } from "./mascotas.js";
 import { almacenActual, bytesDeFoto, claves } from "../almacen.js";
+import { avisarPush } from "../push.js";
+import { enmascararTelefono, enviarSms, normalizarTelefono } from "../sms.js";
 
 /* Portal del dueño (decidido 2026-09-27).
 
@@ -41,7 +60,12 @@ import { almacenActual, bytesDeFoto, claves } from "../almacen.js";
    servidor. El portal gestiona lo que es público o de trámite: el perfil
    para quien encuentre al animal, el código de activación y las
    reclamaciones sobre su chip. La bandeja (notas y avisos) sale sellada y se
-   abre en el navegador del dueño, con la clave de su código en papel. */
+   abre en el navegador del dueño, con la clave de su código en papel.
+
+   El código de entrada llega por correo o, si el dueño confirmó un teléfono y
+   lo eligió, por SMS (decidido 2026-09-30). La app móvil usa las mismas rutas:
+   con la cabecera `x-bm-cliente: app` recibe el token en la respuesta y lo
+   manda como `Authorization: Bearer`, en vez de cookie. */
 
 const COOKIE = "bam_owner";
 const PENDIENTE_MS = 15 * 60 * 1000;
@@ -50,6 +74,8 @@ const INTENTOS = 5;
 const REENVIO_MS = 60 * 1000;
 const FOTO_MAX = 2 * 1024 * 1024;
 const BANDEJA_MAX = 200;
+const SMS_DIA = Number(process.env.LIMITE_SMS_DIA ?? 8);
+const DISPOSITIVOS_MAX = 10;
 
 type Dueno = { ownerId: string; sessionId: string };
 
@@ -68,8 +94,17 @@ function ponerCookie(reply: FastifyReply, token: string, dias: number) {
   });
 }
 
+/** La app móvil no guarda cookies: pide el token en el cuerpo de la respuesta. */
+const esApp = (req: FastifyRequest) => req.headers["x-bm-cliente"] === "app";
+
+/** El token de sesión: el de la cookie del portal o el Bearer de la app. */
+function tokenDe(req: FastifyRequest): string | null {
+  const bearer = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization ?? "");
+  return bearer?.[1] ?? req.cookies?.[COOKIE] ?? null;
+}
+
 async function sesionDe(req: FastifyRequest, estado: "pendiente" | "abierta") {
-  const token = req.cookies?.[COOKIE];
+  const token = tokenDe(req);
   if (!token) return null;
   const [s] = await db
     .select()
@@ -90,24 +125,61 @@ export async function duenoDe(req: FastifyRequest, reply: FastifyReply): Promise
   return { ownerId: s.ownerId, sessionId: s.id };
 }
 
-/** Abre una sesión pendiente y envía el código de entrada al correo del dueño. */
-async function sesionPendiente(reply: FastifyReply, owner: { id: string; email: string }, asunto: string) {
-  const { token, hash } = nuevoToken();
-  const codigo = nuevoCodigoCorreo();
-  const id = randomUUID();
-  await db.insert(ownerSessions).values({
-    id,
-    ownerId: owner.id,
-    tokenHash: hash,
-    estado: "pendiente",
-    codeHash: hashCodigoCorreo(id, codigo),
-    expiresAt: new Date(Date.now() + PENDIENTE_MS),
-  });
-  await db.update(owners).set({ emailCodeSentAt: new Date() }).where(eq(owners.id, owner.id));
-  ponerCookie(reply, token, 1);
+type Destinatario = {
+  id: string;
+  email: string;
+  telefono: string | null;
+  telefonoVerificadoAt: Date | null;
+  segundoFactor: "correo" | "sms";
+};
+type Canal = "correo" | "sms";
+
+const destinatario = {
+  id: owners.id,
+  email: owners.email,
+  telefono: owners.telefono,
+  telefonoVerificadoAt: owners.telefonoVerificadoAt,
+  segundoFactor: owners.segundoFactor,
+};
+
+/** El canal que toca: el que eligió el dueño, si sigue siendo posible. */
+function canalDe(o: Destinatario, pedido?: Canal): Canal {
+  const smsListo = !!o.telefono && !!o.telefonoVerificadoAt;
+  const c = pedido ?? o.segundoFactor;
+  return c === "sms" && smsListo ? "sms" : "correo";
+}
+
+/**
+ * Reserva un SMS del cupo diario del dueño, en una sola sentencia: con
+ * peticiones en paralelo nadie pasa del tope. false si ya lo agotó hoy.
+ */
+async function reservarSms(ownerId: string): Promise<boolean> {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const r = await db
+    .update(owners)
+    .set({
+      smsDia: hoy,
+      smsEnviados: sql`case when ${owners.smsDia} = ${hoy} then ${owners.smsEnviados} + 1 else 1 end`,
+      smsUltimo: new Date(),
+    })
+    .where(and(eq(owners.id, ownerId), sql`(${owners.smsDia} is distinct from ${hoy} or ${owners.smsEnviados} < ${SMS_DIA})`))
+    .returning({ id: owners.id });
+  return r.length > 0;
+}
+
+class SinCupoSms extends Error {}
+
+/** Envía el código por el canal elegido. */
+async function enviarCodigo(o: Destinatario, canal: Canal, codigo: string, asunto: string) {
   const legible = `${codigo.slice(0, 4)}-${codigo.slice(4)}`;
+  if (canal === "sms") {
+    if (!(await reservarSms(o.id))) throw new SinCupoSms();
+    // Sin enlaces ni nombre: un SMS con enlace es el formato del phishing.
+    await enviarSms({ para: o.telefono!, texto: `Bark & Meow: tu código es ${legible}. Caduca en 15 minutos. No lo compartas con nadie.` });
+    return;
+  }
   await enviarCorreo({
-    para: owner.email,
+    para: o.email,
     asunto: `${legible} es tu código de Bark & Meow`,
     texto: [
       asunto,
@@ -118,6 +190,45 @@ async function sesionPendiente(reply: FastifyReply, owner: { id: string; email: 
       "nadie puede entrar, aunque sepa el número de chip y tu contraseña.",
     ].join("\n"),
   });
+}
+
+const destinoDe = (o: Destinatario, canal: Canal) =>
+  canal === "sms" ? enmascararTelefono(o.telefono!) : enmascarar(o.email);
+
+/**
+ * Abre una sesión pendiente y envía el código de entrada. Devuelve por dónde
+ * salió y, para la app, el token pendiente.
+ */
+async function sesionPendiente(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  owner: Destinatario,
+  asunto: string,
+  pedido?: Canal,
+) {
+  const { token, hash } = nuevoToken();
+  const codigo = nuevoCodigoCorreo();
+  const id = randomUUID();
+  const canal = canalDe(owner, pedido);
+  // Primero el envío: si falla, no queda una sesión pendiente huérfana.
+  await enviarCodigo(owner, canal, codigo, asunto);
+  await db.insert(ownerSessions).values({
+    id,
+    ownerId: owner.id,
+    tokenHash: hash,
+    estado: "pendiente",
+    codeHash: hashCodigoCorreo(id, codigo),
+    expiresAt: new Date(Date.now() + PENDIENTE_MS),
+  });
+  await db.update(owners).set({ emailCodeSentAt: new Date() }).where(eq(owners.id, owner.id));
+  if (!esApp(req)) ponerCookie(reply, token, 1);
+  return {
+    canal,
+    correo: destinoDe(owner, canal),
+    /** Si hay otro canal al que pedir el código. */
+    otroCanal: canal === "sms" ? ("correo" as const) : owner.telefonoVerificadoAt ? ("sms" as const) : null,
+    ...(esApp(req) ? { token } : {}),
+  };
 }
 
 /** La mascota, si es de este dueño. */
@@ -189,7 +300,7 @@ export default async function rutasDuenos(app: FastifyInstance) {
     const [owner] = await db
       .insert(owners)
       .values({ email, passwordHash: await hashPassword(b.password), pubKey })
-      .returning({ id: owners.id, email: owners.email });
+      .returning(destinatario);
     const mascota = await registrarPendiente({
       identificador: b.mascota.identificador,
       ownerPubKey: pubKey,
@@ -197,12 +308,14 @@ export default async function rutasDuenos(app: FastifyInstance) {
     });
     await db.insert(petProfiles).values({ petId: mascota.petId, nombre: b.mascota.nombre.trim() });
 
+    let pendiente: Awaited<ReturnType<typeof sesionPendiente>> | null = null;
     try {
-      await sesionPendiente(reply, owner, "Este es el código para confirmar tu cuenta de Bark & Meow:");
+      pendiente = await sesionPendiente(req, reply, owner, "Este es el código para confirmar tu cuenta de Bark & Meow:");
     } catch {
       req.log.warn("no se pudo enviar el código del alta");
     }
     return reply.code(201).send({
+      ...(pendiente?.token ? { token: pendiente.token } : {}),
       correo: enmascarar(owner.email),
       mascota: { petId: mascota.petId, codigoActivacion: mascota.codigoActivacion, caduca: mascota.caduca },
     });
@@ -223,7 +336,7 @@ export default async function rutasDuenos(app: FastifyInstance) {
        cuentas candidatas se acotan: cada una cuesta un scrypt. Primero las de
        correo verificado y mascota activa, que son las del dueño real. */
     const candidatos = await db
-      .select({ id: owners.id, email: owners.email, hash: owners.passwordHash })
+      .select({ ...destinatario, hash: owners.passwordHash })
       .from(petIdentifiers)
       .innerJoin(pets, eq(pets.id, petIdentifiers.petId))
       .innerJoin(owners, eq(owners.id, pets.ownerId))
@@ -231,7 +344,7 @@ export default async function rutasDuenos(app: FastifyInstance) {
       .orderBy(sql`${owners.emailVerifiedAt} is null`, sql`${pets.estado} <> 'activa'`)
       .limit(5);
 
-    let owner: { id: string; email: string } | null = null;
+    let owner: Destinatario | null = null;
     for (const c of candidatos)
       if (await verificarPassword(cuerpo.data.password, c.hash)) {
         owner = c;
@@ -242,14 +355,15 @@ export default async function rutasDuenos(app: FastifyInstance) {
     if (!owner) return reply.code(401).send({ error: "chip o contraseña incorrectos" });
 
     try {
-      await sesionPendiente(reply, owner, "Este es el código para entrar en Bark & Meow:");
-    } catch {
+      return { enviado: true, ...(await sesionPendiente(req, reply, owner, "Este es el código para entrar en Bark & Meow:")) };
+    } catch (e) {
+      if (e instanceof SinCupoSms)
+        return { enviado: true, ...(await sesionPendiente(req, reply, owner, "Este es el código para entrar en Bark & Meow:", "correo")) };
       return reply.code(502).send({ error: "no se pudo enviar el código", motivo: "envio" });
     }
-    return { enviado: true, correo: enmascarar(owner.email) };
   });
 
-  /** Entrar, segundo paso (y confirmación del alta): el código del correo. */
+  /** Entrar, segundo paso (y confirmación del alta): el código del correo o del SMS. */
   app.post("/owners/v1/login/verify", async (req, reply) => {
     const cuerpo = codigoCorreoBody.safeParse(req.body);
     if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
@@ -286,29 +400,39 @@ export default async function rutasDuenos(app: FastifyInstance) {
       .update(owners)
       .set({ emailVerifiedAt: new Date() })
       .where(and(eq(owners.id, s.ownerId)));
+    if (esApp(req)) return { ok: true, token };
     ponerCookie(reply, token, SESION_DIAS);
     return { ok: true };
   });
 
-  /** Otro código para la sesión pendiente. Uno por minuto. */
+  /**
+   * Otro código para la sesión pendiente, uno por minuto. `canal` lo pide por
+   * el otro camino: el correo si el móvil no está a mano, o el SMS.
+   */
   app.post("/owners/v1/login/resend", async (req, reply) => {
+    const cuerpo = reenvioBody.safeParse(req.body ?? {});
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
     const s = await sesionDe(req, "pendiente");
     if (!s) return reply.code(410).send({ error: "caducado", motivo: "caducado" });
-    const [o] = await db.select().from(owners).where(eq(owners.id, s.ownerId));
-    const espera = o.emailCodeSentAt ? o.emailCodeSentAt.getTime() + REENVIO_MS - Date.now() : 0;
-    if (espera > 0) return reply.code(429).send({ motivo: "espera", segundos: Math.ceil(espera / 1000) });
+    const [o] = await db.select({ ...destinatario, enviado: owners.emailCodeSentAt }).from(owners).where(eq(owners.id, s.ownerId));
+    const espera = o.enviado ? o.enviado.getTime() + REENVIO_MS - Date.now() : 0;
+    if (espera > 0) return reply.code(429).send({ error: "espera antes de pedir otro código", motivo: "espera", segundos: Math.ceil(espera / 1000) });
 
-    await db.delete(ownerSessions).where(eq(ownerSessions.id, s.id));
+    let r: Awaited<ReturnType<typeof sesionPendiente>>;
     try {
-      await sesionPendiente(reply, o, "Este es tu nuevo código de Bark & Meow:");
-    } catch {
+      r = await sesionPendiente(req, reply, o, "Este es tu nuevo código de Bark & Meow:", cuerpo.data.canal);
+    } catch (e) {
+      if (e instanceof SinCupoSms)
+        return reply.code(429).send({ error: "límite diario de SMS", motivo: "sin-cupo-sms" });
       return reply.code(502).send({ error: "no se pudo enviar el código", motivo: "envio" });
     }
-    return reply.code(202).send({ enviado: true, correo: enmascarar(o.email) });
+    // La pendiente anterior deja de valer: solo cuenta el último código.
+    await db.delete(ownerSessions).where(eq(ownerSessions.id, s.id));
+    return reply.code(202).send({ enviado: true, ...r });
   });
 
   app.post("/owners/v1/logout", async (req, reply) => {
-    const token = req.cookies?.[COOKIE];
+    const token = tokenDe(req);
     if (token) await db.delete(ownerSessions).where(eq(ownerSessions.tokenHash, hashToken(token)));
     reply.clearCookie(COOKIE, { path: "/" });
     return { ok: true };
@@ -361,6 +485,10 @@ export default async function rutasDuenos(app: FastifyInstance) {
     return {
       correo: o.email,
       pubKey: o.pubKey.toString("base64"),
+      segundoFactor: canalDe(o),
+      telefono: o.telefono
+        ? { numero: enmascararTelefono(o.telefono), verificado: !!o.telefonoVerificadoAt }
+        : null,
       mascotas: mias.map((m) => {
         const r = recs.find((x) => x.petId === m.petId || x.reclamantePetId === m.petId);
         return {
@@ -500,6 +628,153 @@ export default async function rutasDuenos(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /* ── Segundo factor por SMS ───────────────────────────────── */
+
+  /**
+   * Poner o cambiar el teléfono: le llega un código por SMS y no cuenta como
+   * canal hasta confirmarlo. Cambiarlo deja el correo como canal mientras
+   * tanto, para que un teléfono sin confirmar nunca sea el único camino.
+   */
+  app.put("/owners/v1/phone", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = telefonoBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const telefono = normalizarTelefono(cuerpo.data.telefono);
+    if (!telefono)
+      return reply.code(400).send({ error: "teléfono no válido o de un país sin SMS", motivo: "telefono" });
+
+    const [o] = await db.select({ ultimo: owners.smsUltimo }).from(owners).where(eq(owners.id, d.ownerId));
+    const espera = o.ultimo ? o.ultimo.getTime() + REENVIO_MS - Date.now() : 0;
+    if (espera > 0) return reply.code(429).send({ error: "espera antes de pedir otro código", motivo: "espera", segundos: Math.ceil(espera / 1000) });
+    if (!(await reservarSms(d.ownerId)))
+      return reply.code(429).send({ error: "límite diario de SMS", motivo: "sin-cupo-sms" });
+
+    const codigo = nuevoCodigoCorreo();
+    try {
+      await enviarSms({
+        para: telefono,
+        texto: `Bark & Meow: tu código para confirmar este teléfono es ${codigo.slice(0, 4)}-${codigo.slice(4)}. Caduca en 15 minutos.`,
+      });
+    } catch (e) {
+      req.log.warn({ err: (e as Error).message }, "no se pudo enviar el SMS de confirmación");
+      return reply.code(502).send({ error: "no se pudo enviar el SMS", motivo: "envio" });
+    }
+    await db
+      .update(owners)
+      .set({
+        telefono,
+        telefonoVerificadoAt: null,
+        segundoFactor: "correo",
+        telefonoCodigoHash: hashCodigoCorreo(`tel:${d.ownerId}:${telefono}`, codigo),
+        telefonoCodigoCaduca: new Date(Date.now() + PENDIENTE_MS),
+        telefonoCodigoIntentos: 0,
+      })
+      .where(eq(owners.id, d.ownerId));
+    return reply.code(202).send({ enviado: true, telefono: enmascararTelefono(telefono) });
+  });
+
+  /** Confirmar el teléfono con el código del SMS. Desde ese momento, el SMS es el canal. */
+  app.post("/owners/v1/phone/verify", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = codigoCorreoBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const [o] = await db.select().from(owners).where(eq(owners.id, d.ownerId));
+    if (!o.telefono || !o.telefonoCodigoHash || !o.telefonoCodigoCaduca || o.telefonoCodigoCaduca < new Date())
+      return reply.code(410).send({ error: "caducado", motivo: "caducado" });
+
+    const [reserva] = await db
+      .update(owners)
+      .set({ telefonoCodigoIntentos: sql`${owners.telefonoCodigoIntentos} + 1` })
+      .where(and(eq(owners.id, o.id), lt(owners.telefonoCodigoIntentos, INTENTOS)))
+      .returning({ intentos: owners.telefonoCodigoIntentos });
+    if (!reserva) return reply.code(429).send({ error: "demasiados intentos", motivo: "demasiados-intentos" });
+
+    const esperado = hashCodigoCorreo(`tel:${o.id}:${o.telefono}`, normalizarCodigoCorreo(cuerpo.data.codigo));
+    if (!mismoHash(esperado, o.telefonoCodigoHash))
+      return reply.code(400).send({
+        error: "código incorrecto",
+        motivo: "incorrecto",
+        intentosRestantes: Math.max(0, INTENTOS - reserva.intentos),
+      });
+
+    await db
+      .update(owners)
+      .set({ telefonoVerificadoAt: new Date(), segundoFactor: "sms", telefonoCodigoHash: null, telefonoCodigoCaduca: null })
+      .where(eq(owners.id, o.id));
+    return { ok: true, segundoFactor: "sms" };
+  });
+
+  /** Quitar el teléfono: el código vuelve a llegar por correo. */
+  app.delete("/owners/v1/phone", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    await db
+      .update(owners)
+      .set({ telefono: null, telefonoVerificadoAt: null, telefonoCodigoHash: null, telefonoCodigoCaduca: null, segundoFactor: "correo" })
+      .where(eq(owners.id, d.ownerId));
+    return { ok: true, segundoFactor: "correo" };
+  });
+
+  /** Elegir el canal del código de entrada. «sms» exige el teléfono confirmado. */
+  app.put("/owners/v1/second-factor", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = segundoFactorBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const r = await db
+      .update(owners)
+      .set({ segundoFactor: cuerpo.data.canal })
+      .where(
+        and(
+          eq(owners.id, d.ownerId),
+          cuerpo.data.canal === "sms" ? sql`${owners.telefonoVerificadoAt} is not null` : undefined,
+        ),
+      )
+      .returning({ id: owners.id });
+    if (!r.length) return reply.code(409).send({ error: "confirma antes un teléfono", motivo: "sin-telefono" });
+    return { ok: true, segundoFactor: cuerpo.data.canal };
+  });
+
+  /* ── Móviles con la app: avisos push ─────────────────────── */
+
+  /** Registrar el token push del móvil. Si ya era de otra cuenta, pasa a esta. */
+  app.post("/owners/v1/devices", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = dispositivoBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const [{ n }] = await db.select({ n: count() }).from(ownerDevices).where(eq(ownerDevices.ownerId, d.ownerId));
+    if (n >= DISPOSITIVOS_MAX) {
+      // El más antiguo sale: un móvil que se cambia no deja la cuenta bloqueada.
+      const [viejo] = await db
+        .select({ id: ownerDevices.id })
+        .from(ownerDevices)
+        .where(eq(ownerDevices.ownerId, d.ownerId))
+        .orderBy(sql`coalesce(${ownerDevices.ultimoUso}, ${ownerDevices.createdAt})`)
+        .limit(1);
+      if (viejo) await db.delete(ownerDevices).where(eq(ownerDevices.id, viejo.id));
+    }
+    await db
+      .insert(ownerDevices)
+      .values({ ownerId: d.ownerId, plataforma: cuerpo.data.plataforma, token: cuerpo.data.token })
+      .onConflictDoUpdate({ target: ownerDevices.token, set: { ownerId: d.ownerId, createdAt: new Date() } });
+    return reply.code(201).send({ ok: true });
+  });
+
+  /** Dejar de recibir avisos en este móvil (al salir de la app). */
+  app.delete("/owners/v1/devices", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = dispositivoRetirarBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    await db
+      .delete(ownerDevices)
+      .where(and(eq(ownerDevices.ownerId, d.ownerId), eq(ownerDevices.token, cuerpo.data.token)));
+    return { ok: true };
+  });
+
   /**
    * Impugnar una reclamación sobre mi chip. Detiene el traspaso automático de
    * los 14 días; el caso pasa a revisión a mano con la documentación de las
@@ -554,6 +829,13 @@ export default async function rutasDuenos(app: FastifyInstance) {
       .where(and(eq(pets.ownerId, d.ownerId), ne(pets.estado, "retirada")))
       .orderBy(desc(inbox.createdAt))
       .limit(BANDEJA_MAX);
+    const adjuntos = filas.length
+      ? await db
+          .select({ id: inboxAdjuntos.id, inboxId: inboxAdjuntos.inboxId, orden: inboxAdjuntos.orden, bytes: inboxAdjuntos.bytes })
+          .from(inboxAdjuntos)
+          .where(inArray(inboxAdjuntos.inboxId, filas.map((f) => f.id)))
+          .orderBy(inboxAdjuntos.inboxId, inboxAdjuntos.orden)
+      : [];
     reply.header("cache-control", "no-store");
     return {
       mensajes: filas.map((f) => ({
@@ -561,6 +843,10 @@ export default async function rutasDuenos(app: FastifyInstance) {
         petId: f.petId,
         sellado: f.sealed.toString("base64"),
         llegada: f.llegada.toISOString(),
+        /** PDF sellados aparte, en el orden de `adjuntos` del registro firmado. */
+        adjuntos: adjuntos
+          .filter((a) => a.inboxId === f.id)
+          .map((a) => ({ id: a.id, orden: a.orden, bytes: a.bytes })),
         origen: f.clinica
           ? {
               clinica: f.clinica,
@@ -590,8 +876,50 @@ export default async function rutasDuenos(app: FastifyInstance) {
       .limit(1);
     if (!m) return reply.code(404).send({ error: "no encontrado" });
 
+    const guardados = await db.select({ s3Key: inboxAdjuntos.s3Key }).from(inboxAdjuntos).where(eq(inboxAdjuntos.inboxId, m.id));
     await db.delete(inbox).where(eq(inbox.id, m.id));
+    // Si el almacén falla, el objeto queda huérfano pero sellado: nadie más lo abre.
+    for (const a of guardados)
+      await almacenActual()
+        .borrar(a.s3Key)
+        .catch((e) => req.log.warn({ err: (e as Error).message }, "no se pudo borrar un adjunto del almacén"));
     return { ok: true };
+  });
+
+  /** Un PDF adjunto, sellado. Se abre en el navegador o el móvil del dueño. */
+  app.get("/owners/v1/inbox/:id/attachments/:adjuntoId", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const { id, adjuntoId } = req.params as { id: string; adjuntoId: string };
+    if (!/^[0-9a-f-]{36}$/.test(id) || !/^[0-9a-f-]{36}$/.test(adjuntoId))
+      return reply.code(404).send({ error: "no encontrado" });
+
+    const [a] = await db
+      .select({ s3Key: inboxAdjuntos.s3Key })
+      .from(inboxAdjuntos)
+      .innerJoin(inbox, eq(inbox.id, inboxAdjuntos.inboxId))
+      .innerJoin(pets, eq(pets.id, inbox.petId))
+      .where(
+        and(
+          eq(inboxAdjuntos.id, adjuntoId),
+          eq(inbox.id, id),
+          eq(pets.ownerId, d.ownerId),
+          ne(pets.estado, "retirada"),
+        ),
+      )
+      .limit(1);
+    if (!a) return reply.code(404).send({ error: "no encontrado" });
+    let bytes: Buffer | null;
+    try {
+      bytes = await almacenActual().leer(a.s3Key);
+    } catch (e) {
+      req.log.error({ err: (e as Error).message }, "no se pudo leer un adjunto del almacén");
+      return reply.code(503).send({ error: "almacén no disponible", motivo: "almacen" });
+    }
+    if (!bytes) return reply.code(404).send({ error: "no encontrado" });
+    reply.header("content-type", "application/octet-stream");
+    reply.header("cache-control", "private, no-store");
+    return reply.send(bytes);
   });
 }
 
@@ -605,6 +933,7 @@ export async function avisarReclamacion(petId: string, plazo: Date) {
     .where(eq(pets.id, petId))
     .limit(1);
   if (!o) return;
+  await avisarPush({ tipo: "reclamacion", petId });
   const d = plazo;
   const fecha = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   await enviarCorreo({

@@ -6,24 +6,12 @@ import { BajaMiembro } from "@/components/BajaMiembro";
 import { EntregarClave } from "@/components/Custodia";
 import { InvitarForm } from "@/components/InvitarForm";
 import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+import { api } from "@barkandmeow/schema/api";
+import type { Rol } from "@barkandmeow/schema";
 
 export const metadata: Metadata = {
   title: "Equipo · Bark & Meow",
   description: "Altas y bajas del equipo de la clínica, y custodia de la clave de la clínica.",
-};
-
-type Rol = "admin" | "vet" | "assistant";
-
-type Miembro = {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: Rol;
-  aceptado: string | null;
-  alta: string;
-  yo: boolean;
-  custodia: "codigo" | "entregada" | "pendiente" | "sin-aceptar" | null;
-  devicePubKey: string | null;
 };
 
 const rolNombre: Record<Rol, string> = { admin: "ADMINISTRADOR", vet: "VETERINARIO", assistant: "AUXILIAR" };
@@ -41,7 +29,7 @@ const fecha = (iso: string) => {
 
 export default async function Equipo() {
   const yo = await exigirSesion();
-  const { miembros } = await apiServidor<{ miembros: Miembro[] }>("/clinics/v1/members");
+  const { miembros } = await apiServidor(api.clinicas.listarMiembros);
   const esAdmin = yo.role === "admin";
   const activos = miembros.filter((m) => m.aceptado).length;
   const custodios = miembros.filter(

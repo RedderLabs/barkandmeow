@@ -1,0 +1,16 @@
+{
+  "validez": [
+    { "patron": "rabisin", "meses": 36 },
+    { "patron": "nobivac rabies", "meses": 36 },
+    { "patron": "versican plus .*r", "meses": 36 }
+  ],
+  "qvet": {
+    "separador": ";",
+    "columnas": {
+      "fecha": ["F. Vacuna"],
+      "chip": ["Identificador"],
+      "vacuna": ["Nombre comercial"],
+      "lote": ["Nº de lote"]
+    }
+  }
+}

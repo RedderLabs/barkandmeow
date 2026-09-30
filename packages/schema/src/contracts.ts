@@ -19,14 +19,34 @@ export const chipLookupBody = z.object({
   vetPubKey: base64.optional(),
 });
 
-/** Misma forma exista o no la ficha: el tamaño no puede delatar nada. */
+/** Lo que el dueño publica para quien encuentre al animal. Lo único en claro. */
+export const perfilPublicoRespuesta = z.object({
+  nombre: z.string(),
+  bio: z.string(),
+  telefonos: z.array(z.object({ etiqueta: z.string(), numero: z.string() })),
+  /** Ruta relativa a la API (`/perfil/v1/foto/<id>`), o null. */
+  foto: z.string().nullable(),
+});
+
+/** Misma forma exista o no la ficha: el tamaño no puede delatar nada. Sin
+    ficha, `requestId`, `sas`, `aviso` y `ownerPubKey` son señuelos con la
+    forma correcta, y `pad` rellena la respuesta hasta 4096 bytes. */
 export const chipLookupRespuesta = z.object({
   existe: z.boolean(),
-  origen: z
-    .object({ clase: z.string(), codigo: z.string(), iso2: z.string().nullable() })
-    .nullable(),
-  requestId: z.string().uuid().nullable(),
-  sas: z.string().regex(/^\d{6}$/).nullable(),
+  /** Resuelto offline desde los tres primeros dígitos (tablas ICAR). */
+  origen: z.object({
+    clase: z.enum(["pais", "fabricante", "desconocido", "no-iso"]),
+    codigo: z.string(),
+    iso2: z.string().nullable(),
+  }),
+  requestId: z.string().uuid(),
+  sas: z.string().regex(/^\d{6}$/),
+  /** Token para avisar al dueño por /chip/v1/notify. */
+  aviso: z.string(),
+  /** Clave pública X25519 del dueño, para sellar el aviso. */
+  ownerPubKey: base64,
+  perfil: perfilPublicoRespuesta.nullable(),
+  pad: z.string(),
 });
 
 /* ── Alta de nivel 3 ─────────────────────────────────────── */
@@ -143,10 +163,16 @@ export const apiKeyCreateBody = z.object({
 /** Buscar, entre los pacientes con nivel 3, el de un chip que el software ya conoce. */
 export const pacienteBuscarBody = z.object({ identificador });
 
+/** Tope de cada PDF adjunto, ya sellado (48 bytes más que el PDF). */
+export const ADJUNTO_MAX = 8 * 1024 * 1024;
+export const ADJUNTOS_POR_INFORME = 3;
+
 /** Informe sellado en el software de la clínica para la clave pública del dueño. */
 export const informeBody = z.object({
   petId: z.string().uuid(),
   sellado: sellado(64 * 1024),
+  /** PDF sellados aparte, en el mismo orden que `adjuntos` del registro firmado. */
+  adjuntos: z.array(sellado(ADJUNTO_MAX)).max(ADJUNTOS_POR_INFORME).default([]),
 });
 
 /* ── Registro de mascotas y activación en clínica ─────────── */
@@ -178,6 +204,32 @@ export const ownerLoginBody = z.object({
   identificador,
   password: z.string().min(1).max(200),
 });
+
+/** El operador resuelve a mano una reclamación de chip, con su porqué. */
+export const resolverReclamacionBody = z.object({
+  aFavor: z.enum(["reclamante", "titular"]),
+  nota: z.string().trim().min(5).max(2000),
+});
+
+/** Canal del código de entrada. */
+export const segundoFactor = z.enum(["correo", "sms"]);
+
+/** Reenviar el código, si se quiere, por el otro canal. */
+export const reenvioBody = z.object({ canal: segundoFactor.optional() }).default({});
+
+/** Teléfono para el segundo factor, tal como lo teclea el dueño. */
+export const telefonoBody = z.object({ telefono: z.string().trim().min(8).max(24) });
+
+export const segundoFactorBody = z.object({ canal: segundoFactor });
+
+/** Móvil que recibe avisos push. El token lo da el servicio push de Expo. */
+export const dispositivoBody = z.object({
+  plataforma: z.literal("expo"),
+  token: z.string().regex(/^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$/),
+});
+
+/** Al salir de la app basta el token: la plataforma ya la sabe el servidor. */
+export const dispositivoRetirarBody = dispositivoBody.pick({ token: true });
 
 export const ownerPetBody = z.object({ identificador, nombre: z.string().max(60).default("") });
 

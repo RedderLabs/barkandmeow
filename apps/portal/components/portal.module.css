@@ -603,3 +603,31 @@
   font-size: 14px;
   line-height: 1.4;
 }
+
+/* PDF adjuntos de un informe firmado. */
+.adjuntos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.adjunto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+}
+.adjuntoNombre {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+}
+.adjuntoPeso {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}

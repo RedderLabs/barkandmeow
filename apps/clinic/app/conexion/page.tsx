@@ -5,13 +5,12 @@ import ui from "@barkandmeow/ui-web/ui.module.css";
 import { AppHeader, IconKey } from "@barkandmeow/ui-web/parts";
 import { NuevaClave, RetirarClave } from "@/components/ClavesApi";
 import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+import { api } from "@barkandmeow/schema/api";
 
 export const metadata: Metadata = {
   title: "Conexión · Bark & Meow",
   description: "Claves de API para que el software de gestión de la clínica envíe informes a los dueños.",
 };
-
-type Clave = { id: string; nombre: string; prefijo: string; creada: string; ultimoUso: string | null; firma: string | null };
 
 const fecha = (iso: string) => {
   const d = new Date(iso);
@@ -25,7 +24,7 @@ const ENDPOINTS = [
   ["GET", "/clinics/v1/api/me", "Comprueba la clave: devuelve el nombre de la clínica."],
   ["GET", "/clinics/v1/api/patients", "Pacientes con acceso permanente y la clave pública de su dueño."],
   ["POST", "/clinics/v1/api/patients/search", "El paciente de un chip: { identificador: { tipo: \"iso\", valor } }."],
-  ["POST", "/clinics/v1/reports", "Envía un registro firmado y sellado: { petId, sellado }."],
+  ["POST", "/clinics/v1/reports", "Envía un registro firmado y sellado, con hasta tres PDF sellados aparte: { petId, sellado, adjuntos? }."],
 ] as const;
 
 const EJEMPLO = `{
@@ -59,7 +58,7 @@ async function direccionApi() {
 export default async function Conexion() {
   const yo = await exigirSesion();
   const [{ claves }, base] = await Promise.all([
-    apiServidor<{ claves: Clave[] }>("/clinics/v1/api-keys"),
+    apiServidor(api.clinicas.listarClavesApi),
     direccionApi(),
   ]);
   const esAdmin = yo.role === "admin";

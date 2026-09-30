@@ -9,7 +9,8 @@
    campo a campo con lo justo para pintarlo sin sorpresas. */
 
 import { ad, cargarCripto, claveDeFragmento, deBase64, ErrorCripto, firmaValida, type Cripto } from "@barkandmeow/crypto";
-import { API_URL } from "./api";
+import { ErrorApi } from "@barkandmeow/schema/cliente";
+import { cliente, rutas } from "./api";
 import { CRYPTO_WASM_URL } from "./crypto-url";
 import { ErrorFicha, type Enlace } from "./ficha";
 
@@ -95,16 +96,15 @@ function cripto(): Promise<Cripto> {
   return nucleo;
 }
 
-async function pedir(ruta: string): Promise<Response> {
-  let r: Response;
+/** La copia compartida; los errores de la API en el idioma de la ficha. */
+async function leerCopia(id: string) {
   try {
-    r = await fetch(`${API_URL}${ruta}`);
-  } catch {
-    throw new ErrorFicha("red");
+    return await cliente.llamar(rutas.leerCopia, { params: { id } });
+  } catch (e) {
+    if (e instanceof ErrorApi && (e.estado === 404 || e.estado === 410)) throw new ErrorFicha("ausente");
+    if (e instanceof ErrorApi) throw new ErrorFicha("red");
+    throw e;
   }
-  if (r.status === 404 || r.status === 410) throw new ErrorFicha("ausente");
-  if (!r.ok) throw new ErrorFicha("red");
-  return r;
 }
 
 /** De qué clínica es una clave de firma, según el directorio. null si no está. */
@@ -115,9 +115,7 @@ async function firmante(claveB64: string): Promise<Firmante | null> {
   for (const x of b) s += String.fromCharCode(x);
   const url = btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   try {
-    const r = await fetch(`${API_URL}/firmas/v1/${url}`);
-    if (!r.ok) return null;
-    const j = (await r.json()) as Record<string, unknown>;
+    const j = (await cliente.llamar(rutas.firmante, { params: { clave: url } })) as Record<string, unknown>;
     return {
       clinica: texto(j.clinica),
       pais: texto(j.pais, 8),
@@ -132,8 +130,7 @@ async function firmante(claveB64: string): Promise<Firmante | null> {
 export async function abrirPasaporte(enlace: Enlace): Promise<PasaporteAbierto> {
   const k = enlace.clave ? claveDeFragmento(enlace.clave) : null;
   if (!k) throw new ErrorFicha("enlace");
-  const [c, r] = await Promise.all([cripto(), pedir(`/s/v1/${encodeURIComponent(enlace.id)}`)]);
-  const { sobre, caduca } = (await r.json()) as { sobre: string; caduca: string };
+  const [c, { sobre, caduca }] = await Promise.all([cripto(), leerCopia(enlace.id)]);
 
   let j: Record<string, unknown>;
   try {

@@ -11,7 +11,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "tokens": "pnpm --filter @barkandmeow/tokens build",
-    "docs:build": "node scripts/docs.mjs"
+    "docs:build": "node scripts/docs.mjs",
+    "spec": "pnpm --filter @barkandmeow/spec build"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

@@ -1,0 +1,25 @@
+{
+  "name": "@barkandmeow/conector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Conector que corre en la clínica: lee ezyVet, Provet Cloud o las exportaciones de QVET y envía los registros firmados y sellados al dueño.",
+  "license": "AGPL-3.0-only",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env src/index.ts",
+    "una-vez": "tsx --env-file-if-exists=.env src/index.ts --una-vez",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@barkandmeow/crypto": "workspace:*",
+    "@barkandmeow/schema": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

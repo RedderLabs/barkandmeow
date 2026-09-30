@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
+import type { Rol } from "@barkandmeow/schema";
 import { toast } from "@barkandmeow/ui-web/components/sonner";
 import {
   Select,
@@ -20,7 +21,7 @@ import { ErrorApi, invitar } from "@/lib/api";
    quién custodia la clave. Por eso cada opción explica lo que concede, cosa
    que un <select> nativo no permite. */
 
-const ROLES = [
+const ROLES: { valor: Rol; nombre: string; concede: string }[] = [
   {
     valor: "vet",
     nombre: "Veterinario",
@@ -38,9 +39,9 @@ const ROLES = [
   },
 ];
 
-export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: string; activa: boolean }) {
+export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: Rol; activa: boolean }) {
   const router = useRouter();
-  const [rol, setRol] = useState(rolInicial);
+  const [rol, setRol] = useState<Rol>(rolInicial);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -92,7 +93,7 @@ export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: strin
         <Label id="rol-label" asChild>
           <span>Rol</span>
         </Label>
-        <Select value={rol} onValueChange={setRol}>
+        <Select value={rol} onValueChange={(v) => setRol(v as Rol)}>
           <SelectTrigger
             aria-labelledby="rol-label"
             className="w-full"

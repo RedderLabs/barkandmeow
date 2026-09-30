@@ -5,13 +5,9 @@ import { AppHeader } from "@barkandmeow/ui-web/parts";
 import { Button } from "@barkandmeow/ui-web/components/button";
 import { CustodiaClave } from "@/components/Custodia";
 import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+import { api } from "@barkandmeow/schema/api";
 
 export const metadata: Metadata = { title: "Consola · Bark & Meow" };
-
-type Permiso = { id: string; petId: string; level: number; expiresAt: string | null };
-type Borrador = { id: string; especie: string; caduca: string; reclamado: string | null };
-type Clave = { id: string; nombre: string; ultimoUso: string | null };
-type Envio = { id: string; petId: string; chipPista: string | null; clave: string | null; bytes: number; fecha: string };
 
 /* Iconos dibujados, trazo 1.8, heredando currentColor. */
 
@@ -83,10 +79,10 @@ const DIA = 864e5;
 /** Permisos vigentes con sus días restantes y fichas preparadas sin reclamar. */
 async function cargarConsola() {
   const [{ permisos }, { borradores }, { claves }, { envios }] = await Promise.all([
-    apiServidor<{ permisos: Permiso[] }>("/grants/v1/mine"),
-    apiServidor<{ borradores: Borrador[] }>("/clinics/v1/drafts"),
-    apiServidor<{ claves: Clave[] }>("/clinics/v1/api-keys"),
-    apiServidor<{ envios: Envio[] }>("/clinics/v1/reports"),
+    apiServidor(api.publicas.permisosClinica),
+    apiServidor(api.clinicas.listarBorradores),
+    apiServidor(api.clinicas.listarClavesApi),
+    apiServidor(api.clinicas.listarEnvios),
   ]);
   const ahora = Date.now();
   return {

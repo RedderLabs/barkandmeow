@@ -1,8 +1,53 @@
 /* Llamadas de la web del veterinario a apps/api.
-   Solo nivel 0: la web no tiene sesión, y el servidor responde lo mismo en
-   forma, tamaño y tiempo exista o no la ficha. */
+   La web no tiene sesión: habla con la API por CORS, sin credenciales. En el
+   nivel 0 el servidor responde lo mismo en forma, tamaño y tiempo exista o no
+   la ficha. */
+
+import type { api, Ruta } from "@barkandmeow/schema/api";
+import { crearCliente, type Respuesta } from "@barkandmeow/schema/cliente";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:4601";
+
+type P = typeof api.publicas;
+
+/* La ficha de emergencia es estática y ligera: el catálogo trae zod y todos
+   los contratos, así que aquí solo se importan sus tipos. Cada ruta se repite
+   sin sus esquemas, tipada contra la del catálogo: un cambio de método o de
+   ruta allí no compila aquí. `cuerpo: JSON_` solo marca que la ruta lleva
+   cuerpo JSON (el cliente no valida, solo serializa). */
+const JSON_ = {} as never;
+const soloRuta = <R extends Ruta>(r: Pick<R, "metodo" | "ruta" | "acceso"> & { cuerpo?: never }) =>
+  r as unknown as R;
+
+export const rutas = {
+  consultarChip: soloRuta<P["consultarChip"]>({
+    metodo: "POST",
+    ruta: "/chip/v1/lookup",
+    acceso: "web-vet",
+    cuerpo: JSON_,
+  }),
+  avisarDueno: soloRuta<P["avisarDueno"]>({
+    metodo: "POST",
+    ruta: "/chip/v1/notify",
+    acceso: "web-vet",
+    cuerpo: JSON_,
+  }),
+  leerPlaca: soloRuta<P["leerPlaca"]>({ metodo: "GET", ruta: "/e/v1/:id", acceso: "web-vet" }),
+  leerCopia: soloRuta<P["leerCopia"]>({ metodo: "GET", ruta: "/s/v1/:id", acceso: "web-vet" }),
+  leerDocumentoCopia: soloRuta<P["leerDocumentoCopia"]>({
+    metodo: "GET",
+    ruta: "/s/v1/:id/doc/:docId",
+    acceso: "web-vet",
+  }),
+  dejarNota: soloRuta<P["dejarNota"]>({ metodo: "POST", ruta: "/s/v1/:id/nota", acceso: "web-vet", cuerpo: JSON_ }),
+  firmante: soloRuta<P["firmante"]>({ metodo: "GET", ruta: "/firmas/v1/:clave", acceso: "web-vet" }),
+};
+
+/** Cliente sin credenciales; con `signal` si la llamada se puede cancelar. */
+export const clienteApi = (signal?: AbortSignal) =>
+  crearCliente({ base: API_URL, fetch: signal ? (u, i) => fetch(u, { ...i, signal }) : undefined });
+
+export const cliente = clienteApi();
 
 export type Identificador =
   | { tipo: "iso"; valor: string }
@@ -21,39 +66,21 @@ export function identificar(valor: string): Identificador | null {
   return null;
 }
 
-export type PerfilPublico = {
-  nombre?: string;
-  bio: string;
-  telefonos: { etiqueta: string; numero: string }[];
-  /** URL absoluta de la foto, o null. */
-  foto: string | null;
-};
+/** El perfil público tal como llega, con la foto ya como URL absoluta. */
+export type PerfilPublico = NonNullable<Respuesta<P["consultarChip"]>["perfil"]>;
 
-export type Consulta = {
-  existe: boolean;
-  /** Token para avisar al dueño; si no hay ficha es un señuelo. */
-  aviso: string;
-  /** Clave pública X25519 del dueño, para sellar el aviso (señuelo si no hay ficha). */
-  ownerPubKey: string;
-  /** Lo que el dueño publicó para quien encuentre al animal, si lo hizo. */
-  perfil: PerfilPublico | null;
-};
+/** Lo que la interfaz usa de la consulta de nivel 0. */
+export type Consulta = Pick<Respuesta<P["consultarChip"]>, "existe" | "aviso" | "ownerPubKey" | "perfil">;
+
+/** La foto del perfil viene como ruta de la API: aquí se hace absoluta. */
+export const perfilAbsoluto = <T extends { foto: string | null }>(p: T | null): T | null =>
+  p && { ...p, foto: p.foto ? `${API_URL}${p.foto}` : null };
 
 export async function consultarChip(id: Identificador, signal?: AbortSignal): Promise<Consulta> {
-  const r = await fetch(`${API_URL}/chip/v1/lookup`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ identificador: id }),
-    signal,
+  const { existe, aviso, ownerPubKey, perfil } = await clienteApi(signal).llamar(rutas.consultarChip, {
+    cuerpo: { identificador: id },
   });
-  if (!r.ok) throw new Error(`lookup ${r.status}`);
-  const { existe, aviso, ownerPubKey, perfil } = (await r.json()) as Consulta;
-  return {
-    existe,
-    aviso,
-    ownerPubKey,
-    perfil: perfil && { ...perfil, foto: perfil.foto ? `${API_URL}${perfil.foto}` : null },
-  };
+  return { existe, aviso, ownerPubKey, perfil: perfilAbsoluto(perfil) };
 }
 
 export type Aviso = {
@@ -64,9 +91,7 @@ export type Aviso = {
 };
 
 /* El aviso se sella en este navegador para la clave pública del dueño: el
-   servidor lo guarda en su bandeja sin poder leer la clínica ni el teléfono.
-   PENDIENTE en apps/api: el envío push al móvil del dueño (APNs/FCM). Hasta
-   entonces el aviso espera en la bandeja y el dueño lo ve al abrir la app. */
+   servidor lo guarda en su bandeja sin poder leer la clínica ni el teléfono. */
 export async function enviarAviso(consulta: Consulta, aviso: Aviso): Promise<void> {
   const [{ cargarCripto, deBase64 }, { CRYPTO_WASM_URL }] = await Promise.all([
     import("@barkandmeow/crypto"),
@@ -80,10 +105,5 @@ export async function enviarAviso(consulta: Consulta, aviso: Aviso): Promise<voi
   let b = "";
   for (const x of sellado) b += String.fromCharCode(x);
 
-  const r = await fetch(`${API_URL}/chip/v1/notify`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ aviso: consulta.aviso, sellado: btoa(b) }),
-  });
-  if (!r.ok) throw new Error(`notify ${r.status}`);
+  await cliente.llamar(rutas.avisarDueno, { cuerpo: { aviso: consulta.aviso, sellado: btoa(b) } });
 }

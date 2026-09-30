@@ -3,6 +3,7 @@
      - apps/clinic/app/tokens.generated.css   variables CSS para las webs
      - apps/vet/app/tokens.generated.css
      - apps/portal/app/tokens.generated.css
+     - apps/ops/app/tokens.generated.css
      - packages/tokens/dist/tokens.ts         objeto TypeScript para la app nativa
    Nada de lo generado se edita a mano: se edita tokens.json y se vuelve a correr. */
 
@@ -63,7 +64,7 @@ const objeto = (obj) =>
     .map(([k, v]) => `    ${camel(k)}: ${JSON.stringify(v)},`)
     .join("\n");
 
-const ts = `${CABECERA.replace(/\/\* | \*\//g, "")}
+const ts = `${CABECERA}
 export const tokens = {
   light: {
 ${objeto(t.light)}
@@ -91,6 +92,7 @@ const salidas = [
   [join(raiz, "apps", "clinic", "app", "tokens.generated.css"), css],
   [join(raiz, "apps", "vet", "app", "tokens.generated.css"), css],
   [join(raiz, "apps", "portal", "app", "tokens.generated.css"), css],
+  [join(raiz, "apps", "ops", "app", "tokens.generated.css"), css],
   [join(aqui, "dist", "tokens.css"), css],
   [join(aqui, "dist", "tokens.ts"), ts],
 ];

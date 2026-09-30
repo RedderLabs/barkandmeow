@@ -1,9 +1,18 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, desc, eq, gt, isNull, or } from "drizzle-orm";
-import { clinicApiKeys, clinics, envios, grants, inbox, petIdentifiers, pets } from "@barkandmeow/db";
-import { apiKeyCreateBody, informeBody, normalizarChip, pacienteBuscarBody } from "@barkandmeow/schema";
+import { clinicApiKeys, clinics, envios, grants, inbox, inboxAdjuntos, petIdentifiers, pets } from "@barkandmeow/db";
+import {
+  ADJUNTO_MAX,
+  ADJUNTOS_POR_INFORME,
+  apiKeyCreateBody,
+  informeBody,
+  normalizarChip,
+  pacienteBuscarBody,
+} from "@barkandmeow/schema";
+import { almacenActual, claves } from "../almacen.js";
 import { db, hashToken, indexar } from "../core.js";
+import { avisarPush } from "../push.js";
 import { sesionDe } from "./clinics.js";
 
 /* Software de gestión conectado por API (decidido 2026-09-29).
@@ -19,6 +28,8 @@ const PREFIJO = "bmk_";
 const TOKEN_RE = /^Bearer (bmk_[A-Za-z0-9_-]{43})$/;
 const CLAVES_MAX = Number(process.env.LIMITE_CLAVES_API ?? 10);
 const ENVIOS_LISTA = 50;
+/** El informe y sus PDF en base64, con margen para el JSON. */
+const INFORME_BODY_MAX = Math.ceil(((64 * 1024 + ADJUNTOS_POR_INFORME * ADJUNTO_MAX) * 4) / 3) + 64 * 1024;
 
 type Clave = { id: string; clinicId: string; nombre: string };
 
@@ -124,8 +135,12 @@ export async function rutasApiSoftware(app: FastifyInstance) {
     return { ...f, ownerPubKey: b64(f.ownerPubKey) };
   });
 
-  /** Enviar un informe sellado a la bandeja del dueño. */
-  app.post("/clinics/v1/reports", async (req, reply) => {
+  /**
+   * Enviar un informe sellado a la bandeja del dueño, con hasta tres PDF
+   * sellados aparte. Los PDF van al almacén de objetos antes de tocar la base:
+   * si algo falla, no queda un mensaje que apunte a adjuntos que no existen.
+   */
+  app.post("/clinics/v1/reports", { bodyLimit: INFORME_BODY_MAX }, async (req, reply) => {
     const k = await exigirClave(req, reply);
     if (!k) return;
     const cuerpo = informeBody.safeParse(req.body);
@@ -141,14 +156,47 @@ export async function rutasApiSoftware(app: FastifyInstance) {
     if (!p) return reply.code(404).send({ error: "sin permiso de nivel 3 para esa mascota", motivo: "sin-permiso" });
 
     const sellado = Buffer.from(cuerpo.data.sellado, "base64");
-    const [e] = await db.transaction(async (tx) => {
-      await tx.insert(inbox).values({ petId: p.petId, sealed: sellado, clinicId: k.clinicId, apiKeyId: k.id });
-      return tx
-        .insert(envios)
-        .values({ clinicId: k.clinicId, apiKeyId: k.id, petId: p.petId, bytes: sellado.length })
-        .returning({ id: envios.id, fecha: envios.createdAt });
+    const adjuntos = cuerpo.data.adjuntos.map((a, orden) => {
+      const id = randomUUID();
+      return { id, orden, bytes: Buffer.from(a, "base64"), s3Key: claves.adjunto(p.petId, id) };
     });
-    return reply.code(201).send({ envioId: e.id, fecha: e.fecha });
+
+    const subidos: string[] = [];
+    try {
+      for (const a of adjuntos) {
+        // Sellado: el almacén ve bytes opacos, no un PDF.
+        await almacenActual().guardar(a.s3Key, a.bytes, "application/octet-stream");
+        subidos.push(a.s3Key);
+      }
+    } catch (e) {
+      req.log.error({ err: (e as Error).message }, "no se pudieron guardar los adjuntos");
+      await Promise.allSettled(subidos.map((key) => almacenActual().borrar(key)));
+      return reply.code(503).send({ error: "no se pudieron guardar los adjuntos", motivo: "almacen" });
+    }
+
+    let e: { id: string; fecha: Date };
+    try {
+      [e] = await db.transaction(async (tx) => {
+        const [m] = await tx
+          .insert(inbox)
+          .values({ petId: p.petId, sealed: sellado, clinicId: k.clinicId, apiKeyId: k.id })
+          .returning({ id: inbox.id });
+        if (adjuntos.length)
+          await tx.insert(inboxAdjuntos).values(
+            adjuntos.map((a) => ({ id: a.id, inboxId: m.id, orden: a.orden, s3Key: a.s3Key, bytes: a.bytes.length })),
+          );
+        const total = sellado.length + adjuntos.reduce((n, a) => n + a.bytes.length, 0);
+        return tx
+          .insert(envios)
+          .values({ clinicId: k.clinicId, apiKeyId: k.id, petId: p.petId, bytes: total })
+          .returning({ id: envios.id, fecha: envios.createdAt });
+      });
+    } catch (err) {
+      await Promise.allSettled(subidos.map((key) => almacenActual().borrar(key)));
+      throw err;
+    }
+    await avisarPush({ tipo: "bandeja", petId: p.petId }, req.log);
+    return reply.code(201).send({ envioId: e.id, fecha: e.fecha, adjuntos: adjuntos.length });
   });
 }
 

@@ -1,6 +1,10 @@
 import cookie from "@fastify/cookie";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
+import { generarOpenApi } from "@barkandmeow/schema/api/openapi";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
+import { vigilarContrato } from "./contrato.js";
 import { env } from "./core.js";
 import rutasChip, { caducarPeticiones } from "./routes/chip.js";
 import rutasClinicas, { sesionDe } from "./routes/clinics.js";
@@ -9,6 +13,7 @@ import rutasPasaporte, { rutasFirmas } from "./routes/pasaporte.js";
 import rutasFicha from "./routes/ficha.js";
 import { purgarSinVerificar } from "./limpieza.js";
 import rutasMascotas, { resolverReclamaciones } from "./routes/mascotas.js";
+import rutasOperador from "./routes/operador.js";
 import { idDeClave, rutasApiSoftware, rutasSoftware } from "./routes/software.js";
 
 /* apps/api NO depende de packages/crypto, y es a propósito: el servidor guarda
@@ -27,6 +32,10 @@ export async function crearApp() {
        por IP no frenaban nada. */
     trustProxy: process.env.TRUST_PROXY ?? "loopback",
   });
+
+  /* Antes que ninguna ruta: anota las que se montan y, en los tests, valida
+     las respuestas contra el catálogo de packages/schema/src/api. */
+  vigilarContrato(app);
 
   await app.register(cookie);
 
@@ -59,6 +68,24 @@ export async function crearApp() {
   });
 
   app.get("/health", async () => ({ ok: true }));
+
+  /* Swagger UI en /docs, con el documento que sale del catálogo: lo que se ve
+     es lo que el test de contrato obliga a cumplir. Encendido en desarrollo;
+     en producción solo con DOCS=on, que la lista de rutas no hace falta
+     anunciarla. */
+  const docs = process.env.DOCS ?? (process.env.NODE_ENV === "production" ? "off" : "on");
+  if (docs === "on") {
+    await app.register(swagger, {
+      mode: "static",
+      specification: {
+        document: generarOpenApi([{ url: `http://127.0.0.1:${env.port}`, description: "Esta API" }]) as never,
+      },
+    });
+    await app.register(swaggerUi, {
+      routePrefix: "/docs",
+      uiConfig: { docExpansion: "none", deepLinking: true, tryItOutEnabled: true },
+    });
+  }
 
   await app.register(async (scope) => {
     await scope.register(rateLimit, {
@@ -105,6 +132,12 @@ export async function crearApp() {
     await scope.register(rateLimit, { max: Number(process.env.LIMITE_DUENOS ?? 20), timeWindow: "1 minute" });
     await scope.register(rutasDuenos);
     await scope.register(rutasPasaporte);
+  });
+
+  /* Panel del operador: pocas peticiones, y un token equivocado cuenta igual. */
+  await app.register(async (scope) => {
+    await scope.register(rateLimit, { max: 30, timeWindow: "1 minute" });
+    await scope.register(rutasOperador);
   });
 
   return app;

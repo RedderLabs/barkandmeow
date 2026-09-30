@@ -19,8 +19,15 @@ import { Button } from "@barkandmeow/ui-web/components/button";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
 import { toast } from "@barkandmeow/ui-web/components/sonner";
-import { sobreFirmado } from "@barkandmeow/schema";
-import { borrarMensaje, leerBandeja, type MensajeSellado, type Origen } from "@/lib/api";
+import { sobreFirmado, type AdjuntoFirmado } from "@barkandmeow/schema";
+import {
+  borrarMensaje,
+  descargarAdjunto,
+  leerBandeja,
+  type AdjuntoSellado,
+  type MensajeSellado,
+  type Origen,
+} from "@/lib/api";
 import { comprobar, resumenRegistro } from "@/lib/pasaporte";
 import { guardarClave, leerClave } from "@/lib/claves";
 import { CRYPTO_WASM_URL } from "@/lib/crypto-url";
@@ -63,14 +70,23 @@ type Contenido =
       observaciones: string;
       /** Firmado por la clínica con la clave de su conexión. */
       firmado?: boolean;
+      /** Los PDF que la firma cubre: nombre, tamaño y huella de cada uno. */
+      adjuntos?: AdjuntoFirmado[];
     }
   /** Vacuna, tratamiento o análisis firmado por la clínica: va al pasaporte. */
-  | { tipo: "certificado"; titulo: string; detalle: string }
+  | { tipo: "certificado"; titulo: string; detalle: string; adjuntos?: AdjuntoFirmado[] }
   /** Llegó firmado, pero la firma no es de la clínica que lo envió. */
   | { tipo: "firma-mala" }
   | { tipo: "ilegible" };
 
-type Mensaje = { id: string; petId: string; llegada: string; origen: Origen | null; contenido: Contenido };
+type Mensaje = {
+  id: string;
+  petId: string;
+  llegada: string;
+  origen: Origen | null;
+  contenido: Contenido;
+  adjuntos: AdjuntoSellado[];
+};
 
 /* Un informe solo cuenta como tal si llegó con clave de API: entonces el
    servidor sabe qué clínica lo envió. Sellado por otra vía (la nota de la web
@@ -99,8 +115,13 @@ function interpretar(c: Cripto, claro: Uint8Array, origen: Origen | null): Conte
         tratamiento: r.registro.tratamiento,
         observaciones: r.registro.observaciones,
         firmado: true,
+        adjuntos: r.registro.adjuntos,
       };
-    return { tipo: "certificado", ...resumenRegistro(r.registro) };
+    return {
+      tipo: "certificado",
+      ...resumenRegistro(r.registro),
+      adjuntos: r.registro.tipo === "titulacion" ? r.registro.adjuntos : [],
+    };
   }
   if (j.tipo === "nota")
     return {
@@ -143,7 +164,7 @@ function abrirTodos(c: Cripto, secreta: Uint8Array, sellados: MensajeSellado[]):
         // Sellado para otra clave o dañado: se enseña como ilegible.
       }
     }
-    return { id: m.id, petId: m.petId, llegada: m.llegada, origen: m.origen, contenido };
+    return { id: m.id, petId: m.petId, llegada: m.llegada, origen: m.origen, contenido, adjuntos: m.adjuntos ?? [] };
   });
 }
 
@@ -254,14 +275,24 @@ export function Bandeja({
     <ol className={s.bandeja}>
       {estado.mensajes.map((m) => (
         <li key={m.id}>
-          <Tarjeta m={m} nombre={nombres[m.petId] || "Tu mascota"} alBorrar={() => alBorrar(m.id)} />
+          <Tarjeta m={m} nombre={nombres[m.petId] || "Tu mascota"} secreta={secreta} alBorrar={() => alBorrar(m.id)} />
         </li>
       ))}
     </ol>
   );
 }
 
-function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar: () => Promise<void> }) {
+function Tarjeta({
+  m,
+  nombre,
+  secreta,
+  alBorrar,
+}: {
+  m: Mensaje;
+  nombre: string;
+  secreta: Uint8Array | null;
+  alBorrar: () => Promise<void>;
+}) {
   const ids = useId();
   const c = m.contenido;
   const aviso = c.tipo === "aviso";
@@ -380,6 +411,10 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
         </>
       )}
 
+      {(c.tipo === "informe" || c.tipo === "certificado") && !!c.adjuntos?.length && (
+        <Adjuntos mensajeId={m.id} firmados={c.adjuntos} sellados={m.adjuntos} secreta={secreta} />
+      )}
+
       {c.tipo === "firma-mala" && (
         <p className={s.mensajeTexto}>
           Dice venir de tu clínica, pero la firma no es la de su conexión con Bark &amp; Meow. No se
@@ -414,6 +449,84 @@ function Tarjeta({ m, nombre, alBorrar }: { m: Mensaje; nombre: string; alBorrar
         </AlertDialogContent>
       </AlertDialog>
     </article>
+  );
+}
+
+/* ── PDF adjuntos ─────────────────────────────────────────────
+   Cada PDF llega sellado aparte. Se descarga, se abre con la clave del dueño
+   y, antes de dárselo, se comprueba que su SHA-256 es el que firmó la clínica
+   en el registro: si el servidor lo cambiara por otro, no pasaría. */
+
+const tamano = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+
+async function sha256Hex(b: Uint8Array) {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", b as BufferSource));
+  return Array.from(h, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+const esPdf = (b: Uint8Array) => b.length > 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+
+function Adjuntos({
+  mensajeId,
+  firmados,
+  sellados,
+  secreta,
+}: {
+  mensajeId: string;
+  firmados: AdjuntoFirmado[];
+  sellados: AdjuntoSellado[];
+  secreta: Uint8Array | null;
+}) {
+  const [abriendo, setAbriendo] = useState<number | null>(null);
+
+  async function descargar(i: number) {
+    const firmado = firmados[i];
+    const sellado = sellados.find((a) => a.orden === i);
+    if (!secreta || !sellado) return;
+    setAbriendo(i);
+    try {
+      const [c, bytes] = await Promise.all([cripto(), descargarAdjunto(mensajeId, sellado.id)]);
+      const pdf = c.abrirSellado(secreta, bytes);
+      if (!esPdf(pdf) || (await sha256Hex(pdf)) !== firmado.sha256) {
+        toast("Este PDF no es el que firmó la clínica", {
+          description: "No se ha descargado. Pídele a tu clínica que lo vuelva a enviar.",
+        });
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([pdf as BlobPart], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = firmado.nombre.toLowerCase().endsWith(".pdf") ? firmado.nombre : `${firmado.nombre || "informe"}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch {
+      toast("No se ha podido abrir el PDF", { description: "Comprueba la conexión y vuelve a intentarlo." });
+    } finally {
+      setAbriendo(null);
+    }
+  }
+
+  return (
+    <ul className={s.adjuntos} aria-label="Documentos adjuntos">
+      {firmados.map((f, i) => {
+        const llego = sellados.some((a) => a.orden === i);
+        return (
+          <li key={f.sha256 + i} className={s.adjunto}>
+            <span className={s.adjuntoNombre}>
+              {f.nombre || `Documento ${i + 1}`}
+              <span className={s.adjuntoPeso}> · PDF · {tamano(f.bytes)}</span>
+            </span>
+            {llego ? (
+              <Button type="button" variant="outline" size="sm" disabled={abriendo !== null} onClick={() => void descargar(i)}>
+                {abriendo === i ? "Abriendo…" : "Descargar"}
+              </Button>
+            ) : (
+              <span className={s.adjuntoPeso}>No llegó con el mensaje</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

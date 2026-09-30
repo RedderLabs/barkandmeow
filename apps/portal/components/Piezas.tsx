@@ -7,7 +7,7 @@ import { Button } from "@barkandmeow/ui-web/components/button";
 import { Checkbox } from "@barkandmeow/ui-web/components/checkbox";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
-import { confirmarCodigo, ErrorApi, reenviarCodigo } from "@/lib/api";
+import { confirmarCodigo, ErrorApi, reenviarCodigo, type Canal } from "@/lib/api";
 import { fecha } from "@/lib/fecha";
 import s from "./portal.module.css";
 
@@ -38,7 +38,7 @@ export function CodigoActivacion({
   );
 }
 
-/* ── Código del correo ────────────────────────────────────── */
+/* ── Código del correo o del SMS ──────────────────────────── */
 
 export function PasoCodigo({
   correo,
@@ -46,10 +46,16 @@ export function PasoCodigo({
   alTerminar,
   sinMarco = false,
   claseTitulo,
+  canal: canalInicial = "correo",
+  otroCanal: otroInicial = null,
 }: {
+  /** El destino enmascarado: un correo o un teléfono. */
   correo: string;
   titulo: string;
   alTerminar: () => void;
+  canal?: Canal;
+  /** El canal alternativo al que se puede pedir el código, si lo hay. */
+  otroCanal?: Canal | null;
   /** Dentro de una tarjeta que ya lo enmarca: sin panel propio. */
   sinMarco?: boolean;
   claseTitulo?: string;
@@ -59,6 +65,8 @@ export function PasoCodigo({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [destino, setDestino] = useState(correo);
+  const [canal, setCanal] = useState<Canal>(canalInicial);
+  const [otroCanal, setOtroCanal] = useState<Canal | null>(otroInicial);
   const [espera, setEspera] = useState(60);
   const ids = useId();
 
@@ -92,12 +100,14 @@ export function PasoCodigo({
     }
   }
 
-  async function otro() {
+  async function otro(pedido?: Canal) {
     setError(null);
     setAviso(null);
     try {
-      const r = await reenviarCodigo();
+      const r = await reenviarCodigo(pedido);
       setDestino(r.correo);
+      if (r.canal) setCanal(r.canal);
+      setOtroCanal(r.otroCanal ?? null);
       setAviso("Te hemos enviado un código nuevo. El anterior ya no vale.");
       setCodigo("");
       setEspera(60);
@@ -105,7 +115,8 @@ export function PasoCodigo({
       const d = e instanceof ErrorApi ? e.datos : {};
       if (d.motivo === "espera") setEspera(Number(d.segundos) || 60);
       else if (d.motivo === "caducado") setError("La sesión ha caducado. Vuelve a empezar.");
-      else setError("No se ha podido enviar el correo. Vuelve a intentarlo en un momento.");
+      else if (d.motivo === "sin-cupo-sms") setError("Has pedido demasiados SMS hoy. Pide el código por correo.");
+      else setError("No se ha podido enviar el código. Vuelve a intentarlo en un momento.");
     }
   }
 
@@ -118,8 +129,8 @@ export function PasoCodigo({
           <h1 className={ui.pageTitle}>{titulo}</h1>
         )}
         <p className={sinMarco ? "mt-2 text-sm leading-relaxed text-ink-soft" : ui.lede}>
-          Te hemos enviado un código de 8 caracteres a <strong>{destino}</strong>. Caduca en 15
-          minutos.
+          {canal === "sms" ? "Te hemos enviado un SMS con un código de 8 caracteres al " : "Te hemos enviado un código de 8 caracteres a "}
+          <strong>{destino}</strong>. Caduca en 15 minutos.
         </p>
       </div>
       <div className={sinMarco ? "flex flex-col gap-4" : ui.panel}>
@@ -156,6 +167,11 @@ export function PasoCodigo({
           <Button type="button" variant="ghost" size="md" disabled={espera > 0} onClick={() => void otro()}>
             {espera > 0 ? `Pedir otro (${espera} s)` : "Pedir otro código"}
           </Button>
+          {otroCanal && (
+            <Button type="button" variant="ghost" size="md" disabled={espera > 0} onClick={() => void otro(otroCanal)}>
+              {otroCanal === "correo" ? "Recibirlo por correo" : "Recibirlo por SMS"}
+            </Button>
+          )}
         </div>
       </div>
     </form>

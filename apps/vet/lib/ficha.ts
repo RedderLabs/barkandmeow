@@ -19,7 +19,8 @@ import {
   ErrorCripto,
   type Cripto,
 } from "@barkandmeow/crypto";
-import { API_URL } from "./api";
+import { ErrorApi } from "@barkandmeow/schema/cliente";
+import { cliente, perfilAbsoluto, rutas } from "./api";
 import { CRYPTO_WASM_URL } from "./crypto-url";
 
 /* ── Modelo ─────────────────────────────────────────────────── */
@@ -158,16 +159,15 @@ function clave(enlace: Enlace): Uint8Array {
   return k;
 }
 
-async function pedir(ruta: string, init?: RequestInit): Promise<Response> {
-  let r: Response;
+/** Los errores de la API en el idioma de la ficha: no está, o no hay red. */
+async function pedir<T>(llamada: Promise<T>): Promise<T> {
   try {
-    r = await fetch(`${API_URL}${ruta}`, init);
-  } catch {
-    throw new ErrorFicha("red");
+    return await llamada;
+  } catch (e) {
+    if (e instanceof ErrorApi && (e.estado === 404 || e.estado === 410)) throw new ErrorFicha("ausente");
+    if (e instanceof ErrorApi) throw new ErrorFicha("red");
+    throw e;
   }
-  if (r.status === 404 || r.status === 410) throw new ErrorFicha("ausente");
-  if (!r.ok) throw new ErrorFicha("red");
-  return r;
 }
 
 function descifrarJson<T>(c: Cripto, k: Uint8Array, datos: string, sobreB64: string): T {
@@ -181,10 +181,6 @@ function descifrarJson<T>(c: Cripto, k: Uint8Array, datos: string, sobreB64: str
     throw e;
   }
 }
-
-type PerfilApi = { bio: string; telefonos: Perfil["telefonos"]; foto: string | null } | null;
-const perfilAbsoluto = (p: PerfilApi): Perfil | null =>
-  p && { ...p, foto: p.foto ? `${API_URL}${p.foto}` : null };
 
 const aBase64 = (b: Uint8Array) => {
   let s = "";
@@ -200,8 +196,10 @@ export async function abrirResumen(enlace: Enlace): Promise<Resumen> {
     return RESUMEN_EJEMPLO;
   }
   const k = clave(enlace);
-  const [c, r] = await Promise.all([cripto(), pedir(`/e/v1/${encodeURIComponent(enlace.id)}`)]);
-  const { sobre, perfil } = (await r.json()) as { sobre: string; perfil: PerfilApi };
+  const [c, { sobre, perfil }] = await Promise.all([
+    cripto(),
+    pedir(cliente.llamar(rutas.leerPlaca, { params: { id: enlace.id } })),
+  ]);
   const resumen = descifrarJson<Resumen>(c, k, ad.emergencia(enlace.id), sobre);
   return { ...resumen, perfil: perfilAbsoluto(perfil) };
 }
@@ -212,13 +210,10 @@ export async function abrirHistorial(enlace: Enlace): Promise<Historial> {
     return historialEjemplo();
   }
   const k = clave(enlace);
-  const [c, r] = await Promise.all([cripto(), pedir(`/s/v1/${encodeURIComponent(enlace.id)}`)]);
-  const { sobre, caduca, ownerPubKey, perfil } = (await r.json()) as {
-    sobre: string;
-    caduca: string;
-    ownerPubKey: string;
-    perfil: PerfilApi;
-  };
+  const [c, { sobre, caduca, ownerPubKey, perfil }] = await Promise.all([
+    cripto(),
+    pedir(cliente.llamar(rutas.leerCopia, { params: { id: enlace.id } })),
+  ]);
   const datos = descifrarJson<Omit<Historial, "caduca" | "ownerPubKey">>(
     c,
     k,
@@ -264,11 +259,7 @@ export async function enviarNota(
     ...nota,
   });
   const sellado = c.sellar(historial.ownerPubKey, new TextEncoder().encode(claro));
-  await pedir(`/s/v1/${encodeURIComponent(enlace.id)}/nota`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ sellado: aBase64(sellado) }),
-  });
+  await pedir(cliente.llamar(rutas.dejarNota, { params: { id: enlace.id }, cuerpo: { sellado: aBase64(sellado) } }));
   return "enviada";
 }
 
@@ -278,13 +269,13 @@ export async function abrirDocumento(enlace: Enlace, registro: Registro): Promis
   if (enlace.ejemplo || !registro.documento) throw new ErrorFicha("ausente");
   const doc = registro.documento;
   const k = clave(enlace);
-  const [c, r] = await Promise.all([
+  const [c, cifrado] = await Promise.all([
     cripto(),
-    pedir(`/s/v1/${encodeURIComponent(enlace.id)}/doc/${encodeURIComponent(doc.blobId)}`),
+    pedir(cliente.bytes(rutas.leerDocumentoCopia, { params: { id: enlace.id, docId: doc.blobId } })),
   ]);
   let claro: Uint8Array;
   try {
-    claro = c.abrirDocumento(k, ad.documento(doc.blobId), new Uint8Array(await r.arrayBuffer()));
+    claro = c.abrirDocumento(k, ad.documento(doc.blobId), cifrado);
   } catch (e) {
     if (e instanceof ErrorCripto) throw new ErrorFicha("clave");
     throw e;

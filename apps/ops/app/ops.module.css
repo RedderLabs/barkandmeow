@@ -1,0 +1,63 @@
+.cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.marca,
+.marcaAviso {
+  padding: 2px 10px;
+  border-radius: var(--r-badge);
+  font-size: 0.8125rem;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.marcaAviso {
+  border-color: var(--alert-soft-line);
+  background: var(--alert-soft);
+  color: var(--alert-soft-ink);
+}
+
+.partes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.parte {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.parteTitulo {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.fila {
+  display: flex;
+  flex-direction: column;
+}
+
+.clave {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.valor {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+}
+
+.nota {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--line);
+  font-size: 0.9375rem;
+}

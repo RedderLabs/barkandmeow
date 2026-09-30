@@ -8,7 +8,7 @@ import { Button } from "@barkandmeow/ui-web/components/button";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { PasswordInput } from "@barkandmeow/ui-web/components/password-input";
 import { Label } from "@barkandmeow/ui-web/components/label";
-import { entrar, ErrorApi, identificar } from "@/lib/api";
+import { entrar, ErrorApi, identificar, type EnvioCodigo } from "@/lib/api";
 import { PasoCodigo } from "./Piezas";
 import { Placa } from "./Placa";
 import a from "./acceso.module.css";
@@ -23,15 +23,15 @@ export function formatearChip(valor: string) {
 export const CLASE_CHIP =
   "h-[52px] border-2 border-brand font-mono text-lg tracking-[0.04em] tabular-nums hover:border-brand aria-invalid:border-alert-ink";
 
-/* Entrar: chip y contraseña, y después el código del correo. El chip solo
-   identifica; sin la contraseña y el correo no abre nada. */
+/* Entrar: chip y contraseña, y después el código del correo o del SMS. El
+   chip solo identifica; sin la contraseña y el código no abre nada. */
 export function Entrar() {
   const router = useRouter();
   const [chip, setChip] = useState("");
   const [password, setPassword] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [correo, setCorreo] = useState<string | null>(null);
+  const [envio, setEnvio] = useState<EnvioCodigo | null>(null);
   const ids = useId();
 
   async function alEnviar(ev: FormEvent) {
@@ -44,8 +44,7 @@ export function Entrar() {
     setEnviando(true);
     setError(null);
     try {
-      const r = await entrar(id, password);
-      setCorreo(r.correo);
+      setEnvio(await entrar(id, password));
     } catch (e) {
       setError(
         e instanceof ErrorApi && e.estado === 401
@@ -74,13 +73,15 @@ export function Entrar() {
       <Placa chip={chip} />
       </section>
 
-      {correo ? (
+      {envio ? (
         <div className={a.tarjeta}>
           <PasoCodigo
             sinMarco
             claseTitulo={a.tarjetaTitulo}
-            correo={correo}
-            titulo="Revisa tu correo"
+            correo={envio.correo}
+            canal={envio.canal}
+            otroCanal={envio.otroCanal}
+            titulo={envio.canal === "sms" ? "Revisa tu móvil" : "Revisa tu correo"}
             alTerminar={() => {
               router.replace("/");
               router.refresh();
@@ -125,7 +126,7 @@ export function Entrar() {
             {enviando ? "Comprobando…" : "Continuar"}
           </Button>
           <p id={`${ids}-nota`} className={a.tarjetaNota}>
-            Después te enviaremos un código a tu correo.
+            Después te enviaremos un código a tu correo, o por SMS si lo has elegido.
           </p>
           <div className={a.separador}>¿Primera vez?</div>
           <Button asChild variant="outline" size="md" className="w-full">

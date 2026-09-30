@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   // Los CSS Modules de un paquete del workspace hay que transpilarlos; crypto
   // se publica como TypeScript sin compilar.
-  transpilePackages: ["@barkandmeow/ui-web", "@barkandmeow/crypto"],
+  transpilePackages: ["@barkandmeow/ui-web", "@barkandmeow/crypto", "@barkandmeow/schema"],
   /* El SaaS habla con apps/api por /clinica/api, en su mismo origen: la cookie
      de sesión es de primera parte y nunca sale del dominio de la clínica. En
      producción Next hace el mismo reenvío; API_INTERNAL_URL apunta a la API

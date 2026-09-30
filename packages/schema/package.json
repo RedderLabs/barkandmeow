@@ -16,6 +16,12 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./correo": "./src/correo.ts"
+    "./correo": "./src/correo.ts",
+    "./api": "./src/api/index.ts",
+    "./cliente": "./src/cliente.ts",
+    "./api/openapi": "./src/api/openapi.ts"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }

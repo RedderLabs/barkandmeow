@@ -1,261 +1,4905 @@
 openapi: 3.1.0
 info:
-  title: Bark & Meow — API pública
-  version: 0.1.0
-  description: |
-    Protocolo abierto de la ficha de salud portátil. Implementarlo no requiere
-    permiso: la especificación es CC BY 4.0.
+  title: Bark & Meow — API
+  version: 1.0.0
+  description: |-
+    Contrato de apps/api: lo consumen el portal del dueño (mi-mascota), la app, la web de la clínica, la web del veterinario, el panel del operador y el software de gestión.
 
     Dos principios que cualquier implementación debe respetar:
 
-    1. **El servidor no descifra.** Todo lo que lleva contenido clínico viaja
-       como bytes opacos en base64. Un nodo que pueda leer el contenido no es
-       conforme.
-    2. **Localizar no es abrir.** La consulta por identificador responde si
-       existe ficha y nada más, con el mismo tamaño y el mismo tiempo en ambos
-       casos, para que un observador de red no pueda recorrer números.
+    1. **El servidor no descifra.** Todo lo que lleva contenido clínico viaja como bytes opacos en base64.
+    2. **Localizar no es abrir.** La consulta por identificador responde si existe ficha y nada más, con el mismo tamaño y el mismo tiempo en ambos casos.
+
+    La consulta entre nodos (`/federation/v1/lookup`) está por implementar: solo podrá decir si existe ficha y ofrecer un enlace de aviso, con peticiones y respuestas firmadas con Ed25519.
+
+    Generado desde packages/schema/src/api. No se edita a mano.
   license:
     name: CC BY 4.0
     url: https://creativecommons.org/licenses/by/4.0/
-
 servers:
-  - url: https://api.barkandmeow.app
-    description: Nodo de referencia
+  - url: https://barkandmeow.app/api
+    description: Producción
   - url: http://127.0.0.1:4601
     description: Desarrollo
-
-tags:
-  - name: chip
-    description: Nivel 0. Localizar sin abrir.
-  - name: grants
-    description: Permisos de nivel 3 y su aprobación con número de comparación.
-  - name: clinics
-    description: Cuentas de organización. Nunca son una llave a los datos.
-  - name: federation
-    description: Consulta entre nodos. Sin implementar todavía.
-
 paths:
-  /chip/v1/lookup:
+  /owners/v1/register:
     post:
-      tags: [chip]
-      summary: ¿Existe ficha para este identificador?
-      description: |
-        La respuesta se rellena siempre al mismo tamaño y consume el mismo
-        presupuesto de tiempo exista o no la ficha. Cuando no existe, `requestId`
-        y `sas` llevan señuelos con la forma correcta que no apuntan a nada.
+      tags:
+        - Dueño (portal y app)
+      summary: "Alta: cuenta, primera mascota pendiente y código de entrada al correo."
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ChipLookupBody' }
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                email:
+                  type: string
+                  maxLength: 254
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                password:
+                  type: string
+                  minLength: 12
+                  maxLength: 200
+                pubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                mascota:
+                  type: object
+                  properties:
+                    identificador:
+                      oneOf:
+                        - type: object
+                          properties:
+                            tipo:
+                              type: string
+                              const: iso
+                            valor:
+                              type: string
+                              pattern: ^\d{15}$
+                          required:
+                            - tipo
+                            - valor
+                        - type: object
+                          properties:
+                            tipo:
+                              type: string
+                              const: nonISO
+                            valor:
+                              type: string
+                              pattern: ^nonISO:[0-9A-F]{9,10}$
+                          required:
+                            - tipo
+                            - valor
+                        - type: object
+                          properties:
+                            tipo:
+                              type: string
+                              const: ring
+                            valor:
+                              type: string
+                              minLength: 3
+                              maxLength: 32
+                          required:
+                            - tipo
+                            - valor
+                        - type: object
+                          properties:
+                            tipo:
+                              type: string
+                              const: tattoo
+                            valor:
+                              type: string
+                              minLength: 3
+                              maxLength: 32
+                            ubicacion:
+                              type: string
+                              maxLength: 64
+                          required:
+                            - tipo
+                            - valor
+                    nombre:
+                      default: ""
+                      type: string
+                      maxLength: 60
+                  required:
+                    - identificador
+              required:
+                - email
+                - password
+                - pubKey
+                - mascota
       responses:
-        '200':
-          description: Respuesta de tamaño constante
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ChipLookupRespuesta' }
-        '400': { description: Cuerpo inválido }
-        '429': { description: Límite de consultas superado }
-
-  /grants/v1/request:
-    post:
-      tags: [grants]
-      summary: Pedir alta de nivel 3 para un identificador
-      description: |
-        Devuelve el número de comparación de seis dígitos, derivado de
-        `BLAKE2b(pk_veterinario ‖ pk_dueño ‖ id_petición)` truncado a 20 bits.
-        **El número no es secreto y no abre nada:** sirve para que el dueño
-        detecte a un intermediario comparándolo con el de su pantalla.
-        La petición caduca a los 10 minutos.
-      security: [{ sesionClinica: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/GrantRequestBody' }
-      responses:
-        '201':
-          description: Petición abierta
+        "201":
+          description: Correcto
           content:
             application/json:
               schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
                 type: object
-                required: [requestId, sas, caduca]
                 properties:
-                  requestId: { type: string, format: uuid }
-                  sas: { type: string, pattern: '^\d{6}$' }
-                  caduca: { type: string, format: date-time }
-        '401': { description: Sin sesión }
-        '404': { description: Sin ficha }
-
-  /grants/v1/request/{id}:
+                  token:
+                    type: string
+                  correo:
+                    type: string
+                  mascota:
+                    type: object
+                    properties:
+                      codigoActivacion:
+                        type: string
+                      caduca:
+                        type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      petId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                    required:
+                      - codigoActivacion
+                      - caduca
+                      - petId
+                    additionalProperties: false
+                required:
+                  - correo
+                  - mascota
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /owners/v1/login:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Entrar, primer paso: chip y contraseña. Envía el código de entrada."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+              required:
+                - identificador
+                - password
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enviado:
+                    type: boolean
+                    const: true
+                  canal:
+                    type: string
+                    enum:
+                      - correo
+                      - sms
+                  correo:
+                    type: string
+                  otroCanal:
+                    anyOf:
+                      - type: string
+                        enum:
+                          - correo
+                          - sms
+                      - type: "null"
+                  token:
+                    type: string
+                required:
+                  - enviado
+                  - canal
+                  - correo
+                  - otroCanal
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /owners/v1/login/verify:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Entrar, segundo paso (y confirmación del alta): el código del correo o del SMS."
+      security: &a1
+        - sesionDueno: []
+        - tokenApp: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                codigo:
+                  type: string
+                  maxLength: 20
+              required:
+                - codigo
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  token:
+                    type: string
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno-pendiente
+  /owners/v1/login/resend:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: Otro código para la sesión pendiente, uno por minuto, por el canal pedido.
+      security: *a1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              default: {}
+              type: object
+              properties:
+                canal:
+                  type: string
+                  enum:
+                    - correo
+                    - sms
+      responses:
+        "202":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enviado:
+                    type: boolean
+                    const: true
+                  canal:
+                    type: string
+                    enum:
+                      - correo
+                      - sms
+                  correo:
+                    type: string
+                  otroCanal:
+                    anyOf:
+                      - type: string
+                        enum:
+                          - correo
+                          - sms
+                      - type: "null"
+                  token:
+                    type: string
+                required:
+                  - enviado
+                  - canal
+                  - correo
+                  - otroCanal
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno-pendiente
+  /owners/v1/logout:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: Cierra la sesión. No falla si ya no había.
+      security: &a2
+        - sesionDueno: []
+        - tokenApp: []
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+      x-acceso: dueno
+  /owners/v1/me:
     get:
-      tags: [grants]
-      summary: Estado de una petición
-      security: [{ sesionClinica: [] }]
+      tags:
+        - Dueño (portal y app)
+      summary: "El dueño: sus mascotas, su perfil público, sus reclamaciones y su segundo factor."
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  correo:
+                    type: string
+                  pubKey:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  segundoFactor:
+                    type: string
+                    enum:
+                      - correo
+                      - sms
+                  telefono:
+                    anyOf:
+                      - type: object
+                        properties:
+                          numero:
+                            type: string
+                          verificado:
+                            type: boolean
+                        required:
+                          - numero
+                          - verificado
+                        additionalProperties: false
+                      - type: "null"
+                  mascotas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        estado:
+                          type: string
+                          enum:
+                            - pendiente
+                            - activa
+                            - congelada
+                            - retirada
+                        chipPista:
+                          type:
+                            - string
+                            - "null"
+                        activada:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        mensajes:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        perfil:
+                          type: object
+                          properties:
+                            nombre:
+                              type: string
+                            bio:
+                              type: string
+                            telefonos:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  etiqueta:
+                                    type: string
+                                  numero:
+                                    type: string
+                                required:
+                                  - etiqueta
+                                  - numero
+                                additionalProperties: false
+                            publicado:
+                              type: boolean
+                            foto:
+                              type:
+                                - string
+                                - "null"
+                          required:
+                            - nombre
+                            - bio
+                            - telefonos
+                            - publicado
+                            - foto
+                          additionalProperties: false
+                        reclamacion:
+                          anyOf:
+                            - type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                                plazo:
+                                  type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                                estado:
+                                  type: string
+                                  enum:
+                                    - abierta
+                                    - impugnada
+                                rol:
+                                  type: string
+                                  enum:
+                                    - titular
+                                    - reclamante
+                              required:
+                                - id
+                                - plazo
+                                - estado
+                                - rol
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - petId
+                        - estado
+                        - chipPista
+                        - activada
+                        - mensajes
+                        - perfil
+                        - reclamacion
+                      additionalProperties: false
+                required:
+                  - correo
+                  - pubKey
+                  - segundoFactor
+                  - telefono
+                  - mascotas
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: Otra mascota en la misma cuenta. Queda pendiente hasta que la active una clínica.
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                nombre:
+                  default: ""
+                  type: string
+                  maxLength: 60
+              required:
+                - identificador
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  codigoActivacion:
+                    type: string
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  petId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                required:
+                  - codigoActivacion
+                  - caduca
+                  - petId
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/activation-code:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Nuevo código de activación: se muestra una vez y el anterior deja de valer."
       parameters:
         - name: id
           in: path
           required: true
-          schema: { type: string, format: uuid }
+          schema:
+            type: string
+      security: *a2
       responses:
-        '200':
-          description: Estado
+        "200":
+          description: Correcto
           content:
             application/json:
               schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
                 type: object
                 properties:
-                  requestId: { type: string, format: uuid }
+                  codigoActivacion:
+                    type: string
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - codigoActivacion
+                  - caduca
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/profile:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Perfil público: lo que ve quien encuentre al animal, si el dueño lo publica."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  maxLength: 60
+                bio:
+                  type: string
+                  maxLength: 600
+                telefonos:
+                  maxItems: 3
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      etiqueta:
+                        type: string
+                        maxLength: 30
+                      numero:
+                        type: string
+                        pattern: ^\+?[0-9 ()-]{6,20}$
+                    required:
+                      - etiqueta
+                      - numero
+                publicado:
+                  type: boolean
+              required:
+                - nombre
+                - bio
+                - telefonos
+                - publicado
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/photo:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Foto del perfil: JPEG, PNG o WebP de hasta 2 MB. Cada foto nueva tiene URL nueva."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  foto:
+                    type: string
+                required:
+                  - foto
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: Error 413
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: Error 415
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Error 503
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: La foto vista por su dueño, esté o no publicada.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Bytes
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: Quita la foto del perfil.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/phone:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Poner o cambiar el teléfono: llega un código por SMS; no cuenta hasta confirmarlo."
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                telefono:
+                  type: string
+                  minLength: 8
+                  maxLength: 24
+              required:
+                - telefono
+      responses:
+        "202":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enviado:
+                    type: boolean
+                    const: true
+                  telefono:
+                    type: string
+                required:
+                  - enviado
+                  - telefono
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: "Quitar el teléfono: el código vuelve a llegar por correo."
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  segundoFactor:
+                    type: string
+                    const: correo
+                required:
+                  - ok
+                  - segundoFactor
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/phone/verify:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: Confirmar el teléfono con el código del SMS. Desde ese momento, el SMS es el canal.
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                codigo:
+                  type: string
+                  maxLength: 20
+              required:
+                - codigo
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  segundoFactor:
+                    type: string
+                    const: sms
+                required:
+                  - ok
+                  - segundoFactor
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/second-factor:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: Elegir el canal del código de entrada. «sms» exige el teléfono confirmado.
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                canal:
+                  type: string
+                  enum:
+                    - correo
+                    - sms
+              required:
+                - canal
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  segundoFactor:
+                    type: string
+                    enum:
+                      - correo
+                      - sms
+                required:
+                  - ok
+                  - segundoFactor
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/devices:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: Registrar el token push del móvil. Si era de otra cuenta, pasa a esta.
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                plataforma:
+                  type: string
+                  const: expo
+                token:
+                  type: string
+                  pattern: ^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$
+              required:
+                - plataforma
+                - token
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: Dejar de recibir avisos en este móvil.
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                token:
+                  type: string
+                  pattern: ^Expo(nent)?PushToken\[[A-Za-z0-9_-]{10,64}\]$
+              required:
+                - token
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/claims/{id}/contest:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Impugnar una reclamación sobre mi chip: detiene el traspaso y pasa a revisión a mano."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
                   estado:
                     type: string
-                    enum: [pending, approved, rejected, expired]
-                  caduca: { type: string, format: date-time }
-        '404': { description: No encontrada }
-
+                    const: impugnada
+                required:
+                  - estado
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/inbox:
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: Notas, avisos e informes sellados a la clave pública del dueño.
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  mensajes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        sellado:
+                          type: string
+                          pattern: ^[A-Za-z0-9+/]+={0,2}$
+                        llegada:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        adjuntos:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                                pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                              orden:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                              bytes:
+                                type: integer
+                                minimum: 0
+                                maximum: 9007199254740991
+                            required:
+                              - id
+                              - orden
+                              - bytes
+                            additionalProperties: false
+                        origen:
+                          anyOf:
+                            - type: object
+                              properties:
+                                clinica:
+                                  type: string
+                                pais:
+                                  type: string
+                                dominio:
+                                  type:
+                                    - string
+                                    - "null"
+                                firma:
+                                  anyOf:
+                                    - type: string
+                                      pattern: ^[A-Za-z0-9+/]+={0,2}$
+                                    - type: "null"
+                              required:
+                                - clinica
+                                - pais
+                                - dominio
+                                - firma
+                              additionalProperties: false
+                            - type: "null"
+                      required:
+                        - id
+                        - petId
+                        - sellado
+                        - llegada
+                        - adjuntos
+                        - origen
+                      additionalProperties: false
+                required:
+                  - mensajes
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/inbox/{id}:
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: Borrar un mensaje y sus adjuntos. No hay papelera.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/inbox/{id}/attachments/{adjuntoId}:
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: Un PDF adjunto, sellado. Se abre en el navegador o el móvil del dueño.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: adjuntoId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Error 503
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/passport:
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: El pasaporte cifrado, o null si aún no hay (versión 0).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  sobre:
+                    anyOf:
+                      - type: string
+                        pattern: ^[A-Za-z0-9+/]+={0,2}$
+                      - type: "null"
+                  version:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - sobre
+                  - version
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Guarda el pasaporte. `version` es la leída: si otro la cambió entre medias, 409."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                sobre:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                version:
+                  type: integer
+                  minimum: 0
+                  maximum: 9007199254740991
+              required:
+                - sobre
+                - version
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  version:
+                    type: integer
+                    exclusiveMinimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - version
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/shares:
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: Enlaces de viaje vivos de una mascota.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enlaces:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        caduca:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        creado:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      required:
+                        - id
+                        - caduca
+                        - creado
+                      additionalProperties: false
+                required:
+                  - enlaces
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Nuevo enlace temporal. El id lo elige el navegador: el cifrado va atado a él."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                sobre:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                horas:
+                  anyOf:
+                    - type: number
+                      const: 24
+                    - type: number
+                      const: 72
+                    - type: number
+                      const: 168
+              required:
+                - id
+                - sobre
+                - horas
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - id
+                  - caduca
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/shares/{shareId}:
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: "Retirar un enlace borra el bloque: deja de abrirse al momento."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  descargadoNoVuelve:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                  - descargadoNoVuelve
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /clinics/v1/register:
+    post:
+      tags:
+        - Clínica
+      summary: Alta de la clínica y de su primer administrador. Abre sesión y envía el código al correo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  minLength: 2
+                  maxLength: 160
+                pais:
+                  type: string
+                  minLength: 2
+                  maxLength: 2
+                registroSanitario:
+                  type: string
+                  maxLength: 64
+                direccion:
+                  type: string
+                  maxLength: 300
+                pubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                admin:
+                  type: object
+                  properties:
+                    nombre:
+                      type: string
+                      minLength: 2
+                      maxLength: 160
+                    email:
+                      type: string
+                      format: email
+                      pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                    password:
+                      type: string
+                      minLength: 12
+                      maxLength: 200
+                    devicePubKey:
+                      type: string
+                      pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  required:
+                    - nombre
+                    - email
+                    - password
+                    - devicePubKey
+              required:
+                - nombre
+                - pais
+                - pubKey
+                - admin
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  clinicId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  memberId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  correo:
+                    type: string
+                  dominio:
+                    type:
+                      - string
+                      - "null"
+                  correoVerificado:
+                    type: boolean
+                    const: false
+                required:
+                  - clinicId
+                  - memberId
+                  - correo
+                  - dominio
+                  - correoVerificado
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /clinics/v1/email/verify:
+    post:
+      tags:
+        - Clínica
+      summary: Valida el código del correo; con dominio propio, verifica también la clínica.
+      security: &a3
+        - sesionClinica: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                codigo:
+                  type: string
+                  maxLength: 20
+              required:
+                - codigo
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  verificado:
+                    type: boolean
+                    const: true
+                  dominio:
+                    type:
+                      - string
+                      - "null"
+                  clinicaVerificada:
+                    type: boolean
+                required:
+                  - verificado
+                  - dominio
+                  - clinicaVerificada
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/email/resend:
+    post:
+      tags:
+        - Clínica
+      summary: Envía un código nuevo al correo. Uno por minuto como mucho.
+      security: *a3
+      responses:
+        "202":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enviado:
+                    type: boolean
+                    const: true
+                  correo:
+                    type: string
+                required:
+                  - enviado
+                  - correo
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/login:
+    post:
+      tags:
+        - Clínica
+      summary: Entrada de un miembro con correo y contraseña. Pone la cookie de sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+              required:
+                - email
+                - password
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  memberId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  clinicId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  role:
+                    type: string
+                    enum:
+                      - admin
+                      - vet
+                      - assistant
+                required:
+                  - memberId
+                  - clinicId
+                  - role
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /clinics/v1/logout:
+    post:
+      tags:
+        - Clínica
+      summary: Cierra la sesión y borra la cookie.
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+      x-acceso: clinica
+  /clinics/v1/me:
+    get:
+      tags:
+        - Clínica
+      summary: Quién está dentro y de qué clínica.
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  memberId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  clinicId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  role:
+                    type: string
+                    enum:
+                      - admin
+                      - vet
+                      - assistant
+                  clinicaActiva:
+                    type: boolean
+                  nombre:
+                    type: string
+                  correo:
+                    type: string
+                  correoVerificado:
+                    type: boolean
+                  claveEnvuelta:
+                    type:
+                      - string
+                      - "null"
+                  clinica:
+                    type: object
+                    properties:
+                      nombre:
+                        type: string
+                      pais:
+                        type: string
+                      dominio:
+                        type:
+                          - string
+                          - "null"
+                      verificada:
+                        type: boolean
+                      direccion:
+                        type:
+                          - string
+                          - "null"
+                      pubKey:
+                        type: string
+                    required:
+                      - nombre
+                      - pais
+                      - dominio
+                      - verificada
+                      - direccion
+                      - pubKey
+                    additionalProperties: false
+                required:
+                  - memberId
+                  - clinicId
+                  - role
+                  - clinicaActiva
+                  - nombre
+                  - correo
+                  - correoVerificado
+                  - claveEnvuelta
+                  - clinica
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/members:
+    get:
+      tags:
+        - Clínica
+      summary: Miembros vivos de la clínica y cómo custodia cada administrador la clave.
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  miembros:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        nombre:
+                          type: string
+                        email:
+                          type: string
+                        rol:
+                          type: string
+                          enum:
+                            - admin
+                            - vet
+                            - assistant
+                        aceptado:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        alta:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        yo:
+                          type: boolean
+                        custodia:
+                          anyOf:
+                            - type: string
+                              enum:
+                                - codigo
+                                - entregada
+                                - pendiente
+                                - sin-aceptar
+                            - type: "null"
+                        devicePubKey:
+                          type:
+                            - string
+                            - "null"
+                      required:
+                        - id
+                        - nombre
+                        - email
+                        - rol
+                        - aceptado
+                        - alta
+                        - yo
+                        - custodia
+                        - devicePubKey
+                      additionalProperties: false
+                required:
+                  - miembros
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+    post:
+      tags:
+        - Clínica
+      summary: Un administrador invita por correo a un miembro nuevo.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  minLength: 2
+                  maxLength: 160
+                email:
+                  type: string
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                rol:
+                  type: string
+                  enum:
+                    - admin
+                    - vet
+                    - assistant
+              required:
+                - nombre
+                - email
+                - rol
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  memberId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  enviado:
+                    type: boolean
+                    const: true
+                required:
+                  - memberId
+                  - enviado
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/members/{id}/clinic-key:
+    post:
+      tags:
+        - Clínica
+      summary: Entrega la clave de la clínica, sellada en el navegador, a otro administrador.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                wrappedClinicKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - wrappedClinicKey
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/members/accept:
+    post:
+      tags:
+        - Clínica
+      summary: Acepta la invitación con el token del correo, elige contraseña y abre sesión.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                token:
+                  type: string
+                  minLength: 20
+                  maxLength: 200
+                password:
+                  type: string
+                  minLength: 12
+                  maxLength: 200
+                devicePubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                wrappedClinicKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - token
+                - password
+                - devicePubKey
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  memberId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  clinicId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  role:
+                    type: string
+                    enum:
+                      - admin
+                      - vet
+                      - assistant
+                required:
+                  - memberId
+                  - clinicId
+                  - role
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /clinics/v1/members/{id}:
+    delete:
+      tags:
+        - Clínica
+      summary: "Da de baja a un miembro: borra su envoltura de la clave y sus sesiones."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  descargadoNoVuelve:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                  - descargadoNoVuelve
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/drafts:
+    post:
+      tags:
+        - Clínica
+      summary: Ficha preparada sin dueño todavía, sellada con la clave de la clínica. Caduca a los 90 días.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                especie:
+                  type: string
+                  enum:
+                    - dog
+                    - cat
+                    - ferret
+                    - bird
+                    - rabbit
+                    - rodent
+                    - reptile
+                    - amphibian
+                    - fish
+                    - invertebrate
+                identificadores:
+                  minItems: 0
+                  maxItems: 4
+                  type: array
+                  items:
+                    oneOf:
+                      - type: object
+                        properties:
+                          tipo:
+                            type: string
+                            const: iso
+                          valor:
+                            type: string
+                            pattern: ^\d{15}$
+                        required:
+                          - tipo
+                          - valor
+                      - type: object
+                        properties:
+                          tipo:
+                            type: string
+                            const: nonISO
+                          valor:
+                            type: string
+                            pattern: ^nonISO:[0-9A-F]{9,10}$
+                        required:
+                          - tipo
+                          - valor
+                      - type: object
+                        properties:
+                          tipo:
+                            type: string
+                            const: ring
+                          valor:
+                            type: string
+                            minLength: 3
+                            maxLength: 32
+                        required:
+                          - tipo
+                          - valor
+                      - type: object
+                        properties:
+                          tipo:
+                            type: string
+                            const: tattoo
+                          valor:
+                            type: string
+                            minLength: 3
+                            maxLength: 32
+                          ubicacion:
+                            type: string
+                            maxLength: 64
+                        required:
+                          - tipo
+                          - valor
+                sealed:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - especie
+                - identificadores
+                - sealed
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  draftId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - draftId
+                  - caduca
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+    get:
+      tags:
+        - Clínica
+      summary: Borradores de la clínica.
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  borradores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        especie:
+                          type: string
+                        caduca:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        reclamado:
+                          anyOf:
+                            - type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            - type: "null"
+                      required:
+                        - id
+                        - especie
+                        - caduca
+                        - reclamado
+                      additionalProperties: false
+                  total:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - borradores
+                  - total
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/api-keys:
+    get:
+      tags:
+        - Clínica
+      summary: Claves de API vivas y su último uso. El token no sale nunca.
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  claves:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        nombre:
+                          type: string
+                        prefijo:
+                          type: string
+                        creada:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        ultimoUso:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        firma:
+                          type:
+                            - string
+                            - "null"
+                      required:
+                        - id
+                        - nombre
+                        - prefijo
+                        - creada
+                        - ultimoUso
+                        - firma
+                      additionalProperties: false
+                required:
+                  - claves
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+    post:
+      tags:
+        - Clínica
+      summary: Un administrador crea una clave de API. El token se devuelve una sola vez.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                nombre:
+                  type: string
+                  minLength: 1
+                  maxLength: 60
+                firmaPub:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - nombre
+                - firmaPub
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  prefijo:
+                    type: string
+                  token:
+                    type: string
+                    format: starts_with
+                    pattern: ^bmk_.*
+                required:
+                  - id
+                  - prefijo
+                  - token
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/api-keys/{id}:
+    delete:
+      tags:
+        - Clínica
+      summary: "Retira una clave: deja de valer al momento."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/reports:
+    get:
+      tags:
+        - Clínica
+      summary: "Los últimos 50 envíos: fecha, mascota y clave. Nunca el contenido."
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  envios:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        chipPista:
+                          type:
+                            - string
+                            - "null"
+                        clave:
+                          type:
+                            - string
+                            - "null"
+                        bytes:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        fecha:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      required:
+                        - id
+                        - petId
+                        - chipPista
+                        - clave
+                        - bytes
+                        - fecha
+                      additionalProperties: false
+                required:
+                  - envios
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+    post:
+      tags:
+        - Clínica
+      summary: Informe firmado y sellado para el dueño, con hasta tres PDF sellados aparte.
+      security: &a4
+        - claveApi: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                petId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                sellado:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                adjuntos:
+                  default: []
+                  maxItems: 3
+                  type: array
+                  items:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - petId
+                - sellado
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  envioId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  fecha:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  adjuntos:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - envioId
+                  - fecha
+                  - adjuntos
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: Error 413
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Error 503
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clave-api
+  /clinics/v1/api/me:
+    get:
+      tags:
+        - Clínica
+      summary: "Comprueba la clave: su nombre y la clínica."
+      security: *a4
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  clave:
+                    type: string
+                  clinica:
+                    type: object
+                    properties:
+                      nombre:
+                        type: string
+                      dominio:
+                        type:
+                          - string
+                          - "null"
+                      verificada:
+                        type: boolean
+                    required:
+                      - nombre
+                      - dominio
+                      - verificada
+                    additionalProperties: false
+                required:
+                  - clave
+                  - clinica
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clave-api
+  /clinics/v1/api/patients:
+    get:
+      tags:
+        - Clínica
+      summary: Pacientes con nivel 3 vivo y la clave pública de su dueño.
+      security: *a4
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  pacientes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        ownerPubKey:
+                          type: string
+                        chipPista:
+                          type:
+                            - string
+                            - "null"
+                        desde:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      required:
+                        - petId
+                        - ownerPubKey
+                        - chipPista
+                        - desde
+                      additionalProperties: false
+                required:
+                  - pacientes
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clave-api
+  /clinics/v1/api/patients/search:
+    post:
+      tags:
+        - Clínica
+      summary: El paciente de un chip, solo si dio el nivel 3 a esta clínica. Si no, 404 sin decir por qué.
+      security: *a4
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+              required:
+                - identificador
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  petId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  ownerPubKey:
+                    type: string
+                  chipPista:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - petId
+                  - ownerPubKey
+                  - chipPista
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clave-api
+  /health:
+    get:
+      tags:
+        - Servicio
+      summary: El proceso responde.
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+      x-acceso: publica
+  /chip/v1/lookup:
+    post:
+      tags:
+        - "Nivel 0: localizar"
+      summary: ¿Existe ficha para este identificador? La respuesta se rellena siempre al mismo tamaño (4096 bytes) y gasta el mismo presupuesto de tiempo exista o no; sin ficha, requestId, sas, aviso y ownerPubKey son señuelos con la forma correcta. Con sesión de clínica verificada y vetPubKey, abre de paso la petición de alta de nivel 3 y devuelve el número de comparación.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                vetPubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - identificador
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  existe:
+                    type: boolean
+                  origen:
+                    type: object
+                    properties:
+                      clase:
+                        type: string
+                        enum:
+                          - pais
+                          - fabricante
+                          - desconocido
+                          - no-iso
+                      codigo:
+                        type: string
+                      iso2:
+                        type:
+                          - string
+                          - "null"
+                    required:
+                      - clase
+                      - codigo
+                      - iso2
+                    additionalProperties: false
+                  requestId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  sas:
+                    type: string
+                    pattern: ^\d{6}$
+                  aviso:
+                    type: string
+                  ownerPubKey:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  perfil:
+                    anyOf:
+                      - type: object
+                        properties:
+                          nombre:
+                            type: string
+                          bio:
+                            type: string
+                          telefonos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                etiqueta:
+                                  type: string
+                                numero:
+                                  type: string
+                              required:
+                                - etiqueta
+                                - numero
+                              additionalProperties: false
+                          foto:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - nombre
+                          - bio
+                          - telefonos
+                          - foto
+                        additionalProperties: false
+                      - type: "null"
+                  pad:
+                    type: string
+                required:
+                  - existe
+                  - origen
+                  - requestId
+                  - sas
+                  - aviso
+                  - ownerPubKey
+                  - perfil
+                  - pad
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /chip/v1/notify:
+    post:
+      tags:
+        - "Nivel 0: localizar"
+      summary: Aviso sellado para el dueño con el token que dio el nivel 0. Responde igual con token real o con señuelo, así que no confirma si el chip existe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                aviso:
+                  type: string
+                  pattern: ^[A-Za-z0-9_-]{40,96}$
+                sellado:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - aviso
+                - sellado
+      responses:
+        "202":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  recibido:
+                    type: boolean
+                    const: true
+                required:
+                  - recibido
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /grants/v1/request:
+    post:
+      tags:
+        - Alta de nivel 3
+      summary: "Pedir alta de nivel 3 para un identificador. Devuelve el número de comparación de seis dígitos, derivado de BLAKE2b(pk_veterinario ‖ pk_dueño ‖ id_petición): no es secreto ni abre nada, sirve para que el dueño detecte a un intermediario comparándolo con el de su pantalla. Caduca a los 10 minutos."
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                vetPubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - identificador
+                - vetPubKey
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  sas:
+                    type: string
+                    pattern: ^\d{6}$
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - requestId
+                  - sas
+                  - caduca
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /grants/v1/request/{id}:
+    get:
+      tags:
+        - Alta de nivel 3
+      summary: Estado de una petición de alta de la propia clínica.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  estado:
+                    type: string
+                    enum:
+                      - pending
+                      - approved
+                      - rejected
+                      - expired
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - requestId
+                  - estado
+                  - caduca
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
   /grants/v1/approve:
     post:
-      tags: [grants]
-      summary: El dueño aprueba y sube la clave envuelta
-      description: |
-        Lo llama la app del dueño tras comparar el número. `wrappedKey` es la
-        clave de la ficha envuelta contra la clave pública del veterinario: el
-        servidor la guarda tal cual y no puede abrirla.
+      tags:
+        - Alta de nivel 3
+      summary: "El dueño aprueba: sube K envuelta para la clave pública del veterinario. El servidor guarda bytes que no puede abrir. Misma respuesta si la petición es de otra mascota."
+      security: *a2
       requestBody:
         required: true
         content:
           application/json:
             schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
               type: object
-              required: [requestId, wrappedKey]
               properties:
-                requestId: { type: string, format: uuid }
-                wrappedKey: { $ref: '#/components/schemas/Base64' }
+                requestId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                wrappedKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - requestId
+                - wrappedKey
       responses:
-        '201':
-          description: Permiso creado
+        "201":
+          description: Correcto
           content:
             application/json:
               schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
                 type: object
                 properties:
-                  grantId: { type: string, format: uuid }
-                  level: { type: integer, enum: [3] }
-        '410': { description: Petición caducada o ya resuelta }
-
+                  grantId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  level:
+                    type: number
+                    const: 3
+                required:
+                  - grantId
+                  - level
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
   /grants/v1/revoke:
     post:
-      tags: [grants]
-      summary: Retirar un permiso
-      description: |
-        Borra la copia del servidor. **No retira lo que el titular del permiso
-        ya haya descargado**, y la respuesta lo dice explícitamente en
-        `descargadoNoVuelve`. Una implementación que afirme lo contrario miente.
+      tags:
+        - Alta de nivel 3
+      summary: El dueño retira el nivel 3. Borra la copia del servidor, no lo que ya se descargó.
+      security: *a2
       requestBody:
         required: true
         content:
           application/json:
             schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
               type: object
-              required: [grantId]
               properties:
-                grantId: { type: string, format: uuid }
+                grantId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              required:
+                - grantId
       responses:
-        '200':
-          description: Retirado
+        "200":
+          description: Correcto
           content:
             application/json:
               schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
                 type: object
                 properties:
-                  ok: { type: boolean }
-                  descargadoNoVuelve: { type: boolean, enum: [true] }
-
-  /federation/v1/lookup:
-    post:
-      tags: [federation]
-      summary: ¿Tienes ficha para este identificador? (entre nodos)
-      description: |
-        **Sin implementar.** La respuesta solo puede decir si existe y ofrecer un
-        enlace de aviso; nunca datos de salud ni del dueño. Tiempo máximo de
-        espera por nodo: 2 s. Cada nodo firma peticiones y respuestas con Ed25519.
+                  ok:
+                    type: boolean
+                    const: true
+                  descargadoNoVuelve:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                  - descargadoNoVuelve
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /grants/v1/mine:
+    get:
+      tags:
+        - Alta de nivel 3
+      summary: Los permisos vivos de la clínica. Nunca contenido.
+      security: *a3
       responses:
-        '501': { description: No implementado todavía }
-
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  permisos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        level:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        expiresAt:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        revokedAt:
+                          type: "null"
+                      required:
+                        - id
+                        - petId
+                        - level
+                        - expiresAt
+                        - revokedAt
+                      additionalProperties: false
+                  total:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - permisos
+                  - total
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /pets/v1/register:
+    post:
+      tags:
+        - Registro y activación
+      summary: Registro pendiente de un chip desde la app. No responde a ninguna búsqueda ni reserva el chip hasta que una clínica lo active con el código.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                ownerPubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - identificador
+                - ownerPubKey
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  petId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  codigoActivacion:
+                    type: string
+                    pattern: ^[A-Z0-9]{4}-[A-Z0-9]{4}$
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  estado:
+                    type: string
+                    const: pendiente
+                required:
+                  - petId
+                  - codigoActivacion
+                  - caduca
+                  - estado
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /pets/v1/activate:
+    post:
+      tags:
+        - Registro y activación
+      summary: La clínica, con el animal delante, activa el registro pendiente con el chip leído y el código del dueño.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                codigo:
+                  type: string
+                  maxLength: 20
+              required:
+                - identificador
+                - codigo
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  petId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  estado:
+                    type: string
+                    const: activa
+                required:
+                  - petId
+                  - estado
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /pets/v1/claims:
+    post:
+      tags:
+        - Registro y activación
+      summary: "El chip está activo a nombre de otro y el animal está aquí: congela la ficha del titular, que tiene 14 días para impugnar. Exige dominio verificado."
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+                codigo:
+                  type: string
+                  maxLength: 20
+              required:
+                - identificador
+                - codigo
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  reclamacionId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  plazo:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - reclamacionId
+                  - plazo
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /e/v1/{id}:
+    get:
+      tags:
+        - Web del veterinario
+      summary: "Nivel 1: el resumen de emergencia de una placa, sellado. La clave va en el fragmento de la URL y nunca llega aquí."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  sobre:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  version:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  perfil:
+                    anyOf:
+                      - type: object
+                        properties:
+                          nombre:
+                            type: string
+                          bio:
+                            type: string
+                          telefonos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                etiqueta:
+                                  type: string
+                                numero:
+                                  type: string
+                              required:
+                                - etiqueta
+                                - numero
+                              additionalProperties: false
+                          foto:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - nombre
+                          - bio
+                          - telefonos
+                          - foto
+                        additionalProperties: false
+                      - type: "null"
+                required:
+                  - sobre
+                  - version
+                  - perfil
+                additionalProperties: false
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /s/v1/{id}:
+    get:
+      tags:
+        - Web del veterinario
+      summary: "Nivel 2: la copia temporal (historial o pasaporte) mientras no caduque, con la clave pública del dueño para sellar la nota."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  sobre:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  ownerPubKey:
+                    type: string
+                    pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  perfil:
+                    anyOf:
+                      - type: object
+                        properties:
+                          nombre:
+                            type: string
+                          bio:
+                            type: string
+                          telefonos:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                etiqueta:
+                                  type: string
+                                numero:
+                                  type: string
+                              required:
+                                - etiqueta
+                                - numero
+                              additionalProperties: false
+                          foto:
+                            type:
+                              - string
+                              - "null"
+                        required:
+                          - nombre
+                          - bio
+                          - telefonos
+                          - foto
+                        additionalProperties: false
+                      - type: "null"
+                required:
+                  - sobre
+                  - caduca
+                  - ownerPubKey
+                  - perfil
+                additionalProperties: false
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /s/v1/{id}/doc/{docId}:
+    get:
+      tags:
+        - Web del veterinario
+      summary: Documento original de un registro, cifrado con la misma clave temporal.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: docId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /s/v1/{id}/nota:
+    post:
+      tags:
+        - Web del veterinario
+      summary: "Nota de la consulta, sellada para el dueño en el navegador del veterinario: escribe, no lee."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                sellado:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - sellado
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /perfil/v1/foto/{id}:
+    get:
+      tags:
+        - Web del veterinario
+      summary: "Foto del perfil público, solo si el dueño lo ha publicado. El id cambia con cada foto: se cachea como inmutable."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bytes
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /firmas/v1/{clave}:
+    get:
+      tags:
+        - Web del veterinario
+      summary: De qué clínica es una clave de firma Ed25519 (base64url sin relleno). El dominio solo si está verificado.
+      parameters:
+        - name: clave
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  clinica:
+                    type: string
+                  pais:
+                    type: string
+                  dominio:
+                    type:
+                      - string
+                      - "null"
+                  verificada:
+                    type: boolean
+                  alta:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                  retirada:
+                    anyOf:
+                      - type: string
+                        format: date-time
+                        pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                      - type: "null"
+                required:
+                  - clinica
+                  - pais
+                  - dominio
+                  - verificada
+                  - alta
+                  - retirada
+                additionalProperties: false
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: web-vet
+  /ops/v1/claims:
+    get:
+      tags:
+        - Operador
+      summary: Reclamaciones abiertas e impugnadas y las resueltas en los últimos 30 días. Sin OPS_TOKEN válido responde 404, como una ruta desconocida.
+      security: &a5
+        - tokenOperador: []
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  reclamaciones:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        reclamantePetId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        clinicId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        estado:
+                          type: string
+                          enum:
+                            - abierta
+                            - impugnada
+                            - a-favor-reclamante
+                            - a-favor-titular
+                        motivo:
+                          type: string
+                          enum:
+                            - impugnada
+                            - vencida-sin-cuenta
+                            - en-plazo
+                            - resuelta
+                        plazo:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        creada:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        resuelta:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        nota:
+                          type:
+                            - string
+                            - "null"
+                        clinica:
+                          type: object
+                          properties:
+                            nombre:
+                              type: string
+                            pais:
+                              type: string
+                            direccion:
+                              type:
+                                - string
+                                - "null"
+                            registroSanitario:
+                              type:
+                                - string
+                                - "null"
+                            dominio:
+                              type:
+                                - string
+                                - "null"
+                            verificada:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                                - type: "null"
+                          required:
+                            - nombre
+                            - pais
+                            - direccion
+                            - registroSanitario
+                            - dominio
+                            - verificada
+                          additionalProperties: false
+                        titular:
+                          type: object
+                          properties:
+                            estado:
+                              type: string
+                              enum:
+                                - pendiente
+                                - activa
+                                - congelada
+                                - retirada
+                            chipPista:
+                              type:
+                                - string
+                                - "null"
+                            activada:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                                - type: "null"
+                            activadaPor:
+                              type:
+                                - string
+                                - "null"
+                            registrada:
+                              type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            nombre:
+                              type:
+                                - string
+                                - "null"
+                            correo:
+                              type:
+                                - string
+                                - "null"
+                            correoVerificado:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                                - type: "null"
+                          required:
+                            - estado
+                            - chipPista
+                            - activada
+                            - activadaPor
+                            - registrada
+                            - nombre
+                            - correo
+                            - correoVerificado
+                          additionalProperties: false
+                        reclamante:
+                          type: object
+                          properties:
+                            registrada:
+                              type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            nombre:
+                              type:
+                                - string
+                                - "null"
+                            correo:
+                              type:
+                                - string
+                                - "null"
+                            correoVerificado:
+                              anyOf:
+                                - type: string
+                                  format: date-time
+                                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                                - type: "null"
+                          required:
+                            - registrada
+                            - nombre
+                            - correo
+                            - correoVerificado
+                          additionalProperties: false
+                      required:
+                        - id
+                        - petId
+                        - reclamantePetId
+                        - clinicId
+                        - estado
+                        - motivo
+                        - plazo
+                        - creada
+                        - resuelta
+                        - nota
+                        - clinica
+                        - titular
+                        - reclamante
+                      additionalProperties: false
+                required:
+                  - reclamaciones
+                additionalProperties: false
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: operador
+  /ops/v1/claims/{id}/resolve:
+    post:
+      tags:
+        - Operador
+      summary: Resolver a mano, con una nota que queda guardada y avisa a las dos partes. Una abierta en plazo no se adelanta.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a5
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                aFavor:
+                  type: string
+                  enum:
+                    - reclamante
+                    - titular
+                nota:
+                  type: string
+                  minLength: 5
+                  maxLength: 2000
+              required:
+                - aFavor
+                - nota
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  estado:
+                    type: string
+                    enum:
+                      - a-favor-reclamante
+                      - a-favor-titular
+                required:
+                  - ok
+                  - estado
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: operador
 components:
   securitySchemes:
+    sesionDueno:
+      type: apiKey
+      in: cookie
+      name: bam_owner
+      description: Portal del dueño.
+    tokenApp:
+      type: http
+      scheme: bearer
+      description: "App: token de sesión, con la cabecera `x-bm-cliente: app`."
     sesionClinica:
       type: apiKey
       in: cookie
       name: bam_clinic
-      description: |
-        Identifica a la organización y a la persona. **No es una llave a los
-        datos:** cada paciente exige además un permiso de nivel 3 del dueño.
-
+      description: Identifica a la organización y a la persona. No es una llave a los datos.
+    claveApi:
+      type: http
+      scheme: bearer
+      description: "Software de gestión: `bmk_…`."
+    tokenOperador:
+      type: http
+      scheme: bearer
+      description: "Panel del operador: OPS_TOKEN."
   schemas:
-    Base64:
-      type: string
-      pattern: '^[A-Za-z0-9+/]+={0,2}$'
-      description: Bytes opacos. El servidor no los interpreta.
-
-    Identificador:
-      oneOf:
-        - type: object
-          required: [tipo, valor]
-          properties:
-            tipo: { type: string, enum: [iso] }
-            valor: { type: string, pattern: '^\d{15}$' }
-        - type: object
-          required: [tipo, valor]
-          properties:
-            tipo: { type: string, enum: [nonISO] }
-            valor: { type: string, pattern: '^nonISO:[0-9A-F]{9,10}$' }
-        - type: object
-          required: [tipo, valor]
-          properties:
-            tipo: { type: string, enum: [ring, tattoo] }
-            valor: { type: string, minLength: 3, maxLength: 32 }
-      description: |
-        Un animal lleva una lista, no un campo. El microchip ISO solo es
-        obligatorio en la Parte A del Reglamento (UE) 576/2013; un ave lleva
-        anilla y un reptil puede no llevar nada.
-
-    ChipLookupBody:
+    Error:
+      $schema: https://json-schema.org/draft/2020-12/schema
       type: object
-      required: [identificador]
       properties:
-        identificador: { $ref: '#/components/schemas/Identificador' }
-        vetPubKey:
-          allOf: [{ $ref: '#/components/schemas/Base64' }]
-          description: Clave pública X25519 del navegador, si ya quiere pedir el alta.
-
-    ChipLookupRespuesta:
-      type: object
-      required: [existe, origen, requestId, sas, pad]
-      properties:
-        existe: { type: boolean }
-        origen:
-          type: object
-          description: Resuelto offline desde los tres primeros dígitos (tablas ICAR).
-          properties:
-            clase: { type: string, enum: [pais, fabricante, desconocido, no-iso] }
-            codigo: { type: string }
-            iso2: { type: [string, 'null'] }
-        requestId:
+        error:
           type: string
-          format: uuid
-          description: Señuelo cuando no existe ficha.
-        sas:
+        motivo:
           type: string
-          pattern: '^\d{6}$'
-          description: Señuelo cuando no existe ficha.
-        pad:
-          type: string
-          description: Relleno hasta 512 bytes. Sin él, el tamaño delataría el resultado.
-
-    GrantRequestBody:
-      type: object
-      required: [identificador, vetPubKey]
-      properties:
-        identificador: { $ref: '#/components/schemas/Identificador' }
-        vetPubKey: { $ref: '#/components/schemas/Base64' }
+      required:
+        - error
+      additionalProperties: {}

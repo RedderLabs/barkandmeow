@@ -1,0 +1,11 @@
+# Generadas por expo prebuild desde app.config.ts: no se versionan.
+/android
+/ios
+.expo/
+dist/
+expo-env.d.ts
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision

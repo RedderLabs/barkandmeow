@@ -34,8 +34,36 @@ export const owners = pgTable("owners", {
   emailCodeExpiresAt: timestamp("email_code_expires_at"),
   emailCodeAttempts: integer("email_code_attempts").notNull().default(0),
   emailCodeSentAt: timestamp("email_code_sent_at"),
+  /* Segundo factor por SMS (decidido 2026-09-30). El teléfono, en E.164, solo
+     cuenta como canal cuando está confirmado con un código. Sirve para entrar,
+     no se publica en ningún sitio. */
+  telefono: text("telefono"),
+  telefonoVerificadoAt: timestamp("telefono_verificado_at"),
+  telefonoCodigoHash: text("telefono_codigo_hash"),
+  telefonoCodigoCaduca: timestamp("telefono_codigo_caduca"),
+  telefonoCodigoIntentos: integer("telefono_codigo_intentos").notNull().default(0),
+  /** Por dónde llega el código de entrada. «sms» solo con el teléfono confirmado. */
+  segundoFactor: text("segundo_factor").$type<"correo" | "sms">().notNull().default("correo"),
+  /* Cada SMS cuesta dinero: tope diario por cuenta. */
+  smsDia: text("sms_dia"),
+  smsEnviados: integer("sms_enviados").notNull().default(0),
+  smsUltimo: timestamp("sms_ultimo"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [uniqueIndex("owners_email_uq").on(t.email)]);
+
+/* Móviles del dueño que reciben avisos push (decidido 2026-09-30). El aviso
+   no lleva contenido: solo que hay algo nuevo. Lo que dice sigue sellado en
+   la bandeja. */
+export const ownerDevices = pgTable("owner_devices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerId: uuid("owner_id")
+    .references(() => owners.id, { onDelete: "cascade" })
+    .notNull(),
+  plataforma: text("plataforma").$type<"expo">().notNull(),
+  token: text("token").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  ultimoUso: timestamp("ultimo_uso"),
+}, (t) => [uniqueIndex("owner_devices_token_uq").on(t.token), index("owner_devices_owner_ix").on(t.ownerId)]);
 
 /* Sesión del dueño. «pendiente»: contraseña correcta, falta el código del
    correo; no abre nada hasta confirmarlo. */
@@ -126,6 +154,8 @@ export const reclamaciones = pgTable(
       .default("abierta"),
     plazo: timestamp("plazo").notNull(),
     resueltaAt: timestamp("resuelta_at"),
+    /** Por qué la resolvió así el operador, si pasó por revisión manual. */
+    notaOperador: text("nota_operador"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("reclamaciones_estado_ix").on(t.estado, t.plazo)],
@@ -306,6 +336,21 @@ export const inbox = pgTable("inbox", {
   apiKeyId: uuid("api_key_id").references(() => clinicApiKeys.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/* PDF adjuntos a un informe del software de gestión (decidido 2026-09-30).
+   Cada uno va sellado aparte para la clave del dueño y vive en el almacén de
+   objetos. El registro firmado lleva el SHA-256 de cada PDF en claro: el
+   dueño comprueba al abrirlo que es el que firmó la clínica. */
+export const inboxAdjuntos = pgTable("inbox_adjuntos", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  inboxId: uuid("inbox_id")
+    .references(() => inbox.id, { onDelete: "cascade" })
+    .notNull(),
+  orden: integer("orden").notNull(),
+  s3Key: text("s3_key").notNull(),
+  bytes: integer("bytes").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [index("inbox_adjuntos_inbox_ix").on(t.inboxId)]);
 
 /* Clave de API con la que el software de gestión de una clínica envía
    informes (decidido 2026-09-29). La crea un administrador; el token solo se

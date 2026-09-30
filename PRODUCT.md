@@ -6,7 +6,7 @@
 
 adaptive
 
-Bark & Meow tiene tres superficies sobre dos familias de plataforma. `apps/mobile` es React Native bare para iOS y Android (el dueño). `apps/vet` y `apps/clinic` son web (el veterinario y la clínica). Cada una sigue las convenciones de su plataforma; el sistema de tokens es compartido.
+Bark & Meow tiene tres superficies sobre dos familias de plataforma. `apps/mobile` es React Native con Expo para iOS y Android (el dueño): development build con `expo prebuild` y compilación en EAS, para poder sacar iOS sin un Mac (decidido 2026-09-30). `apps/vet` y `apps/clinic` son web (el veterinario y la clínica). Cada una sigue las convenciones de su plataforma; el sistema de tokens es compartido.
 
 **Dónde se usa cada superficie** (decidido 2026-09-27). La web del veterinario (`apps/vet`: `/chip`, `/e`, `/s`) y el SaaS (`/clinica`) se usan **solo desde la clínica veterinaria**, en el ordenador del mostrador o de la consulta; se diseñan para monitor, y la versión estrecha queda como red de seguridad (una placa también se puede escanear con el móvil del veterinario). El dueño usa **su propio dispositivo**: la app móvil y un **portal web del dueño**.
 
@@ -65,13 +65,13 @@ El segundo diferencial es la federación: Bark & Meow publica un protocolo abier
 
 **Sin conexión.** La app guarda la ficha completa en el móvil y tiene "modo veterinario": solo lectura, texto grande, selector de idioma. El resumen de emergencia puede ir comprimido dentro del propio QR (hasta unos 2 KB), sin cifrar, opcional y con el dueño eligiendo campos.
 
-**Stack.** Monorepo pnpm y Turborepo. `apps/mobile` React Native bare · `apps/vet` Next.js con export estático · `apps/clinic` web, framework por decidir · `apps/api` Fastify · `packages/crypto` Rust a WASM · `packages/schema` tipos y catálogos con Zod · `packages/db` Drizzle. API en homelab con Docker Compose, PostgreSQL, DragonflyDB y Garage S3; web servida desde Cloudflare. Licencia AGPL-3.0; la especificación de federación, CC BY 4.0.
+**Stack.** Monorepo pnpm y Turborepo. `apps/mobile` React Native con Expo (development build) · `apps/vet` Next.js con export estático · `apps/clinic` web, framework por decidir · `apps/api` Fastify · `packages/crypto` Rust a WASM · `packages/schema` tipos y catálogos con Zod · `packages/db` Drizzle. API en homelab con Docker Compose, PostgreSQL, DragonflyDB y Garage S3; web servida desde Cloudflare. Licencia AGPL-3.0; la especificación de federación, CC BY 4.0.
 
 **Decisiones explícitamente abiertas, no inventar:**
 
 - **Dominio: `barkandmeow.app`** (decidido 2026-09-26, ya en posesión del titular). Cierra la búsqueda de dominio; `hilo.fans` pertenece a otro producto. **Queda una tensión sin resolver:** el nombre del dominio habla de perros y gatos, y el catálogo de especies cubre además hurones, aves, conejos, roedores, reptiles, anfibios y peces ornamentales, que es justo lo que se amplió el mismo día. O el nombre de marca se separa del dominio, o hay que asumir que la marca promete menos de lo que el producto hace.
 - **Monetización.** Sin decidir (2026-09-26). El SaaS de clínicas se construye sin cobro, planes ni facturación. No hay precios que mostrar y no deben inventarse.
-- **`apps/clinic` y `apps/mobile` no existen todavía** como workspaces. `packages/crypto` es una carpeta vacía.
+- **App móvil, primera versión** (2026-09-30): `apps/mobile` entra con chip, contraseña y código (correo o SMS), enseña «Mis mascotas», abre la bandeja en el móvil con la clave del código en papel (guardada en el llavero del sistema) y recibe avisos push sin contenido. El alta, el perfil público y el pasaporte siguen en el portal web. Aún no hay ficha, OCR, NFC ni compartir.
 
 ## Brand Commitments
 

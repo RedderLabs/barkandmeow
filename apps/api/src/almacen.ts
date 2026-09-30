@@ -87,4 +87,5 @@ export async function bytesDeFoto(f: { foto: Buffer | null; fotoKey: string | nu
 export const claves = {
   foto: (fotoId: string) => `perfil/fotos/${fotoId}`,
   blob: (petId: string, blobId: string) => `ficha/${petId}/${blobId}`,
+  adjunto: (petId: string, adjuntoId: string) => `bandeja/${petId}/${adjuntoId}`,
 };

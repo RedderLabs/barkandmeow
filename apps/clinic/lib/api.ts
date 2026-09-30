@@ -1,121 +1,56 @@
 /* Llamadas del SaaS de clínicas a apps/api. Van por /clinica/api, en el mismo
    origen (ver rewrites en next.config.ts): la cookie de sesión es de primera
-   parte y httpOnly. */
+   parte y httpOnly. Rutas, cuerpos y respuestas salen del catálogo de
+   @barkandmeow/schema/api: si el servidor cambia, esto no compila. */
+
+import { api, type ClaveCreada, type CorreoVerificado, type RegistroHecho } from "@barkandmeow/schema/api";
+import { crearCliente, ErrorApi } from "@barkandmeow/schema/cliente";
+import type { ClinicRegisterBody, Identificador, Rol } from "@barkandmeow/schema";
+
+export { ErrorApi };
+export type { ClaveCreada, CorreoVerificado, Identificador, RegistroHecho };
 
 export const API = "/clinica/api";
 
-export class ErrorApi extends Error {
-  readonly estado: number;
-  /** El cuerpo de la respuesta de error: motivo, segundos, intentos… */
-  readonly datos: Record<string, unknown>;
-  constructor(estado: number, mensaje: string, datos: Record<string, unknown> = {}) {
-    super(mensaje);
-    this.estado = estado;
-    this.datos = datos;
-  }
-}
+const cliente = crearCliente({ base: API, credentials: "same-origin" });
+const c = api.clinicas;
+const p = api.publicas;
 
-export async function llamar<T>(ruta: string, init?: RequestInit & { json?: unknown }): Promise<T> {
-  let r: Response;
-  try {
-    r = await fetch(`${API}${ruta}`, {
-      ...init,
-      credentials: "same-origin",
-      headers: init?.json !== undefined ? { "content-type": "application/json" } : init?.headers,
-      body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
-    });
-  } catch {
-    throw new ErrorApi(0, "sin conexión");
-  }
-  const cuerpo = (await r.json().catch(() => ({}))) as T & { error?: string };
-  if (!r.ok) throw new ErrorApi(r.status, cuerpo.error ?? `error ${r.status}`, cuerpo);
-  return cuerpo;
-}
+export type Registro = ClinicRegisterBody;
 
-export type Registro = {
-  nombre: string;
-  pais: string;
-  registroSanitario?: string;
-  direccion?: string;
-  pubKey: string;
-  admin: { nombre: string; email: string; password: string; devicePubKey: string };
-};
+export const registrarClinica = (r: Registro) => cliente.llamar(c.registrarClinica, { cuerpo: r });
 
-export type RegistroHecho = {
-  clinicId: string;
-  memberId: string;
-  correo: string;
-  /** El dominio que queda verificado con el código, o null si el correo es gratuito. */
-  dominio: string | null;
-  correoVerificado: boolean;
-};
+export const verificarCorreo = (codigo: string) => cliente.llamar(c.verificarCorreo, { cuerpo: { codigo } });
 
-export type CorreoVerificado = {
-  verificado: true;
-  dominio: string | null;
-  clinicaVerificada: boolean;
-};
-
-export const registrarClinica = (r: Registro) =>
-  llamar<RegistroHecho>("/clinics/v1/register", { method: "POST", json: r });
-
-export const verificarCorreo = (codigo: string) =>
-  llamar<CorreoVerificado>("/clinics/v1/email/verify", { method: "POST", json: { codigo } });
-
-export const reenviarCodigo = () =>
-  llamar<{ enviado: true; correo: string }>("/clinics/v1/email/resend", { method: "POST", json: {} });
+export const reenviarCodigo = () => cliente.llamar(c.reenviarCodigoCorreo);
 
 /* ── Activación de mascotas en clínica ─────────────────────── */
 
-export type Identificador = { tipo: "iso"; valor: string } | { tipo: "nonISO"; valor: string };
-
 export const activarMascota = (identificador: Identificador, codigo: string) =>
-  llamar<{ petId: string; estado: "activa" }>("/pets/v1/activate", {
-    method: "POST",
-    json: { identificador, codigo },
-  });
+  cliente.llamar(p.activarMascota, { cuerpo: { identificador, codigo } });
 
 export const abrirReclamacion = (identificador: Identificador, codigo: string) =>
-  llamar<{ reclamacionId: string; plazo: string }>("/pets/v1/claims", {
-    method: "POST",
-    json: { identificador, codigo },
-  });
+  cliente.llamar(p.reclamarChip, { cuerpo: { identificador, codigo } });
 
 /* ── Sesión y equipo ───────────────────────────────────────── */
 
 export const entrar = (email: string, password: string) =>
-  llamar<{ memberId: string; clinicId: string; role: string }>("/clinics/v1/login", {
-    method: "POST",
-    json: { email, password },
-  });
+  cliente.llamar(c.entrarClinica, { cuerpo: { email, password } });
 
 export const aceptarInvitacion = (token: string, password: string, devicePubKey: string) =>
-  llamar<{ memberId: string; clinicId: string; role: "admin" | "vet" | "assistant" }>(
-    "/clinics/v1/members/accept",
-    { method: "POST", json: { token, password, devicePubKey } },
-  );
+  cliente.llamar(c.aceptarInvitacion, { cuerpo: { token, password, devicePubKey } });
 
-export const invitar = (nombre: string, email: string, rol: string) =>
-  llamar<{ memberId: string; enviado: true }>("/clinics/v1/members", {
-    method: "POST",
-    json: { nombre, email, rol },
-  });
+export const invitar = (nombre: string, email: string, rol: Rol) =>
+  cliente.llamar(c.invitarMiembro, { cuerpo: { nombre, email, rol } });
 
-export const darDeBaja = (id: string) =>
-  llamar<{ ok: true }>(`/clinics/v1/members/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const darDeBaja = (id: string) => cliente.llamar(c.darDeBajaMiembro, { params: { id } });
 
 export const entregarClave = (id: string, wrappedClinicKey: string) =>
-  llamar<{ ok: true }>(`/clinics/v1/members/${encodeURIComponent(id)}/clinic-key`, {
-    method: "POST",
-    json: { wrappedClinicKey },
-  });
+  cliente.llamar(c.entregarClaveClinica, { params: { id }, cuerpo: { wrappedClinicKey } });
 
 /* ── Software de gestión ───────────────────────────────────── */
 
-export type ClaveCreada = { id: string; prefijo: string; token: string };
-
 export const crearClaveApi = (nombre: string, firmaPub: string) =>
-  llamar<ClaveCreada>("/clinics/v1/api-keys", { method: "POST", json: { nombre, firmaPub } });
+  cliente.llamar(c.crearClaveApi, { cuerpo: { nombre, firmaPub } });
 
-export const retirarClaveApi = (id: string) =>
-  llamar<{ ok: true }>(`/clinics/v1/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const retirarClaveApi = (id: string) => cliente.llamar(c.retirarClaveApi, { params: { id } });
