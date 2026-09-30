@@ -91,6 +91,10 @@ export const borrarMensaje = (id: string) => conSesion.llamar(d.borrarMensaje, {
 export const impugnar = (reclamacionId: string) =>
   conSesion.llamar(d.impugnar, { params: { id: reclamacionId } });
 
+/** Sube una vez la clave pública de recuperación (cuentas de antes). */
+export const guardarClaveRecuperacion = (clave: string) =>
+  conSesion.llamar(d.guardarClaveRecuperacion, { cuerpo: { clave } });
+
 export const registrarDispositivo = (token: string) =>
   conSesion.llamar(d.registrarDispositivo, { cuerpo: { plataforma: "expo", token } });
 

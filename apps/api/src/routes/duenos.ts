@@ -79,7 +79,7 @@ const DISPOSITIVOS_MAX = 10;
 
 type Dueno = { ownerId: string; sessionId: string };
 
-const enmascarar = (email: string) => {
+export const enmascarar = (email: string) => {
   const [u, d] = email.split("@");
   return `${u.slice(0, 2)}${"•".repeat(Math.max(1, u.length - 2))}@${d}`;
 };
@@ -125,7 +125,7 @@ export async function duenoDe(req: FastifyRequest, reply: FastifyReply): Promise
   return { ownerId: s.ownerId, sessionId: s.id };
 }
 
-type Destinatario = {
+export type Destinatario = {
   id: string;
   email: string;
   telefono: string | null;
@@ -134,7 +134,7 @@ type Destinatario = {
 };
 type Canal = "correo" | "sms";
 
-const destinatario = {
+export const destinatario = {
   id: owners.id,
   email: owners.email,
   telefono: owners.telefono,
@@ -143,7 +143,7 @@ const destinatario = {
 };
 
 /** El canal que toca: el que eligió el dueño, si sigue siendo posible. */
-function canalDe(o: Destinatario, pedido?: Canal): Canal {
+export function canalDe(o: Destinatario, pedido?: Canal): Canal {
   const smsListo = !!o.telefono && !!o.telefonoVerificadoAt;
   const c = pedido ?? o.segundoFactor;
   return c === "sms" && smsListo ? "sms" : "correo";
@@ -167,10 +167,10 @@ async function reservarSms(ownerId: string): Promise<boolean> {
   return r.length > 0;
 }
 
-class SinCupoSms extends Error {}
+export class SinCupoSms extends Error {}
 
 /** Envía el código por el canal elegido. */
-async function enviarCodigo(o: Destinatario, canal: Canal, codigo: string, asunto: string) {
+export async function enviarCodigo(o: Destinatario, canal: Canal, codigo: string, asunto: string) {
   const legible = `${codigo.slice(0, 4)}-${codigo.slice(4)}`;
   if (canal === "sms") {
     if (!(await reservarSms(o.id))) throw new SinCupoSms();
@@ -192,7 +192,7 @@ async function enviarCodigo(o: Destinatario, canal: Canal, codigo: string, asunt
   });
 }
 
-const destinoDe = (o: Destinatario, canal: Canal) =>
+export const destinoDe = (o: Destinatario, canal: Canal) =>
   canal === "sms" ? enmascararTelefono(o.telefono!) : enmascarar(o.email);
 
 /**
@@ -299,7 +299,12 @@ export default async function rutasDuenos(app: FastifyInstance) {
     const pubKey = Buffer.from(b.pubKey, "base64");
     const [owner] = await db
       .insert(owners)
-      .values({ email, passwordHash: await hashPassword(b.password), pubKey })
+      .values({
+        email,
+        passwordHash: await hashPassword(b.password),
+        pubKey,
+        recoveryPub: b.recuperacionPub ? Buffer.from(b.recuperacionPub, "base64") : null,
+      })
       .returning(destinatario);
     const mascota = await registrarPendiente({
       identificador: b.mascota.identificador,
@@ -485,6 +490,8 @@ export default async function rutasDuenos(app: FastifyInstance) {
     return {
       correo: o.email,
       pubKey: o.pubKey.toString("base64"),
+      /** Si ya guardó la clave de recuperación del papel. */
+      recuperacion: !!o.recoveryPub,
       segundoFactor: canalDe(o),
       telefono: o.telefono
         ? { numero: enmascararTelefono(o.telefono), verificado: !!o.telefonoVerificadoAt }

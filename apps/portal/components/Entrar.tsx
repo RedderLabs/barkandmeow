@@ -128,6 +128,11 @@ export function Entrar() {
           <p id={`${ids}-nota`} className={a.tarjetaNota}>
             Después te enviaremos un código a tu correo, o por SMS si lo has elegido.
           </p>
+          <p className={a.tarjetaNota}>
+            <Link href="/recuperar" className="underline underline-offset-2">
+              ¿Has olvidado la contraseña?
+            </Link>
+          </p>
           <div className={a.separador}>¿Primera vez?</div>
           <Button asChild variant="outline" size="md" className="w-full">
             <Link href="/alta">Dar de alta a mi mascota</Link>

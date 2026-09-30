@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
+import { generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { crearCliente } from "@barkandmeow/db";
 import { crearApp } from "../src/index.js";
@@ -12,6 +12,7 @@ import { resolverReclamaciones } from "../src/routes/mascotas.js";
 /* Correo sin red: el cartero de los tests guarda las cartas en memoria. */
 // Los tests del portal hacen más peticiones por minuto que un dueño real.
 process.env.LIMITE_DUENOS = "1000";
+process.env.LIMITE_RECUPERACION = "1000";
 const buzon: Carta[] = [];
 usarCartero(async (c) => {
   buzon.push(c);
@@ -1783,5 +1784,190 @@ describe("panel del operador: reclamaciones", () => {
     const r = await conOps("POST", `/ops/v1/claims/${enPlazo}/resolve`, { aFavor: "reclamante", nota: "Demasiado pronto" });
     assert.equal(r.statusCode, 409);
     assert.equal(r.json().motivo, "en-plazo");
+  });
+});
+
+describe("recuperar la contraseña", () => {
+  /* La clave de recuperación del papel: un par Ed25519. El navegador la saca
+     de la clave del dueño; aquí basta con un par cualquiera. */
+  const parRecuperacion = () => {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const x = publicKey.export({ format: "jwk" }).x!;
+    return { pub: Buffer.from(x, "base64url").toString("base64"), privateKey };
+  };
+  const firmar = (privateKey: ReturnType<typeof parRecuperacion>["privateKey"], id: string, reto: string) =>
+    sign(null, Buffer.from(`bm:dueno:recuperacion:v1\n${id}\n${reto}`), privateKey).toString("base64");
+
+  const CHIP_R = "724098100008001";
+  const EMAIL_R = "recupera@correo.example";
+  const papel = parRecuperacion();
+
+  const empezar = async (chip = CHIP_R) => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/recovery",
+      payload: { identificador: { tipo: "iso", valor: chip } },
+    });
+    assert.equal(r.statusCode, 201);
+    return r.json() as { recuperacionId: string; reto: string };
+  };
+  const probar = (id: string, pub: string, firma: string) =>
+    app.inject({ method: "POST", url: "/owners/v1/recovery/proof", payload: { recuperacionId: id, clave: pub, firma } });
+  const terminar = (recuperacionId: string, codigo: string, password: string) =>
+    app.inject({ method: "POST", url: "/owners/v1/recovery/finish", payload: { recuperacionId, codigo, password } });
+  const entrar = (password: string) =>
+    app.inject({
+      method: "POST",
+      url: "/owners/v1/login",
+      payload: { identificador: { tipo: "iso", valor: CHIP_R }, password },
+    });
+  const alta = async (email: string, chip: string, recuperacionPub?: string) => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: {
+        email,
+        password: "la-clave-de-antes-larga",
+        pubKey: b64(),
+        ...(recuperacionPub ? { recuperacionPub } : {}),
+        mascota: { identificador: { tipo: "iso", valor: chip }, nombre: "" },
+      },
+    });
+    assert.equal(r.statusCode, 201);
+    const pendiente = r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: pendiente },
+      payload: { codigo: ultimoCodigo(email) },
+    });
+    assert.equal(v.statusCode, 200);
+    return v.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  };
+
+  let sesionVieja = "";
+
+  it("el alta guarda la clave de recuperación y /me lo dice", async () => {
+    sesionVieja = await alta(EMAIL_R, CHIP_R, papel.pub);
+    const me = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: sesionVieja } });
+    assert.equal(me.json().recuperacion, true);
+  });
+
+  it("un chip sin cuenta también recibe reto, y ninguna firma lo abre", async () => {
+    const { recuperacionId, reto } = await empezar(CHIP_INEXISTENTE);
+    assert.equal(Buffer.from(reto, "base64url").length, 32);
+    const r = await probar(recuperacionId, papel.pub, firmar(papel.privateKey, recuperacionId, reto));
+    assert.equal(r.statusCode, 401);
+    assert.equal(r.json().motivo, "papel");
+  });
+
+  it("sin el papel no hay código: otra clave o la firma de otro reto no valen", async () => {
+    const otro = parRecuperacion();
+    const cartas = buzon.length;
+    const a = await empezar();
+    assert.equal((await probar(a.recuperacionId, otro.pub, firmar(otro.privateKey, a.recuperacionId, a.reto))).statusCode, 401);
+    const b = await empezar();
+    // La firma de la recuperación «a» no sirve para la «b».
+    assert.equal((await probar(b.recuperacionId, papel.pub, firmar(papel.privateKey, a.recuperacionId, a.reto))).statusCode, 401);
+    assert.equal(buzon.length, cartas, "no sale ningún código");
+  });
+
+  it("cinco pruebas fallidas agotan la recuperación", async () => {
+    const otro = parRecuperacion();
+    const { recuperacionId, reto } = await empezar();
+    for (let i = 0; i < 5; i++)
+      assert.equal((await probar(recuperacionId, otro.pub, firmar(otro.privateKey, recuperacionId, reto))).statusCode, 401);
+    const r = await probar(recuperacionId, papel.pub, firmar(papel.privateKey, recuperacionId, reto));
+    assert.equal(r.statusCode, 410);
+  });
+
+  it("papel y código: contraseña nueva, sesiones cerradas y aviso al correo", async () => {
+    const { recuperacionId, reto } = await empezar();
+    // Sin pasar la prueba del papel no se puede terminar.
+    assert.equal((await terminar(recuperacionId, "AAAA-AAAA", "la-clave-nueva-larga")).statusCode, 410);
+
+    const p = await probar(recuperacionId, papel.pub, firmar(papel.privateKey, recuperacionId, reto));
+    assert.equal(p.statusCode, 200);
+    assert.equal(p.json().canal, "correo");
+    assert.match(p.json().destino, /^re•+@correo\.example$/);
+
+    const mal = await terminar(recuperacionId, "AAAA-AAAA", "la-clave-nueva-larga");
+    assert.equal(mal.statusCode, 400);
+    assert.equal(mal.json().intentosRestantes, 4);
+
+    const bien = await terminar(recuperacionId, ultimoCodigo(EMAIL_R), "la-clave-nueva-larga");
+    assert.equal(bien.statusCode, 200);
+    assert.match([...buzon].reverse().find((c) => c.para === EMAIL_R)!.asunto, /ha cambiado/);
+
+    // La sesión de antes ya no vale, la contraseña vieja tampoco, la nueva sí.
+    const me = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: sesionVieja } });
+    assert.equal(me.statusCode, 401);
+    assert.equal((await entrar("la-clave-de-antes-larga")).statusCode, 401);
+    assert.equal((await entrar("la-clave-nueva-larga")).statusCode, 200);
+
+    // Y la recuperación no se reutiliza.
+    assert.equal((await terminar(recuperacionId, "AAAA-AAAA", "otra-clave-mas-larga")).statusCode, 410);
+  });
+
+  it("las cuentas de antes guardan su clave de recuperación una sola vez", async () => {
+    const c = await alta("sin-papel-guardado@correo.example", "724098100008002");
+    const me = await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: c } });
+    assert.equal(me.json().recuperacion, false);
+
+    const clave = parRecuperacion().pub;
+    const put = (k: string, headers: Record<string, string> = { cookie: c }) =>
+      app.inject({ method: "PUT", url: "/owners/v1/recovery-key", headers, payload: { clave: k } });
+    assert.equal((await put(clave)).statusCode, 200);
+    // Una vez puesta no se cambia: una sesión robada no puede cambiar el papel.
+    const otra = await put(parRecuperacion().pub);
+    assert.equal(otra.statusCode, 409);
+    assert.equal(otra.json().motivo, "ya-guardada");
+    assert.equal((await put(clave, {})).statusCode, 401);
+  });
+
+  it("miembro de clínica: código al correo, contraseña nueva y fuera de la consola", async () => {
+    const EMAIL_M = "admin@prueba.example";
+    const cartas = buzon.length;
+    const r = await app.inject({ method: "POST", url: "/clinics/v1/recovery", payload: { email: EMAIL_M } });
+    assert.equal(r.statusCode, 202);
+    await new Promise((ok) => setImmediate(ok));
+    assert.equal(buzon.length, cartas + 1);
+
+    // Pedirla otra vez dentro del minuto devuelve la misma, sin otro correo.
+    const otra = await app.inject({ method: "POST", url: "/clinics/v1/recovery", payload: { email: EMAIL_M } });
+    assert.equal(otra.json().recuperacionId, r.json().recuperacionId);
+    assert.equal(buzon.length, cartas + 1);
+
+    const hecho = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/recovery/finish",
+      payload: { recuperacionId: r.json().recuperacionId, codigo: ultimoCodigo(EMAIL_M), password: "clave-nueva-de-la-clinica" },
+    });
+    assert.equal(hecho.statusCode, 200);
+
+    const me = await app.inject({ method: "GET", url: "/clinics/v1/me", headers: { cookie } });
+    assert.equal(me.statusCode, 401);
+    const login = (password: string) =>
+      app.inject({ method: "POST", url: "/clinics/v1/login", payload: { email: EMAIL_M, password } });
+    assert.equal((await login("una-clave-bastante-larga")).statusCode, 401);
+    const nuevo = await login("clave-nueva-de-la-clinica");
+    assert.equal(nuevo.statusCode, 200);
+    cookie = nuevo.cookies[0].name + "=" + nuevo.cookies[0].value;
+  });
+
+  it("un correo sin cuenta responde igual y ningún código lo abre", async () => {
+    const cartas = buzon.length;
+    const r = await app.inject({ method: "POST", url: "/clinics/v1/recovery", payload: { email: "nadie@prueba.example" } });
+    assert.equal(r.statusCode, 202);
+    assert.match(r.json().recuperacionId, /^[0-9a-f-]{36}$/);
+    await new Promise((ok) => setImmediate(ok));
+    assert.equal(buzon.length, cartas);
+    const f = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/recovery/finish",
+      payload: { recuperacionId: r.json().recuperacionId, codigo: "AAAA-AAAA", password: "clave-nueva-de-la-clinica" },
+    });
+    assert.equal(f.statusCode, 400);
+    assert.equal(f.json().motivo, "incorrecto");
   });
 });

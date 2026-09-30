@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { Boton, Campo, Pantalla, Texto, Titulo } from "@/components/ui";
 import { yo } from "@/lib/api";
 import { guardarClave } from "@/lib/almacen";
+import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { claveDeDueno, deBase64, iguales, leerCodigo } from "@/lib/cripto";
 import { espacio } from "@/lib/tema";
 
@@ -28,12 +29,13 @@ export default function Clave() {
       // Derivar cuesta unos milisegundos; se deja pintar el indicador antes.
       await new Promise((r) => setTimeout(r, 0));
       const clave = claveDeDueno(semilla);
-      const { pubKey } = await yo();
-      if (!iguales(clave.publica, deBase64(pubKey))) {
+      const y = await yo();
+      if (!iguales(clave.publica, deBase64(y.pubKey))) {
         setError("Ese código es válido, pero no es el de esta cuenta.");
         return;
       }
       await guardarClave(clave.secreta);
+      rellenarRecuperacion(y, clave.secreta);
       router.back();
     } catch {
       setError("No se ha podido comprobar. Revisa la conexión y vuelve a intentarlo.");

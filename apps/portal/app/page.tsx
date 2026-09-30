@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { NuevaMascota } from "@/components/Acciones";
 import { Cabecera } from "@/components/Cabecera";
+import { RellenoRecuperacion } from "@/components/RellenoRecuperacion";
 import { FichaMascota } from "@/components/FichaMascota";
 import { Placa } from "@/components/Placa";
 import s from "@/components/portal.module.css";
@@ -16,6 +17,7 @@ export default async function Page() {
   return (
     <div className={ui.shell}>
       <Cabecera conSesion activo="mascotas" />
+      <RellenoRecuperacion pubKey={yo.pubKey} pendiente={!yo.recuperacion} />
       <main className={ui.reading}>
         <div className={ui.readingMain}>
           <div>

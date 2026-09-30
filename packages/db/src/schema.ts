@@ -48,6 +48,10 @@ export const owners = pgTable("owners", {
   smsDia: text("sms_dia"),
   smsEnviados: integer("sms_enviados").notNull().default(0),
   smsUltimo: timestamp("sms_ultimo"),
+  /* Clave pública Ed25519 que sale de la clave del código en papel. Con ella
+     el dueño demuestra que tiene el papel al recuperar la contraseña; el
+     servidor solo comprueba firmas, no puede derivarla ni usarla. */
+  recoveryPub: bytea("recovery_pub"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [uniqueIndex("owners_email_uq").on(t.email)]);
 
@@ -264,6 +268,29 @@ export const clinicMembers = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [uniqueIndex("clinic_members_email_uq").on(t.email)],
+);
+
+/* Recuperación de contraseña, de dueños y de miembros de clínica. Caduca a
+   los 15 minutos y el código solo se guarda como hash. Para el dueño hay un
+   paso antes: firmar `reto` con la clave del papel; hasta entonces `sujetoId`
+   va vacío y solo se sabe el chip (`idIndex`). */
+export const recuperaciones = pgTable(
+  "recuperaciones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tipo: text("tipo").$type<"dueno" | "miembro">().notNull(),
+    /** El dueño o el miembro. Vacío hasta que la prueba sale bien. */
+    sujetoId: uuid("sujeto_id"),
+    idIndex: bytea("id_index"),
+    reto: text("reto"),
+    pruebas: integer("pruebas").notNull().default(0),
+    codeHash: text("code_hash"),
+    codeAttempts: integer("code_attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at").notNull(),
+    usadaAt: timestamp("usada_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("recuperaciones_caduca_ix").on(t.expiresAt)],
 );
 
 export const clinicSessions = pgTable(

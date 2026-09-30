@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ad, aBase64Url, cargarCripto, claveDeClinica, claveDeFragmento, ErrorCripto, firmaValida, firmarRegistro, leerCodigo, nuevoCodigo } from "./index.ts";
+import { ad, aBase64Url, cargarCripto, claveDeClinica, claveDeDueno, claveDeFragmento, claveDeRecuperacion, ErrorCripto, firmaValida, firmarRegistro, leerCodigo, nuevoCodigo } from "./index.ts";
 
 const cripto = await cargarCripto(readFileSync(new URL("../wasm/bm_crypto.wasm", import.meta.url)));
 const enc = new TextEncoder();
@@ -78,4 +78,21 @@ test("un registro firmado se comprueba, y cambiado en un byte ya no", () => {
   const otra = firmarRegistro(cripto, crypto.getRandomValues(new Uint8Array(32)), {});
   assert.equal(firmaValida(cripto, { ...f, clave: otra.clave }), false);
   assert.equal(firmaValida(cripto, { ...f, firma: "corta" }), false);
+});
+
+test("la clave de recuperación del dueño: fija para su papel, distinta de la X25519 y firma", async () => {
+  const { semilla } = await nuevoCodigo();
+  const dueno = claveDeDueno(cripto, semilla);
+  const a = claveDeRecuperacion(cripto, dueno.secreta);
+  const b = claveDeRecuperacion(cripto, claveDeDueno(cripto, semilla).secreta);
+  assert.deepEqual(a.publica, b.publica);
+  assert.notDeepEqual(a.publica, dueno.publica);
+  assert.notDeepEqual(a.semilla, dueno.secreta);
+  const m = enc.encode("bm:dueno:recuperacion:v1\nid\nreto");
+  const f = cripto.firmar(a.semilla, m);
+  assert.ok(cripto.verificar(a.publica, m, f));
+  assert.ok(!cripto.verificar(a.publica, enc.encode("otro reto"), f));
+  // Otro papel, otra clave.
+  const otro = claveDeRecuperacion(cripto, claveDeDueno(cripto, (await nuevoCodigo()).semilla).secreta);
+  assert.notDeepEqual(otro.publica, a.publica);
 });

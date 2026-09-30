@@ -1,14 +1,18 @@
 import { useState } from "react";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { Image, useColorScheme, View } from "react-native";
 import { Boton, Campo, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
-import { ErrorApi, identificar } from "@/lib/api";
+import { API, ErrorApi, identificar } from "@/lib/api";
 import { useSesion } from "@/lib/sesion";
 import { espacio } from "@/lib/tema";
 
 /* Entrar, primer paso: el número de chip (identifica, no autoriza) y la
    contraseña. Después llega un código por correo o por SMS. El alta se hace
    en el portal web: ahí se genera y se imprime el código de recuperación. */
+
+/** El portal vive en el mismo origen que la API, sin el /api. */
+const URL_RECUPERAR = `${API.replace(/\/api$/, "")}/mi-mascota/recuperar`;
 
 export default function Entrar() {
   const { entrar } = useSesion();
@@ -84,6 +88,10 @@ export default function Entrar() {
         )}
         <Boton alPulsar={() => void alEnviar()} ocupado={enviando} desactivado={!chip.trim() || !password}>
           Continuar
+        </Boton>
+        {/* La recuperación pide el código en papel: se hace en el portal web. */}
+        <Boton variante="secundario" alPulsar={() => void Linking.openURL(URL_RECUPERAR)}>
+          ¿Has olvidado la contraseña?
         </Boton>
       </View>
       <Texto tono="suave">

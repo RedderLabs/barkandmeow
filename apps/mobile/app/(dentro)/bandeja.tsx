@@ -4,6 +4,7 @@ import { Alert, Pressable, View } from "react-native";
 import { Boton, Cargando, Datos, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { borrarMensaje, leerBandeja, yo } from "@/lib/api";
 import { leerClave } from "@/lib/almacen";
+import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { abrirTodos, type Mensaje } from "@/lib/bandeja";
 import { deBase64, iguales, publica } from "@/lib/cripto";
 import { useCarga } from "@/lib/datos";
@@ -17,6 +18,7 @@ type Vista = { falta: true } | { falta: false; mensajes: Mensaje[]; nombres: Rec
 
 async function cargar(): Promise<Vista> {
   const [yoMismo, clave] = await Promise.all([yo(), leerClave()]);
+  rellenarRecuperacion(yoMismo, clave);
   if (!clave || !iguales(publica(clave), deBase64(yoMismo.pubKey))) return { falta: true };
   const { mensajes } = await leerBandeja();
   return {

@@ -4,6 +4,7 @@ import { Alert, View } from "react-native";
 import { Boton, Cargando, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { yo } from "@/lib/api";
 import { leerClave, leerPush } from "@/lib/almacen";
+import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { deBase64, iguales, publica } from "@/lib/cripto";
 import { useCarga } from "@/lib/datos";
 import { activarPush } from "@/lib/push";
@@ -12,6 +13,7 @@ import { espacio } from "@/lib/tema";
 
 async function cargar() {
   const [y, clave, push] = await Promise.all([yo(), leerClave(), leerPush()]);
+  rellenarRecuperacion(y, clave);
   return { correo: y.correo, clave: !!clave && iguales(publica(clave), deBase64(y.pubKey)), push: !!push };
 }
 

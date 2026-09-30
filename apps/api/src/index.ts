@@ -10,6 +10,7 @@ import rutasChip, { caducarPeticiones } from "./routes/chip.js";
 import rutasClinicas, { sesionDe } from "./routes/clinics.js";
 import rutasDuenos from "./routes/duenos.js";
 import rutasPasaporte, { rutasFirmas } from "./routes/pasaporte.js";
+import rutasRecuperacion from "./routes/recuperacion.js";
 import rutasFicha from "./routes/ficha.js";
 import { purgarSinVerificar } from "./limpieza.js";
 import rutasMascotas, { resolverReclamaciones } from "./routes/mascotas.js";
@@ -132,6 +133,13 @@ export async function crearApp() {
     await scope.register(rateLimit, { max: Number(process.env.LIMITE_DUENOS ?? 20), timeWindow: "1 minute" });
     await scope.register(rutasDuenos);
     await scope.register(rutasPasaporte);
+  });
+
+  /* Recuperar la contraseña, de dueños y de clínicas: el límite más corto,
+     porque cada paso prueba algo (un chip, una firma, un código). */
+  await app.register(async (scope) => {
+    await scope.register(rateLimit, { max: Number(process.env.LIMITE_RECUPERACION ?? 10), timeWindow: "1 minute" });
+    await scope.register(rutasRecuperacion);
   });
 
   /* Panel del operador: pocas peticiones, y un token equivocado cuenta igual. */

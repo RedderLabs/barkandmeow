@@ -319,3 +319,11 @@ export function claveDeDueno(cripto: Cripto, semilla: Uint8Array) {
   const secreta = cripto.derivar(semilla, "bm:dueno:x25519:v1");
   return { secreta, publica: cripto.publica(secreta) };
 }
+
+/** Par Ed25519 con el que el dueño demuestra que tiene su papel al recuperar
+    la contraseña. Sale de su clave X25519 (y esta, del papel), así que un
+    navegador o un móvil que ya guarda la clave también puede sacarlo. */
+export function claveDeRecuperacion(cripto: Cripto, secretaDueno: Uint8Array) {
+  const semilla = cripto.derivar(secretaDueno, "bm:dueno:ed25519:recuperacion:v1");
+  return { semilla, publica: cripto.publicaFirma(semilla) };
+}

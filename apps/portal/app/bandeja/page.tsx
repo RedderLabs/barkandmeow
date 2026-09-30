@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { Bandeja } from "@/components/Bandeja";
 import { Cabecera } from "@/components/Cabecera";
+import { RellenoRecuperacion } from "@/components/RellenoRecuperacion";
 import { exigirSesion } from "@/lib/servidor";
 
 export const metadata: Metadata = { title: "Bandeja · Mi mascota · Bark & Meow" };
@@ -12,6 +13,7 @@ export default async function Page() {
   return (
     <div className={ui.shell}>
       <Cabecera conSesion activo="bandeja" />
+      <RellenoRecuperacion pubKey={yo.pubKey} pendiente={!yo.recuperacion} />
       <main className={ui.reading}>
         <div className={ui.readingMain}>
           <div>

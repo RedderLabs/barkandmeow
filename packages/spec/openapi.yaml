@@ -47,6 +47,9 @@ paths:
                 pubKey:
                   type: string
                   pattern: ^[A-Za-z0-9+/]+={0,2}$
+                recuperacionPub:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
                 mascota:
                   type: object
                   properties:
@@ -464,6 +467,8 @@ paths:
                   pubKey:
                     type: string
                     pattern: ^[A-Za-z0-9+/]+={0,2}$
+                  recuperacion:
+                    type: boolean
                   segundoFactor:
                     type: string
                     enum:
@@ -586,6 +591,7 @@ paths:
                 required:
                   - correo
                   - pubKey
+                  - recuperacion
                   - segundoFactor
                   - telefono
                   - mascotas
@@ -1828,6 +1834,306 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/recovery:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Paso 1: el chip. Devuelve un reto para firmar con la clave del código en papel, haya cuenta o no."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+              required:
+                - identificador
+      responses:
+        "201":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  recuperacionId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  reto:
+                    type: string
+                  caduca:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - recuperacionId
+                  - reto
+                  - caduca
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /owners/v1/recovery/proof:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Paso 2: el reto firmado (Ed25519) con la clave de recuperación del papel. Si vale, sale un código por el segundo factor."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                recuperacionId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                clave:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                firma:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - recuperacionId
+                - clave
+                - firma
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  enviado:
+                    type: boolean
+                    const: true
+                  canal:
+                    type: string
+                    enum:
+                      - correo
+                      - sms
+                  destino:
+                    type: string
+                required:
+                  - enviado
+                  - canal
+                  - destino
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          description: Error 502
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /owners/v1/recovery/finish:
+    post:
+      tags:
+        - Dueño (portal y app)
+      summary: "Paso 3: el código y la contraseña nueva. Cierra todas las sesiones y avisa por correo."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                recuperacionId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                codigo:
+                  type: string
+                  maxLength: 20
+                password:
+                  type: string
+                  minLength: 12
+                  maxLength: 200
+              required:
+                - recuperacionId
+                - codigo
+                - password
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /owners/v1/recovery-key:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Cuentas de antes de la recuperación: guardar una vez la clave pública de recuperación."
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                clave:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - clave
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
           content:
             application/json:
               schema:
@@ -3317,6 +3623,117 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
       x-acceso: clave-api
+  /clinics/v1/recovery:
+    post:
+      tags:
+        - Clínica
+      summary: "Paso 1: el correo. Llega un código si hay cuenta; la respuesta es la misma si no la hay."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                email:
+                  type: string
+                  maxLength: 254
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+              required:
+                - email
+      responses:
+        "202":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  recuperacionId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                required:
+                  - recuperacionId
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
+  /clinics/v1/recovery/finish:
+    post:
+      tags:
+        - Clínica
+      summary: "Paso 2: el código del correo y la contraseña nueva. Cierra todas las sesiones del miembro."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                recuperacionId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                codigo:
+                  type: string
+                  maxLength: 20
+                password:
+                  type: string
+                  minLength: 12
+                  maxLength: 200
+              required:
+                - recuperacionId
+                - codigo
+                - password
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: Error 410
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: publica
   /health:
     get:
       tags:

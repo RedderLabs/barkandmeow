@@ -37,6 +37,14 @@ export const abrirReclamacion = (identificador: Identificador, codigo: string) =
 export const entrar = (email: string, password: string) =>
   cliente.llamar(c.entrarClinica, { cuerpo: { email, password } });
 
+/* ── Recuperar la contraseña ───────────────────────────────── */
+
+export const empezarRecuperacion = (email: string) =>
+  cliente.llamar(c.empezarRecuperacion, { cuerpo: { email } });
+
+export const terminarRecuperacion = (recuperacionId: string, codigo: string, password: string) =>
+  cliente.llamar(c.terminarRecuperacion, { cuerpo: { recuperacionId, codigo, password } });
+
 export const aceptarInvitacion = (token: string, password: string, devicePubKey: string) =>
   cliente.llamar(c.aceptarInvitacion, { cuerpo: { token, password, devicePubKey } });
 

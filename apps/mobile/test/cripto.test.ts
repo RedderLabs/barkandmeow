@@ -10,6 +10,7 @@ import {
   aBase64 as aBase64Wasm,
   cargarCripto,
   claveDeDueno as claveDeDuenoWasm,
+  claveDeRecuperacion as claveDeRecuperacionWasm,
   firmarRegistro,
   nuevoCodigo,
 } from "@barkandmeow/crypto";
@@ -17,6 +18,7 @@ import {
   aBase64,
   abrirSellado,
   claveDeDueno,
+  claveDeRecuperacion,
   deBase64,
   derivar,
   ErrorCripto,
@@ -110,4 +112,17 @@ test("base64 propio igual que el de la web, y acepta base64url", () => {
     assert.deepEqual(deBase64(aBase64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")), b);
   }
   assert.equal(deBase64("no es base64!"), null);
+});
+
+test("la clave de recuperación del móvil es la misma que la de la web", () => {
+  for (let i = 0; i < 25; i++) {
+    const secreta = azar(32);
+    const web = claveDeRecuperacionWasm(wasm, secreta);
+    const movil = claveDeRecuperacion(secreta);
+    assert.deepEqual(movil.semilla, web.semilla);
+    assert.deepEqual(movil.publica, web.publica);
+    // Y lo que firma el móvil lo verifica el núcleo de la web.
+    const m = enc.encode("bm:dueno:recuperacion:v1\nid\nreto");
+    assert.ok(verificar(movil.publica, m, wasm.firmar(web.semilla, m)));
+  }
 });

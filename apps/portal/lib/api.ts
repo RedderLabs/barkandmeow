@@ -39,6 +39,8 @@ export const darDeAlta = (datos: {
   email: string;
   password: string;
   pubKey: string;
+  /** Pública Ed25519 de recuperación, sacada de la misma clave del papel. */
+  recuperacionPub?: string;
   mascota: { identificador: Identificador; nombre: string };
 }) => cliente.llamar(d.darDeAlta, { cuerpo: datos });
 
@@ -49,6 +51,21 @@ export const confirmarCodigo = (codigo: string) => cliente.llamar(d.confirmarCod
 
 export const reenviarCodigo = (canal?: Canal) =>
   cliente.llamar(d.reenviarCodigo, { cuerpo: canal ? { canal } : {} });
+
+/* ── Recuperar la contraseña: papel y segundo factor ──────── */
+
+export const empezarRecuperacion = (identificador: Identificador) =>
+  cliente.llamar(d.empezarRecuperacion, { cuerpo: { identificador } });
+
+export const probarPapel = (recuperacionId: string, clave: string, firma: string) =>
+  cliente.llamar(d.probarPapel, { cuerpo: { recuperacionId, clave, firma } });
+
+export const terminarRecuperacion = (recuperacionId: string, codigo: string, password: string) =>
+  cliente.llamar(d.terminarRecuperacion, { cuerpo: { recuperacionId, codigo, password } });
+
+/** Cuentas de antes de la recuperación: la pública, una sola vez. */
+export const guardarClaveRecuperacion = (clave: string) =>
+  cliente.llamar(d.guardarClaveRecuperacion, { cuerpo: { clave } });
 
 /* ── Segundo factor por SMS ────────────────────────────────── */
 

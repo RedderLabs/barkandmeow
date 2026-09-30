@@ -10,6 +10,8 @@ import {
   memberAcceptBody,
   memberInviteBody,
   pacienteBuscarBody,
+  recuperacionFinBody,
+  recuperacionMiembroBody,
   rol,
 } from "../contracts";
 import { fecha, ok, ruta } from "./tipos";
@@ -330,5 +332,28 @@ export const rutasClinicas = {
     respuesta: informeEnviado,
     estado: 201,
     errores: [400, 401, 404, 413, 503],
+  }),
+
+  /* ── Recuperar la contraseña de un miembro ───────────────── */
+
+  empezarRecuperacion: ruta({
+    metodo: "POST",
+    ruta: "/clinics/v1/recovery",
+    acceso: "publica",
+    resumen: "Paso 1: el correo. Llega un código si hay cuenta; la respuesta es la misma si no la hay.",
+    cuerpo: recuperacionMiembroBody,
+    respuesta: z.object({ recuperacionId: z.string().uuid() }),
+    estado: 202,
+    errores: [400, 429],
+  }),
+
+  terminarRecuperacion: ruta({
+    metodo: "POST",
+    ruta: "/clinics/v1/recovery/finish",
+    acceso: "publica",
+    resumen: "Paso 2: el código del correo y la contraseña nueva. Cierra todas las sesiones del miembro.",
+    cuerpo: recuperacionFinBody,
+    respuesta: ok,
+    errores: [400, 410, 429],
   }),
 } as const;

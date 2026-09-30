@@ -42,6 +42,12 @@ export function claveDeDueno(semilla: Uint8Array) {
   return { secreta, publica: publica(secreta) };
 }
 
+/** Par Ed25519 de recuperación: lo mismo que `claveDeRecuperacion` de packages/crypto. */
+export function claveDeRecuperacion(secretaDueno: Uint8Array) {
+  const semilla = derivar(secretaDueno, "bm:dueno:ed25519:recuperacion:v1");
+  return { semilla, publica: ed25519.getPublicKey(semilla) };
+}
+
 /* ── Código de recuperación ─────────────────────────────────
    8 bloques de 4 en base32 Crockford: 150 bits de semilla + 10 de
    comprobación (los 10 bits altos de SHA-256 de la semilla). Igual que

@@ -80,6 +80,9 @@ export function Entrar() {
             <Button type="submit" disabled={enviando}>
               {enviando ? "Entrando…" : "Entrar"}
             </Button>
+            <Button asChild variant="ghost" size="md">
+              <Link href="/recuperar">¿Has olvidado la contraseña?</Link>
+            </Button>
           </div>
         </form>
       </div>

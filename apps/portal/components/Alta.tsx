@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
-import { cargarCripto, claveDeDueno, type CodigoRecuperacion } from "@barkandmeow/crypto";
+import { cargarCripto, claveDeDueno, claveDeRecuperacion, type CodigoRecuperacion } from "@barkandmeow/crypto";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { Button } from "@barkandmeow/ui-web/components/button";
 import { Input } from "@barkandmeow/ui-web/components/input";
@@ -94,6 +94,7 @@ export function Alta() {
         email: email.trim().toLowerCase(),
         password,
         pubKey: b64(clave.publica),
+        recuperacionPub: b64(claveDeRecuperacion(cripto, clave.secreta).publica),
         mascota: { identificador: id!, nombre: nombre.trim() },
       });
       await guardarClave(clave.secreta, clave.publica);

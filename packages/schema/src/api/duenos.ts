@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   base64,
+  claveRecuperacionBody,
   codigoCorreoBody,
   dispositivoBody,
   dispositivoRetirarBody,
@@ -8,6 +9,9 @@ import {
   ownerPetBody,
   ownerRegisterBody,
   perfilBody,
+  recuperacionFinBody,
+  recuperacionInicioBody,
+  recuperacionPruebaBody,
   reenvioBody,
   segundoFactor,
   segundoFactorBody,
@@ -78,6 +82,8 @@ export type Mascota = z.infer<typeof mascota>;
 export const yo = z.object({
   correo: z.string(),
   pubKey: base64,
+  /** Si ya guardó la clave de recuperación del papel. */
+  recuperacion: z.boolean(),
   /** Por dónde llega el código de entrada. */
   segundoFactor,
   /** El teléfono del segundo factor, enmascarado. */
@@ -407,5 +413,50 @@ export const rutasDuenos = {
     resumen: "Retirar un enlace borra el bloque: deja de abrirse al momento.",
     respuesta: z.object({ ok: z.literal(true), descargadoNoVuelve: z.literal(true) }),
     errores: [401, 404],
+  }),
+
+  /* ── Recuperar la contraseña: papel y segundo factor ─────── */
+
+  empezarRecuperacion: ruta({
+    metodo: "POST",
+    ruta: "/owners/v1/recovery",
+    acceso: "publica",
+    resumen:
+      "Paso 1: el chip. Devuelve un reto para firmar con la clave del código en papel, haya cuenta o no.",
+    cuerpo: recuperacionInicioBody,
+    respuesta: z.object({ recuperacionId: z.string().uuid(), reto: z.string(), caduca: fecha }),
+    estado: 201,
+    errores: [400, 429],
+  }),
+
+  probarPapel: ruta({
+    metodo: "POST",
+    ruta: "/owners/v1/recovery/proof",
+    acceso: "publica",
+    resumen:
+      "Paso 2: el reto firmado (Ed25519) con la clave de recuperación del papel. Si vale, sale un código por el segundo factor.",
+    cuerpo: recuperacionPruebaBody,
+    respuesta: z.object({ enviado: z.literal(true), canal: segundoFactor, destino: z.string() }),
+    errores: [400, 401, 410, 429, 502],
+  }),
+
+  terminarRecuperacion: ruta({
+    metodo: "POST",
+    ruta: "/owners/v1/recovery/finish",
+    acceso: "publica",
+    resumen: "Paso 3: el código y la contraseña nueva. Cierra todas las sesiones y avisa por correo.",
+    cuerpo: recuperacionFinBody,
+    respuesta: ok,
+    errores: [400, 410, 429],
+  }),
+
+  guardarClaveRecuperacion: ruta({
+    metodo: "PUT",
+    ruta: "/owners/v1/recovery-key",
+    acceso: "dueno",
+    resumen: "Cuentas de antes de la recuperación: guardar una vez la clave pública de recuperación.",
+    cuerpo: claveRecuperacionBody,
+    respuesta: ok,
+    errores: [400, 401, 409],
   }),
 } as const;

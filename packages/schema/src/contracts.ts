@@ -192,11 +192,16 @@ export const activacionBody = z.object({
 
 /* ── Portal del dueño ─────────────────────────────────────── */
 
+/** 32 bytes en base64 (44 caracteres con relleno). */
+const clavePublica32 = base64.refine((s) => s.length === 44, "32 bytes");
+
 export const ownerRegisterBody = z.object({
   email: z.string().email().max(254),
   password: z.string().min(12).max(200),
   /** Clave pública X25519 del dueño, derivada en su navegador del código en papel. */
   pubKey: base64,
+  /** Clave pública Ed25519 de recuperación, derivada de la misma clave del papel. */
+  recuperacionPub: clavePublica32.optional(),
   mascota: z.object({ identificador, nombre: z.string().max(60).default("") }),
 });
 
@@ -249,3 +254,35 @@ export const perfilBody = z.object({
 
 export type ChipLookupRespuesta = z.infer<typeof chipLookupRespuesta>;
 export type ClinicRegisterBody = z.infer<typeof clinicRegisterBody>;
+
+/* ── Recuperación de contraseña ───────────────────────────── */
+
+const contrasenaNueva = z.string().min(12).max(200);
+
+/** Dueño, paso 1: el chip. Devuelve un reto, haya cuenta o no. */
+export const recuperacionInicioBody = z.object({ identificador });
+
+/** Dueño, paso 2: el reto firmado con la clave de recuperación del papel. */
+export const recuperacionPruebaBody = z.object({
+  recuperacionId: z.string().uuid(),
+  clave: clavePublica32,
+  /** Ed25519, 64 bytes. */
+  firma: base64.refine((s) => s.length === 88, "64 bytes"),
+});
+
+/** Último paso, dueño o miembro: el código recibido y la contraseña nueva. */
+export const recuperacionFinBody = z.object({
+  recuperacionId: z.string().uuid(),
+  codigo: z.string().max(20),
+  password: contrasenaNueva,
+});
+
+/** Dueños de antes de la recuperación: guardan su clave pública una vez. */
+export const claveRecuperacionBody = z.object({ clave: clavePublica32 });
+
+/** Miembro de clínica: su correo. */
+export const recuperacionMiembroBody = z.object({ email: z.string().email().max(254) });
+
+/** Lo que firma el dueño: separa el uso y ata la firma a esta recuperación. */
+export const mensajeRecuperacion = (recuperacionId: string, reto: string) =>
+  `bm:dueno:recuperacion:v1\n${recuperacionId}\n${reto}`;

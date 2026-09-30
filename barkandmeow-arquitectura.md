@@ -353,6 +353,8 @@ Cada apertura queda firmada con fecha, nivel y país aproximado (derivado de la 
 
 Código de recuperación de 24 palabras en papel y, opcionalmente, un segundo dispositivo (por ejemplo, el móvil de otro miembro de la familia) como copia de la clave.
 
+**Contraseña olvidada** (decidido 2026-09-30). La contraseña no protege datos, solo la entrada: cambiarla no descifra ni pierde nada. Para el dueño hacen falta dos cosas. La primera es su código en papel: de su clave sale un par Ed25519 de recuperación, el servidor guarda solo la pública (`owners.recovery_pub`) y el dueño firma un reto (`/owners/v1/recovery`, `/proof`). La segunda es el código de su segundo factor, por correo o SMS (`/finish`). Quien robe el correo no puede quedarse la cuenta; quien pierda el papel tiene la reclamación del chip en una clínica. Los miembros de una clínica recuperan con un código al correo (`/clinics/v1/recovery`), porque la clave de la clínica no depende de la contraseña. En los dos casos se cierran todas las sesiones y llega un aviso al correo. Las cuentas de dueño anteriores guardan su clave de recuperación una sola vez, desde un navegador o un móvil que ya tenga la clave (`PUT /owners/v1/recovery-key`).
+
 ## Interoperabilidad y federación
 
 Bark & Meow no pretende ser la única base de datos: publica un protocolo abierto para que otras apps, registros de identificación y software de clínicas de cualquier país conecten sus chips. Un veterinario en Lisboa consulta un chip una sola vez y la búsqueda llega a todas las plataformas conectadas, sea cual sea el país de origen del animal. Es el mismo modelo que Europetnet usa para la identidad, aplicado a la salud.
