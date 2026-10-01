@@ -15,6 +15,7 @@ import rutasFicha from "./routes/ficha.js";
 import { purgarSinVerificar } from "./limpieza.js";
 import rutasMascotas, { resolverReclamaciones } from "./routes/mascotas.js";
 import rutasOperador from "./routes/operador.js";
+import rutasPacientes from "./routes/pacientes.js";
 import { idDeClave, rutasApiSoftware, rutasSoftware } from "./routes/software.js";
 
 /* apps/api NO depende de packages/crypto, y es a propósito: el servidor guarda
@@ -111,6 +112,22 @@ export async function crearApp() {
 
   await app.register(rutasClinicas);
   await app.register(rutasSoftware);
+
+  /* La portada de la consola: el chip leído en el mostrador y los pacientes.
+     Límite por clínica, como el del nivel 0: un lector de mostrador no pasa de
+     unas pocas lecturas por minuto, y tener cuenta no da barra libre para
+     recorrer números. */
+  await app.register(async (scope) => {
+    await scope.register(rateLimit, {
+      max: Number(process.env.LIMITE_CONSOLA_CHIP ?? 60),
+      timeWindow: "1 minute",
+      keyGenerator: async (req) => {
+        const s = await sesionDe(req);
+        return s ? `consola:${s.clinicId}` : `ip:${req.ip}`;
+      },
+    });
+    await scope.register(rutasPacientes);
+  });
 
   /* Software de gestión con clave de API: límite por clave, no por IP, porque
      un servidor de clínica envía en tandas desde una sola dirección. Sin clave

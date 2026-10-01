@@ -188,6 +188,8 @@ export const ad = {
   pasaporte: (petId: string) => `bm:p:v1:${petId}`,
   /** El pasaporte compartido para un viaje, con la clave del fragmento. */
   pasaporteCompartido: (id: string) => `bm:pv:v1:${id}`,
+  /** La etiqueta con la que una clínica reconoce a un paciente. */
+  etiqueta: (clinicId: string, petId: string) => `bm:ce:v1:${clinicId}:${petId}`,
 };
 
 /* ── Registros firmados ──────────────────────────────────────
@@ -231,6 +233,55 @@ export function aBase64(b: Uint8Array): string {
   let s = "";
   for (const x of b) s += String.fromCharCode(x);
   return btoa(s);
+}
+
+/* ── Etiquetas de paciente ───────────────────────────────────
+   La clínica reconoce a un paciente por un nombre que escribe ella («Kira, de
+   Ana»). Va cifrado con una clave simétrica que sale de la secreta de la
+   clínica, con otro `info`: quien tenga esta clave lee etiquetas, pero no abre
+   la K de ninguna ficha. El texto se rellena a un tamaño fijo antes de cifrar,
+   para que el servidor no sepa ni cuánto mide el nombre. */
+
+/** Lo más largo que puede ser una etiqueta, en caracteres. */
+export const ETIQUETA_MAX = 60;
+/** 60 caracteres ocupan como mucho 240 bytes en UTF-8. */
+const ETIQUETA_BYTES = 256;
+
+export const claveEtiquetas = (cripto: Cripto, secretaClinica: Uint8Array) =>
+  cripto.derivar(secretaClinica, "bm:clinica:etiquetas:v1");
+
+/** Normaliza lo tecleado: sin espacios de más y sin pasar del tope. */
+export const limpiarEtiqueta = (texto: string) =>
+  [...texto.replace(/\s+/g, " ").trim()].slice(0, ETIQUETA_MAX).join("");
+
+export function cerrarEtiqueta(
+  cripto: Cripto,
+  clave: Uint8Array,
+  clinicId: string,
+  petId: string,
+  texto: string,
+): Uint8Array {
+  const relleno = new Uint8Array(ETIQUETA_BYTES);
+  relleno.set(enc.encode(limpiarEtiqueta(texto)));
+  return cripto.cerrar(clave, ad.etiqueta(clinicId, petId), relleno);
+}
+
+/** El texto de una etiqueta, o null si no es de esta clínica y este paciente. */
+export function abrirEtiqueta(
+  cripto: Cripto,
+  clave: Uint8Array,
+  clinicId: string,
+  petId: string,
+  sobre: Uint8Array,
+): string | null {
+  try {
+    const relleno = cripto.abrir(clave, ad.etiqueta(clinicId, petId), sobre);
+    const fin = relleno.indexOf(0);
+    return new TextDecoder().decode(fin < 0 ? relleno : relleno.subarray(0, fin));
+  } catch (e) {
+    if (e instanceof ErrorCripto) return null;
+    throw e;
+  }
 }
 
 /* Código de recuperación de la clave de la clínica.

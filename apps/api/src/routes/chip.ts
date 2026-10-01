@@ -24,6 +24,7 @@ import { avisarPush } from "../push.js";
 import { sesionDe } from "./clinics.js";
 import { duenoDe } from "./duenos.js";
 import { perfilPublico } from "./ficha.js";
+import { limpiarEtiquetas } from "./pacientes.js";
 
 /** La petición de alta caduca pronto: el número está en pantalla mientras tanto. */
 const VENTANA_MS = 10 * 60 * 1000;
@@ -265,8 +266,10 @@ export default async function rutasChip(app: FastifyInstance) {
           ),
         ),
       )
-      .returning({ id: grants.id });
+      .returning({ id: grants.id, petId: grants.petId });
     if (!r.length) return reply.code(404).send({ error: "no encontrado" });
+    // La clínica deja de tenerlo por paciente: su etiqueta se va con el permiso.
+    await limpiarEtiquetas(r[0].petId);
 
     /* Honesto: borra la copia del servidor, no lo que ya se descargó. */
     return { ok: true, descargadoNoVuelve: true };

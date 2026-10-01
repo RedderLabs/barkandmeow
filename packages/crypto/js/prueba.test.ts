@@ -96,3 +96,24 @@ test("la clave de recuperación del dueño: fija para su papel, distinta de la X
   const otro = claveDeRecuperacion(cripto, claveDeDueno(cripto, (await nuevoCodigo()).semilla).secreta);
   assert.notDeepEqual(otro.publica, a.publica);
 });
+
+test("la etiqueta de un paciente: solo la abre su clínica, atada al paciente y sin delatar su largo", async () => {
+  const { abrirEtiqueta, cerrarEtiqueta, claveEtiquetas, ETIQUETA_MAX } = await import("./index.ts");
+  const clinica = claveDeClinica(cripto, (await nuevoCodigo()).semilla);
+  const k = claveEtiquetas(cripto, clinica.secreta);
+  // Otra clave que la de la clínica: tener la de las etiquetas no da la de las fichas.
+  assert.notDeepEqual(k, clinica.secreta);
+
+  const corta = cerrarEtiqueta(cripto, k, "clinica-1", "pet-1", "  Kira,   de Ana ");
+  const larga = cerrarEtiqueta(cripto, k, "clinica-1", "pet-1", "Ñ".repeat(200));
+  assert.equal(abrirEtiqueta(cripto, k, "clinica-1", "pet-1", corta), "Kira, de Ana");
+  assert.equal(abrirEtiqueta(cripto, k, "clinica-1", "pet-1", larga), "Ñ".repeat(ETIQUETA_MAX));
+  assert.equal(corta.length, larga.length);
+  assert.ok(corta.length <= 512);
+
+  // Movida a otro paciente o a otra clínica, o con otra clave, no se abre.
+  assert.equal(abrirEtiqueta(cripto, k, "clinica-1", "pet-2", corta), null);
+  assert.equal(abrirEtiqueta(cripto, k, "clinica-2", "pet-1", corta), null);
+  const ajena = claveEtiquetas(cripto, claveDeClinica(cripto, (await nuevoCodigo()).semilla).secreta);
+  assert.equal(abrirEtiqueta(cripto, ajena, "clinica-1", "pet-1", corta), null);
+});

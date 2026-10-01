@@ -39,10 +39,3 @@ export async function apiServidor<R extends Lectura>(r: R): Promise<Respuesta<R>
   if (!res) redirect("/entrar");
   return res;
 }
-
-/** Lo que muestra la cabecera: nombre y país. */
-export const organizacion = (yo: Yo) => ({
-  nombre: yo.clinica.nombre,
-  ciudad: yo.clinica.direccion?.split(",").pop()?.trim() ?? "",
-  pais: yo.clinica.pais,
-});

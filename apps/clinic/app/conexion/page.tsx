@@ -4,7 +4,8 @@ import Link from "next/link";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { AppHeader, IconKey } from "@barkandmeow/ui-web/parts";
 import { NuevaClave, RetirarClave } from "@/components/ClavesApi";
-import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+import { diaHora } from "@/lib/chip";
+import { apiServidor, exigirSesion } from "@/lib/servidor";
 import { api } from "@barkandmeow/schema/api";
 
 export const metadata: Metadata = {
@@ -17,6 +18,8 @@ const fecha = (iso: string) => {
   const dd = (n: number) => String(n).padStart(2, "0");
   return `${dd(d.getDate())}/${dd(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
+
+const kb = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${Math.round(bytes / 1024)} KB`);
 
 /* Lo que el software de gestión necesita saber, con la dirección real de esta
    instalación: el SaaS reenvía /clinica/api a la API en su mismo origen. */
@@ -57,15 +60,16 @@ async function direccionApi() {
 
 export default async function Conexion() {
   const yo = await exigirSesion();
-  const [{ claves }, base] = await Promise.all([
+  const [{ claves }, { envios }, base] = await Promise.all([
     apiServidor(api.clinicas.listarClavesApi),
+    apiServidor(api.clinicas.listarEnvios),
     direccionApi(),
   ]);
   const esAdmin = yo.role === "admin";
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="conexion" clinica={organizacion(yo)} />
+      <AppHeader active="conexion" />
 
       <main className={ui.grid}>
         <section>
@@ -112,6 +116,42 @@ export default async function Conexion() {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* El registro entero: la portada solo enseña los últimos. */}
+          <div className={`${ui.panel} ${ui.stacked}`} id="envios">
+            <h2 className={ui.panelTitle}>Registro de envíos</h2>
+            {envios.length === 0 ? (
+              <p className={ui.panelNote}>
+                Todavía no se ha enviado nada. Los informes solo llegan a los dueños que os dieron
+                acceso permanente.
+              </p>
+            ) : (
+              <>
+                <div className={ui.rowList}>
+                  {envios.map((e) => (
+                    <div key={e.id} className={ui.row}>
+                      <div>
+                        {/* El servidor no sabe el nombre ni lo que dice el informe. */}
+                        <div className={ui.rowName}>
+                          Informe · chip <code>···{e.chipPista ?? "····"}</code>
+                        </div>
+                        <div className={ui.rowMeta}>
+                          {e.clave ?? "Clave retirada"} · {kb(e.bytes)}
+                        </div>
+                      </div>
+                      <time className={ui.rowMeta} dateTime={e.fecha}>
+                        <code>{diaHora(e.fecha)}</code>
+                      </time>
+                    </div>
+                  ))}
+                </div>
+                <p className={ui.panelNote}>
+                  Los últimos {envios.length}. Cada uno va sellado para su dueño: ni Bark &amp; Meow ni
+                  esta consola pueden leerlo.
+                </p>
+              </>
             )}
           </div>
 

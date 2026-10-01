@@ -12,6 +12,7 @@ import {
 } from "../core.js";
 import { sesionDe } from "./clinics.js";
 import { avisarReclamacion } from "./duenos.js";
+import { limpiarEtiquetas } from "./pacientes.js";
 
 /* Registro de mascotas sin robo de chips (decidido 2026-09-27).
 
@@ -337,6 +338,7 @@ export async function traspasarChip(r: Reclamacion): Promise<boolean> {
       .update(grants)
       .set({ revokedAt: ahora })
       .where(and(eq(grants.petId, r.petId), isNull(grants.revokedAt)));
+    await limpiarEtiquetas(r.petId, tx);
     await tx
       .update(blobs)
       .set({ expiresAt: ahora })

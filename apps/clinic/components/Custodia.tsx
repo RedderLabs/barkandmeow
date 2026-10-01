@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { toast } from "@barkandmeow/ui-web/components/sonner";
-import { cargarCripto, claveDeClinica, deBase64, leerCodigo, type Cripto } from "@barkandmeow/crypto";
+import { claveDeClinica, deBase64, leerCodigo } from "@barkandmeow/crypto";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { IconCheck, IconKey } from "@barkandmeow/ui-web/parts";
 import { Button } from "@barkandmeow/ui-web/components/button";
@@ -11,7 +11,7 @@ import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
 import { entregarClave } from "@/lib/api";
 import { guardarClaves, leerClaves } from "@/lib/claves";
-import { CRYPTO_WASM_URL } from "@/lib/crypto-url";
+import { CLAVE_LISTA, cripto, igual } from "@/lib/cripto";
 
 /* Custodia de la clave de la clínica en este navegador.
 
@@ -21,17 +21,14 @@ import { CRYPTO_WASM_URL } from "@/lib/crypto-url";
    en papel. En las tres se comprueba contra la clave pública de la clínica:
    una clave que no corresponde no se guarda. */
 
-let nucleo: Promise<Cripto> | null = null;
-const cripto = () => (nucleo ??= cargarCripto(fetch(CRYPTO_WASM_URL)));
+/** La portada espera la clave para abrir las etiquetas de los pacientes. */
+const avisarClave = () => window.dispatchEvent(new Event(CLAVE_LISTA));
 
 const b64 = (b: Uint8Array) => {
   let s = "";
   for (const x of b) s += String.fromCharCode(x);
   return btoa(s);
 };
-
-const igual = (a: Uint8Array, b: Uint8Array | null) =>
-  !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 
 type Estado = "mirando" | "tiene" | "recibida" | "falta";
 
@@ -67,6 +64,7 @@ export function CustodiaClave({
           const clave = c.abrirSellado(local.dispositivo, sellada);
           if (igual(c.publica(clave), publica)) {
             await guardarClaves({ ...local, clinica: clave, guardada: new Date().toISOString() });
+            avisarClave();
             if (vivo) setEstado("recibida");
             return;
           }
@@ -106,6 +104,7 @@ export function CustodiaClave({
       dispositivo: local?.dispositivo ?? crypto.getRandomValues(new Uint8Array(32)),
       guardada: new Date().toISOString(),
     });
+    avisarClave();
     setEstado("recibida");
     setRecuperando(false);
   }

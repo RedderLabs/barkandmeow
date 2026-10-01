@@ -5,7 +5,7 @@ import { AppHeader, IconAlert, IconInvite } from "@barkandmeow/ui-web/parts";
 import { BajaMiembro } from "@/components/BajaMiembro";
 import { EntregarClave } from "@/components/Custodia";
 import { InvitarForm } from "@/components/InvitarForm";
-import { apiServidor, exigirSesion, organizacion } from "@/lib/servidor";
+import { apiServidor, exigirSesion } from "@/lib/servidor";
 import { api } from "@barkandmeow/schema/api";
 import type { Rol } from "@barkandmeow/schema";
 
@@ -38,7 +38,7 @@ export default async function Equipo() {
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="equipo" clinica={organizacion(yo)} />
+      <AppHeader active="equipo" />
 
       <main className={ui.grid}>
         <section>

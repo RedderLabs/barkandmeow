@@ -1,10 +1,12 @@
 import { z } from "zod";
 import {
   apiKeyCreateBody,
+  chipClinicaBody,
   clinicKeyBody,
   clinicRegisterBody,
   codigoCorreoBody,
   draftCreateBody,
+  etiquetaBody,
   informeBody,
   loginBody,
   memberAcceptBody,
@@ -128,6 +130,39 @@ export const paciente = z.object({
   chipPista: z.string().nullable(),
 });
 export type Paciente = z.infer<typeof paciente>;
+
+/** Qué toca hacer con un chip leído en el mostrador. */
+export const situacionChip = z.object({
+  situacion: z.enum([
+    /** La clínica ya tiene el nivel 3 de esta mascota. */
+    "paciente",
+    /** Activo en Bark & Meow, sin permiso para esta clínica: se puede pedir el alta. */
+    "activa",
+    /** Solo hay registros pendientes: falta activarlo con el código del dueño. */
+    "pendiente",
+    /** Activo, pero con una reclamación abierta: no se puede hacer nada hasta que se resuelva. */
+    "reclamada",
+    /** Nadie lo ha registrado. */
+    "sin-registro",
+  ]),
+  /** Solo si ya es paciente: para señalarlo en la lista. */
+  petId: z.string().uuid().nullable(),
+});
+export type SituacionChip = z.infer<typeof situacionChip>;
+
+export const pacienteConsola = z.object({
+  petId: z.string().uuid(),
+  chipPista: z.string().nullable(),
+  /** Desde cuándo tiene la clínica el nivel 3. */
+  desde: fecha,
+  /** Hasta cuándo, si el permiso caduca. */
+  caduca: fecha.nullable(),
+  /** La etiqueta de la clínica, cifrada en su navegador; null si no tiene. */
+  etiqueta: z.string().nullable(),
+  /** El último informe que el software de gestión le envió, si hay alguno. */
+  ultimoEnvio: fecha.nullable(),
+});
+export type PacienteConsola = z.infer<typeof pacienteConsola>;
 
 export const informeEnviado = z.object({
   envioId: z.string().uuid(),
@@ -256,6 +291,45 @@ export const rutasClinicas = {
     resumen: "Borradores de la clínica.",
     respuesta: z.object({ borradores: z.array(borrador), total: z.number().int() }),
     errores: [401],
+  }),
+
+  /* El chip y los pacientes */
+  consultarChipClinica: ruta({
+    metodo: "POST",
+    ruta: "/clinics/v1/chip",
+    acceso: "clinica",
+    resumen:
+      "Qué toca hacer con un chip leído en el mostrador: ya es paciente, se puede pedir el alta de nivel 3, falta activarlo con el código del dueño, tiene una reclamación abierta o nadie lo ha registrado. No dice nada de la mascota ni de su dueño.",
+    cuerpo: chipClinicaBody,
+    respuesta: situacionChip,
+    errores: [400, 401, 403, 429],
+  }),
+  listarPacientesConsola: ruta({
+    metodo: "GET",
+    ruta: "/clinics/v1/patients",
+    acceso: "clinica",
+    resumen:
+      "Los pacientes con nivel 3 vivo: final del chip, fechas y la etiqueta cifrada de la clínica. Nunca contenido.",
+    respuesta: z.object({ pacientes: z.array(pacienteConsola) }),
+    errores: [401],
+  }),
+  etiquetarPaciente: ruta({
+    metodo: "PUT",
+    ruta: "/clinics/v1/patients/:petId/label",
+    acceso: "clinica",
+    resumen:
+      "Pone o cambia la etiqueta con la que la clínica reconoce a un paciente. Va cifrada en el navegador con una clave que sale de la de la clínica: el servidor guarda bytes que no puede abrir.",
+    cuerpo: etiquetaBody,
+    respuesta: ok,
+    errores: [400, 401, 404],
+  }),
+  quitarEtiquetaPaciente: ruta({
+    metodo: "DELETE",
+    ruta: "/clinics/v1/patients/:petId/label",
+    acceso: "clinica",
+    resumen: "Borra la etiqueta de un paciente.",
+    respuesta: ok,
+    errores: [401, 404],
   }),
 
   /* Software de gestión: consola */

@@ -914,6 +914,159 @@ describe("registro de chips: nadie se queda el chip de una mascota ajena", () =>
   });
 });
 
+describe("portada de la consola: el chip dice qué toca y los pacientes se reconocen", () => {
+  const CHIP_PACIENTE = "724098100008801";
+  const id = { tipo: "iso", valor: CHIP_PACIENTE };
+  const correoDueno = "dueno-paciente@correo.example";
+  let pet = "";
+  let cookieDueno = "";
+  let grantId = "";
+
+  const queToca = (valor = CHIP_PACIENTE, c: string | null = cookie) =>
+    app.inject({
+      method: "POST",
+      url: "/clinics/v1/chip",
+      headers: c ? { cookie: c } : {},
+      payload: { identificador: { tipo: "iso", valor } },
+    });
+  const pacientes = (c: string | null = cookie) =>
+    app.inject({ method: "GET", url: "/clinics/v1/patients", headers: c ? { cookie: c } : {} });
+  const etiquetar = (petId: string, etiqueta: string, c: string | null = cookie) =>
+    app.inject({
+      method: "PUT",
+      url: `/clinics/v1/patients/${petId}/label`,
+      headers: c ? { cookie: c } : {},
+      payload: { etiqueta },
+    });
+  const quitar = (petId: string, c: string | null = cookie) =>
+    app.inject({ method: "DELETE", url: `/clinics/v1/patients/${petId}/label`, headers: c ? { cookie: c } : {} });
+
+  it("sin sesión de clínica no responde nada", async () => {
+    assert.equal((await queToca(CHIP_PACIENTE, null)).statusCode, 401);
+    assert.equal((await pacientes(null)).statusCode, 401);
+    assert.equal((await etiquetar(randomUUID(), b64(64), null)).statusCode, 401);
+    assert.equal((await quitar(randomUUID(), null)).statusCode, 401);
+  });
+
+  it("un chip que nadie ha registrado: sin registro", async () => {
+    const r = await queToca();
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.json(), { situacion: "sin-registro", petId: null });
+  });
+
+  it("registrado por el dueño y sin activar: toca activarlo con su código", async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email: correoDueno, password: "clave-del-dueno-larga", pubKey: b64(), mascota: { identificador: id, nombre: "" } },
+    });
+    assert.equal(r.statusCode, 201);
+    pet = r.json().mascota.petId;
+    const pendiente = r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: pendiente },
+      payload: { codigo: ultimoCodigo(correoDueno) },
+    });
+    assert.equal(v.statusCode, 200);
+    cookieDueno = v.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+
+    assert.deepEqual((await queToca()).json(), { situacion: "pendiente", petId: null });
+  });
+
+  it("activo y sin permiso: toca pedir el alta de nivel 3", async () => {
+    const [idx] = await indexar([CHIP_PACIENTE]);
+    await sql`UPDATE pet_identifiers SET activo = true WHERE pet_id = ${pet} AND id_index = ${idx}`;
+    await sql`UPDATE pets SET estado = 'activa', activated_at = now() WHERE id = ${pet}`;
+    assert.deepEqual((await queToca()).json(), { situacion: "activa", petId: null });
+    assert.deepEqual((await pacientes()).json().pacientes.filter((p: { petId: string }) => p.petId === pet), []);
+  });
+
+  it("con una reclamación abierta no se puede hacer nada", async () => {
+    await sql`UPDATE pets SET estado = 'congelada' WHERE id = ${pet}`;
+    assert.deepEqual((await queToca()).json(), { situacion: "reclamada", petId: null });
+    await sql`UPDATE pets SET estado = 'activa' WHERE id = ${pet}`;
+  });
+
+  it("no se etiqueta a quien no es paciente", async () => {
+    assert.equal((await etiquetar(pet, b64(64))).statusCode, 404);
+    assert.equal((await etiquetar(randomUUID(), b64(64))).statusCode, 404);
+    assert.equal((await etiquetar("no-es-un-id", b64(64))).statusCode, 404);
+  });
+
+  it("con el nivel 3 concedido ya es paciente y sale en la lista una sola vez", async () => {
+    const pedir = await app.inject({
+      method: "POST",
+      url: "/grants/v1/request",
+      headers: { cookie },
+      payload: { identificador: id, vetPubKey: b64() },
+    });
+    assert.equal(pedir.statusCode, 201);
+    const aprobar = await app.inject({
+      method: "POST",
+      url: "/grants/v1/approve",
+      headers: { cookie: cookieDueno },
+      payload: { requestId: pedir.json().requestId, wrappedKey: b64(48) },
+    });
+    assert.equal(aprobar.statusCode, 201);
+    grantId = aprobar.json().grantId;
+    // Un segundo permiso vivo sobre la misma mascota no la duplica en la lista.
+    const [c] = await sql`SELECT clinic_id FROM grants WHERE id = ${grantId}`;
+    const [doble] = await sql`INSERT INTO grants (pet_id, clinic_id, level, wrapped_key)
+      VALUES (${pet}, ${c.clinic_id}, 3, ${randomBytes(48)}) RETURNING id`;
+
+    assert.deepEqual((await queToca()).json(), { situacion: "paciente", petId: pet });
+    const lista = (await pacientes()).json().pacientes.filter((p: { petId: string }) => p.petId === pet);
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].chipPista, "8801");
+    assert.equal(lista[0].etiqueta, null);
+    assert.equal(lista[0].ultimoEnvio, null);
+    assert.equal(lista[0].caduca, null);
+    await sql`DELETE FROM grants WHERE id = ${doble.id}`;
+  });
+
+  it("la etiqueta entra y sale tal cual: el servidor no la toca", async () => {
+    const primera = b64(297);
+    assert.equal((await etiquetar(pet, primera)).statusCode, 200);
+    const leer = async () =>
+      (await pacientes()).json().pacientes.find((p: { petId: string }) => p.petId === pet).etiqueta;
+    assert.equal(await leer(), primera);
+
+    const segunda = b64(297);
+    assert.equal((await etiquetar(pet, segunda)).statusCode, 200);
+    assert.equal(await leer(), segunda);
+    const [n] = await sql`SELECT count(*)::int AS n FROM etiquetas_paciente WHERE pet_id = ${pet}`;
+    assert.equal(n.n, 1);
+
+    // Más de 512 bytes no es una etiqueta.
+    assert.equal((await etiquetar(pet, b64(600))).statusCode, 400);
+    assert.equal(await leer(), segunda);
+  });
+
+  it("se puede quitar, y quitar lo que no hay no cuela", async () => {
+    assert.equal((await quitar(pet)).statusCode, 200);
+    assert.equal((await quitar(pet)).statusCode, 404);
+    assert.equal((await quitar("no-es-un-id")).statusCode, 404);
+    assert.equal((await etiquetar(pet, b64(297))).statusCode, 200);
+  });
+
+  it("si el dueño retira el permiso, deja de ser paciente y su etiqueta se borra", async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/grants/v1/revoke",
+      headers: { cookie: cookieDueno },
+      payload: { grantId },
+    });
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual((await queToca()).json(), { situacion: "activa", petId: null });
+    assert.deepEqual((await pacientes()).json().pacientes.filter((p: { petId: string }) => p.petId === pet), []);
+    const quedan = await sql`SELECT 1 FROM etiquetas_paciente WHERE pet_id = ${pet}`;
+    assert.equal(quedan.length, 0);
+    assert.equal((await etiquetar(pet, b64(297))).statusCode, 404);
+  });
+});
+
 describe("portal del dueño", () => {
   const CHIP_LUNA = "724098100005555";
   const idLuna = { tipo: "iso", valor: CHIP_LUNA };

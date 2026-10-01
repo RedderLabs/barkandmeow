@@ -74,20 +74,9 @@ export function IconInvite({ size = 20 }: { size?: number }) {
   );
 }
 
-type Surface = "consola" | "activar" | "altas" | "equipo" | "conexion";
+type Surface = "consola" | "equipo" | "conexion";
 
-/* Un paquete compartido no puede saber de qué clínica se trata: la recibe.
-   Antes importaba los datos de demostración de apps/clinic, que era una
-   dependencia al revés. */
-export type Organizacion = { nombre: string; ciudad: string; pais: string };
-
-export function AppHeader({
-  active,
-  clinica,
-}: {
-  active?: Surface;
-  clinica: Organizacion;
-}) {
+export function AppHeader({ active }: { active?: Surface }) {
   return (
     <header className={ui.header}>
       <div className={ui.brand}>
@@ -95,10 +84,6 @@ export function AppHeader({
           <Logotipo alto={40} titulo="" />
         </Link>
         <span className={ui.badge}>CLÍNICA</span>
-        <span className={ui.clinicName}>
-          {clinica.nombre} · {clinica.ciudad ? `${clinica.ciudad}, ` : ""}
-          {clinica.pais}
-        </span>
       </div>
       <nav className={ui.nav}>
         <Link
@@ -106,18 +91,6 @@ export function AppHeader({
           className={`${ui.navLink} ${active === "consola" ? ui.navLinkActive : ""}`}
         >
           Consola
-        </Link>
-        <Link
-          href="/activar"
-          className={`${ui.navLink} ${active === "activar" ? ui.navLinkActive : ""}`}
-        >
-          Activar
-        </Link>
-        <Link
-          href="/altas"
-          className={`${ui.navLink} ${active === "altas" ? ui.navLinkActive : ""}`}
-        >
-          Altas
         </Link>
         <Link
           href="/equipo"

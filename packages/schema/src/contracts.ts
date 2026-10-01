@@ -156,6 +156,15 @@ export const avisoBody = z.object({
   sellado: sellado(8 * 1024),
 });
 
+/* ── Consola de la clínica: el chip y los pacientes ───────── */
+
+/** El chip leído en el mostrador, para saber qué toca hacer con él. */
+export const chipClinicaBody = z.object({ identificador });
+
+/** Etiqueta de un paciente, cifrada en el navegador de la clínica y rellena a
+    tamaño fijo. Opaca para el servidor. */
+export const etiquetaBody = z.object({ etiqueta: sellado(512) });
+
 /* ── Software de gestión conectado por API ────────────────── */
 
 export const apiKeyCreateBody = z.object({

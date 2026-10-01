@@ -3,12 +3,19 @@
    parte y httpOnly. Rutas, cuerpos y respuestas salen del catálogo de
    @barkandmeow/schema/api: si el servidor cambia, esto no compila. */
 
-import { api, type ClaveCreada, type CorreoVerificado, type RegistroHecho } from "@barkandmeow/schema/api";
+import {
+  api,
+  type ClaveCreada,
+  type CorreoVerificado,
+  type Envio,
+  type PacienteConsola,
+  type RegistroHecho,
+} from "@barkandmeow/schema/api";
 import { crearCliente, ErrorApi } from "@barkandmeow/schema/cliente";
 import type { ClinicRegisterBody, Identificador, Rol } from "@barkandmeow/schema";
 
 export { ErrorApi };
-export type { ClaveCreada, CorreoVerificado, Identificador, RegistroHecho };
+export type { ClaveCreada, CorreoVerificado, Envio, Identificador, PacienteConsola, RegistroHecho };
 
 export const API = "/clinica/api";
 
@@ -31,6 +38,18 @@ export const activarMascota = (identificador: Identificador, codigo: string) =>
 
 export const abrirReclamacion = (identificador: Identificador, codigo: string) =>
   cliente.llamar(p.reclamarChip, { cuerpo: { identificador, codigo } });
+
+/* ── El chip del mostrador y los pacientes ─────────────────── */
+
+/** Qué toca hacer con el chip que se acaba de leer. */
+export const consultarChip = (identificador: Identificador) =>
+  cliente.llamar(c.consultarChipClinica, { cuerpo: { identificador } });
+
+/** `etiqueta` ya cifrada en este navegador (ver lib/etiquetas.ts). */
+export const guardarEtiqueta = (petId: string, etiqueta: string) =>
+  cliente.llamar(c.etiquetarPaciente, { params: { petId }, cuerpo: { etiqueta } });
+
+export const quitarEtiqueta = (petId: string) => cliente.llamar(c.quitarEtiquetaPaciente, { params: { petId } });
 
 /* ── Alta de nivel 3 ───────────────────────────────────────── */
 

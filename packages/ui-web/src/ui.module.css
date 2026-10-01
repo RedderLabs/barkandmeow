@@ -56,14 +56,6 @@ svg.wordmark {
   white-space: nowrap;
 }
 
-.clinicName {
-  font-size: 14px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .nav {
   display: flex;
   align-items: center;
@@ -198,6 +190,13 @@ svg.wordmark {
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 600;
+  /* Con icono delante, van en la misma línea. */
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+}
+.panelTitle svg {
+  flex-shrink: 0;
 }
 .panelWarn .panelTitle {
   color: var(--warn-ink);
@@ -368,9 +367,6 @@ svg.wordmark {
   .fieldRow,
   .recovery {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .clinicName {
-    display: none;
   }
 }
 

@@ -4,80 +4,301 @@
   flex-direction: column;
 }
 
-/* ── Tira de conexión ─────────────────────────────────────── */
+/* ── Rejilla de la portada ────────────────────────────────── */
 
-.link {
-  flex-shrink: 0;
-  padding: var(--s-md) var(--relleno);
+/* El mostrador y los pacientes a la izquierda; lo que envía el software de
+   gestión, en la columna de 360px que comparten todas las pantallas. */
+.portada {
+  flex-grow: 1;
+  padding: var(--s-section) var(--relleno) 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 32px;
+  align-items: start;
+}
+
+.principal {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: var(--s-md);
-  border-bottom: 1px solid var(--line);
-  font-size: 14px;
-}
-.linkActive {
-  background: var(--accent-soft);
-  color: var(--accent-soft-ink);
-}
-.linkNone {
-  background: var(--warn-soft);
-  color: var(--warn-ink);
+  flex-direction: column;
+  gap: var(--s-section);
 }
 
-.linkDot {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-.linkActive .linkDot {
-  color: var(--accent-ink);
-}
-.linkNone .linkDot {
-  color: var(--warn);
-}
-
-.linkHead {
+.titulo {
+  font-family: var(--font-display);
+  font-size: 22px;
   font-weight: 600;
 }
-.linkActive .linkHead {
-  color: var(--accent-ink);
-}
-.linkNone .linkHead {
-  color: var(--warn-ink);
+
+.meta {
+  font-size: 13px;
+  color: var(--muted);
 }
 
-.linkMeta {
-  margin-left: auto;
-  font-family: var(--font-data);
-  font-size: 13px;
+.enlace {
+  font-size: 14px;
   white-space: nowrap;
 }
 
-/* ── Contadores ───────────────────────────────────────────── */
+/* ── El mostrador ─────────────────────────────────────────── */
 
-.counters {
-  flex-shrink: 0;
-  margin: var(--s-section) var(--relleno) 0;
+/* La pieza de la portada: se ve desde el otro lado del mostrador. */
+.mostrador {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  padding: var(--s-section);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xl);
+}
+
+.mostradorTitulo {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.mostradorTexto {
+  margin-top: var(--s-xs);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.lectura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 40rem;
+}
+
+.lecturaFila {
+  display: flex;
+  gap: var(--s-md);
+}
+
+/* Sin respuesta no ocupa sitio: el campo y la lista quedan juntos. */
+.respuesta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+.respuesta:empty {
+  display: none;
+}
+
+/* ── Lo que la consola responde a un chip ─────────────────── */
+
+.veredicto {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: var(--s-lg);
+  padding: var(--s-xl);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  animation: llegar 220ms var(--ease) both;
+}
+
+/* El único movimiento de la pantalla: la respuesta llega, no aparece de golpe. */
+@keyframes llegar {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.veredictoIcono {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+}
+
+.veredictoCuerpo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+
+.veredictoTitulo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  /* A la altura del disco del icono. */
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.veredictoTexto {
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.veredictoNota {
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 62ch;
+}
+
+.veredictoPregunta {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.fecha {
+  font-family: var(--font-data);
+  font-weight: 500;
+}
+
+/* Ya es paciente, activada: verde hoja. */
+.vOk {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-soft-ink);
+}
+.vOk .veredictoTitulo,
+.vOk .veredictoIcono,
+.vOk .veredictoPregunta {
+  color: var(--accent-ink);
+}
+
+/* Lo que tiene que ver con el nivel 3 va en el azul de su insignia. */
+.vNivel3 {
+  background: var(--info-soft);
+  border-color: transparent;
+  color: var(--ink-soft);
+}
+.vNivel3 .veredictoTitulo,
+.vNivel3 .veredictoIcono {
+  color: var(--info);
+}
+
+/* Falta algo o hay que esperar: ámbar con texto, nunca rojo. */
+.vFalta {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn-ink);
+}
+.vFalta .veredictoIcono {
+  color: var(--warn);
+}
+
+.vNeutro {
+  background: var(--ground);
+  color: var(--ink-soft);
+}
+.vNeutro .veredictoTitulo {
+  color: var(--ink);
+}
+.vNeutro .veredictoIcono {
+  color: var(--muted);
+}
+
+/* Un formulario dentro de la respuesta: sobre blanco, para que el campo se anuncie. */
+.subformulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+  padding: var(--s-lg);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* El número que se dice en voz alta. */
+.numero {
+  font-family: var(--font-data);
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  color: var(--ink);
+}
+
+/* ── Pacientes ────────────────────────────────────────────── */
+
+.listaCabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+  margin-bottom: var(--s-md);
+  flex-wrap: wrap;
+}
+.listaCabecera .meta {
+  margin-right: auto;
+}
+
+.buscador {
+  position: relative;
+  width: 18rem;
+  max-width: 100%;
+}
+.buscadorIcono {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.avisoClave {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  margin-bottom: var(--s-md);
+  padding: var(--s-md) var(--s-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.avisoClave svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--accent);
+}
+
+.tabla {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
   overflow: hidden;
 }
 
-.counter {
-  padding: var(--s-md) var(--s-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-right: 1px solid var(--divider);
+.fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 9.5rem 8.5rem;
+  gap: var(--s-lg);
+  align-items: center;
+  min-height: 60px;
+  padding: var(--s-sm) var(--s-lg);
+  border-bottom: 1px solid var(--divider);
 }
-.counter:last-child {
-  border-right: none;
+.fila:last-child {
+  border-bottom: none;
 }
 
-.counterLabel {
+.filaCabecera {
+  min-height: 0;
+  padding-top: var(--s-md);
+  padding-bottom: var(--s-md);
+  border-bottom-color: var(--line);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -85,178 +306,117 @@
   color: var(--muted);
 }
 
-.counterValue {
-  font-family: var(--font-data);
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--ink);
+/* El paciente del chip que se acaba de leer. */
+.filaDestacada {
+  background: var(--accent-soft);
+  scroll-margin: 96px;
 }
 
-/* ── Rejilla principal ────────────────────────────────────── */
-
-.grid {
-  flex-grow: 1;
-  padding: var(--s-section) var(--relleno) 32px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: var(--s-section);
-  align-items: start;
-}
-
-.sectionHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-md);
-  margin-bottom: var(--s-md);
-}
-
-.sectionTitle {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.sectionMeta {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* ── Registro de envíos ───────────────────────────────────── */
-
-.log {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  overflow: hidden;
-}
-
-.row {
-  display: grid;
-  grid-template-columns: 60px minmax(0, 1fr) auto;
-  gap: var(--s-lg);
-  align-items: start;
-  padding: var(--s-lg);
-  border-bottom: 1px solid var(--divider);
-}
-.row:last-child {
-  border-bottom: none;
-}
-.rowFailed {
-  background: var(--alert-soft);
-}
-
-.rowTime {
-  font-family: var(--font-data);
-  font-size: 13px;
-  color: var(--muted);
-  padding-top: 1px;
-}
-
-.rowBody {
+.celdaNombre {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.rowTitle {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.rowChip {
-  font-family: var(--font-data);
-  font-size: 12px;
-  color: var(--muted);
-}
-.rowFailed .rowChip {
-  color: var(--alert-soft-ink);
-}
-
-/* El momento de esta pantalla: lo enviado queda sellado y sin vista previa. */
-.sealed {
-  margin-top: var(--s-xs);
   display: flex;
   align-items: center;
   gap: var(--s-sm);
-  padding: var(--s-sm) var(--s-md);
-  border: 1px solid var(--line);
-  border-radius: var(--r-badge);
-  background: var(--ground);
-  color: var(--muted);
-  font-size: 13px;
 }
-.sealedIcon {
-  flex-shrink: 0;
+
+.nombre {
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sinNombre {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.cifrado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-sm);
+  font-size: 15px;
+  color: var(--muted);
+}
+.cifrado svg {
   color: var(--accent);
 }
 
-.reason {
-  margin-top: var(--s-xs);
-  font-size: 13px;
-  color: var(--alert-ink);
+/* El lápiz no compite con el nombre: aparece al pasar por la fila o al llegar con el teclado. */
+.botonNombre {
+  color: var(--muted);
 }
-.recovery {
-  font-size: 13px;
-  color: var(--alert-soft-ink);
+@media (hover: hover) {
+  .fila .nombre + .botonNombre {
+    opacity: 0;
+    transition: opacity var(--t-state) var(--ease);
+  }
+  .fila:hover .nombre + .botonNombre,
+  .fila .nombre + .botonNombre:focus-visible {
+    opacity: 1;
+  }
 }
 
-.state {
+.dato {
+  font-family: var(--font-data);
+  font-size: 14px;
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sinDato {
+  font-family: var(--font-text);
+  color: var(--muted);
+}
+
+.caduca {
+  font-size: 12px;
+  color: var(--muted);
+}
+.caducaPronto {
+  color: var(--warn-ink);
+}
+
+.editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+  padding: var(--s-xs) 0;
+}
+.editorFila {
   display: flex;
   align-items: center;
   gap: var(--s-sm);
-  font-size: 13px;
-  white-space: nowrap;
-  padding-top: 1px;
-}
-.stateSealed {
-  color: var(--muted);
-}
-.stateQueued {
-  color: var(--muted);
-}
-.stateFailed {
-  color: var(--alert-ink);
-  font-weight: 600;
+  flex-wrap: wrap;
 }
 
-/* Único momento con movimiento: lo que está en vuelo se ve avanzar. */
-.pending {
-  position: relative;
-  width: 44px;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--divider);
-  overflow: hidden;
-}
-.pending::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  border-radius: inherit;
-  background: var(--accent);
-  animation: slide 1.6s var(--ease) infinite;
-}
-@keyframes slide {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(250%);
-  }
-}
-
-/* ── Columna derecha ──────────────────────────────────────── */
-
-.aside {
+.vacio {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: var(--s-section);
   display: flex;
   flex-direction: column;
-  gap: var(--s-section);
+  gap: var(--s-sm);
+}
+.vacioTitulo {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+.vacioTexto {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 62ch;
 }
 
-.panel {
+/* ── Columna del software de gestión ──────────────────────── */
+
+.lateral {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
@@ -266,130 +426,109 @@
   gap: var(--s-md);
 }
 
-.panelTitle {
-  font-family: var(--font-display);
+.lateralCabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-md);
+}
+.lateralCabecera .titulo {
   font-size: 20px;
-  font-weight: 600;
 }
 
-.panelNote {
+.estado {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-sm);
+  padding: var(--s-md);
+  border-radius: var(--r-control);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.estado svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.estadoConectado {
+  background: var(--accent-soft);
+  color: var(--accent-soft-ink);
+}
+.estadoConectado strong,
+.estadoConectado svg {
+  color: var(--accent-ink);
+}
+.estadoSinConectar {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.estadoSinConectar svg {
+  color: var(--warn);
+}
+
+.lateralNota {
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
 }
 
-/* Sin caja propia: el panel ya es el contenedor y una tarjeta dentro de otra
-   rompe la lectura. Solo hairlines, como las listas de fila del lienzo. */
-.grantList {
-  display: flex;
-  flex-direction: column;
+/* Sin caja propia: la columna ya es el contenedor. Solo hairlines. */
+.envios {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
-.grant {
-  padding: var(--s-md) 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.envio {
+  display: grid;
+  grid-template-columns: 5.75rem minmax(0, 1fr);
   gap: var(--s-md);
+  align-items: baseline;
+  padding: var(--s-md) 0;
   border-bottom: 1px solid var(--divider);
 }
-.grant:last-child {
+.envio:last-child {
   border-bottom: none;
 }
 
-.grantName {
-  font-size: 14px;
-  font-weight: 500;
-}
-.grantChip {
+.envioHora {
   font-family: var(--font-data);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
 }
 
-.tag {
-  flex-shrink: 0;
+.envioQuien {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.envioChip {
+  display: block;
   font-family: var(--font-data);
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: var(--r-badge);
-  white-space: nowrap;
-}
-.tagPermanent {
-  background: var(--info-soft);
-  color: var(--info);
-}
-.tagSoon {
-  background: var(--warn-soft);
-  color: var(--warn-ink);
-}
-.tagOk {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
 }
 
-/* ── Estado vacío: clínica sin software conectado ─────────── */
-
-.empty {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  padding: 32px;
+/* El momento de esta pantalla: lo enviado queda sellado y sin vista previa. */
+.sellado {
   display: flex;
-  flex-direction: column;
-  gap: var(--s-md);
   align-items: flex-start;
-  max-width: 62ch;
+  gap: var(--s-sm);
+  padding: var(--s-sm) var(--s-md);
+  border: 1px solid var(--line);
+  border-radius: var(--r-badge);
+  background: var(--ground);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
-.emptyTitle {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-}
-.emptyBody {
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ink-soft);
-}
-.emptyActions {
-  margin-top: var(--s-sm);
-  display: flex;
-  gap: var(--s-md);
-  flex-wrap: wrap;
-}
-
-/* ── Adaptación a tableta ─────────────────────────────────── */
-
-@media (max-width: 1080px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .counters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .counter:nth-child(2) {
-    border-right: none;
-  }
-  .counter:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--divider);
-  }
-}
-
-@media (max-width: 720px) {
-  .grid {
-    padding: var(--s-xl) var(--relleno) var(--s-page);
-  }
-  .row {
-    grid-template-columns: 52px minmax(0, 1fr);
-  }
-  .state {
-    grid-column: 2;
-  }
-  .linkMeta {
-    display: none;
-  }
+.selladoIcono {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
 }
 
 /* Aviso pendiente (ámbar con texto, nunca rojo). */
@@ -402,7 +541,63 @@
   color: var(--warn-ink);
 }
 
-/* Consola real: dos contadores, los dos con datos del servidor. */
-.counters2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* ── Tableta: una columna, el software de gestión al final ── */
+
+@media (max-width: 1080px) {
+  .portada {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Teléfono: red de seguridad, no el uso previsto ───────── */
+
+@media (max-width: 720px) {
+  .portada {
+    padding: var(--s-xl) var(--relleno) var(--s-page);
+  }
+  .mostrador {
+    padding: var(--s-xl);
+  }
+  .mostradorTitulo {
+    font-size: 26px;
+  }
+  .lecturaFila {
+    flex-direction: column;
+  }
+  /* En columna, el campo no reparte su alto: conserva sus 52px. */
+  .lecturaFila input {
+    flex: none;
+  }
+  .veredicto {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--s-lg);
+  }
+  .numero {
+    font-size: 44px;
+  }
+  .buscador {
+    width: 100%;
+  }
+
+  /* La tabla pasa a fichas: cada dato lleva su etiqueta delante. */
+  .filaCabecera {
+    display: none;
+  }
+  .fila {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-xs);
+    padding: var(--s-md) var(--s-lg);
+  }
+  .dato {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--s-sm);
+  }
+  .dato::before {
+    content: attr(data-etiqueta);
+    font-family: var(--font-text);
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 7.5rem;
+  }
 }

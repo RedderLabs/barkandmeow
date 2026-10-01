@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -427,6 +428,27 @@ export const envios = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("envios_clinic_ix").on(t.clinicId, t.createdAt)],
+);
+
+/* Etiqueta con la que una clínica reconoce a un paciente en su consola
+   («Kira, de Ana»), decidido el 2026-10-01. La escribe la clínica y va cifrada
+   en su navegador con una clave que sale de la clave de la clínica: aquí solo
+   hay bytes opacos, rellenos a un tamaño fijo para que ni el largo diga nada.
+   Vive mientras dure el nivel 3: si el dueño lo retira, se borra. */
+export const etiquetasPaciente = pgTable(
+  "etiquetas_paciente",
+  {
+    clinicId: uuid("clinic_id")
+      .references(() => clinics.id, { onDelete: "cascade" })
+      .notNull(),
+    petId: uuid("pet_id")
+      .references(() => pets.id, { onDelete: "cascade" })
+      .notNull(),
+    sealed: bytea("sealed").notNull(),
+    escritaPor: uuid("escrita_por").references(() => clinicMembers.id, { onDelete: "set null" }),
+    actualizada: timestamp("actualizada").defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.clinicId, t.petId] })],
 );
 
 /* Ficha preparada por la clínica para un dueño que todavía no usa Bark & Meow.

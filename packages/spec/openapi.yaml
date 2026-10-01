@@ -3091,6 +3091,289 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
       x-acceso: clinica
+  /clinics/v1/chip:
+    post:
+      tags:
+        - Clínica
+      summary: "Qué toca hacer con un chip leído en el mostrador: ya es paciente, se puede pedir el alta de nivel 3, falta activarlo con el código del dueño, tiene una reclamación abierta o nadie lo ha registrado. No dice nada de la mascota ni de su dueño."
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                identificador:
+                  oneOf:
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: iso
+                        valor:
+                          type: string
+                          pattern: ^\d{15}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: nonISO
+                        valor:
+                          type: string
+                          pattern: ^nonISO:[0-9A-F]{9,10}$
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: ring
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                      required:
+                        - tipo
+                        - valor
+                    - type: object
+                      properties:
+                        tipo:
+                          type: string
+                          const: tattoo
+                        valor:
+                          type: string
+                          minLength: 3
+                          maxLength: 32
+                        ubicacion:
+                          type: string
+                          maxLength: 64
+                      required:
+                        - tipo
+                        - valor
+              required:
+                - identificador
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  situacion:
+                    type: string
+                    enum:
+                      - paciente
+                      - activa
+                      - pendiente
+                      - reclamada
+                      - sin-registro
+                  petId:
+                    anyOf:
+                      - type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      - type: "null"
+                required:
+                  - situacion
+                  - petId
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Error 429
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/patients:
+    get:
+      tags:
+        - Clínica
+      summary: "Los pacientes con nivel 3 vivo: final del chip, fechas y la etiqueta cifrada de la clínica. Nunca contenido."
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  pacientes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        chipPista:
+                          type:
+                            - string
+                            - "null"
+                        desde:
+                          type: string
+                          format: date-time
+                          pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                        caduca:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                        etiqueta:
+                          type:
+                            - string
+                            - "null"
+                        ultimoEnvio:
+                          anyOf:
+                            - type: string
+                              format: date-time
+                              pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                            - type: "null"
+                      required:
+                        - petId
+                        - chipPista
+                        - desde
+                        - caduca
+                        - etiqueta
+                        - ultimoEnvio
+                      additionalProperties: false
+                required:
+                  - pacientes
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/patients/{petId}/label:
+    put:
+      tags:
+        - Clínica
+      summary: "Pone o cambia la etiqueta con la que la clínica reconoce a un paciente. Va cifrada en el navegador con una clave que sale de la de la clínica: el servidor guarda bytes que no puede abrir."
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                etiqueta:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - etiqueta
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+    delete:
+      tags:
+        - Clínica
+      summary: Borra la etiqueta de un paciente.
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
   /clinics/v1/api-keys:
     get:
       tags:
