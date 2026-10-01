@@ -1458,6 +1458,134 @@ describe("portal del dueño", () => {
   });
 });
 
+describe("ficha de salud y placa del collar", () => {
+  let cookieDuena = "";
+  let cookieOtro = "";
+  let pet = "";
+  let petOtro = "";
+
+  const abrir = async (email: string, chip: string) => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email, password: "clave-de-la-ficha-larga", pubKey: b64(), mascota: { identificador: { tipo: "iso", valor: chip }, nombre: "Lía" } },
+    });
+    assert.equal(r.statusCode, 201);
+    const pendiente = r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: pendiente },
+      payload: { codigo: ultimoCodigo(email) },
+    });
+    assert.equal(v.statusCode, 200);
+    return { cookie: v.cookies.map((c) => `${c.name}=${c.value}`).join("; "), petId: r.json().mascota.petId as string };
+  };
+  const ficha = (c: string | null, id = pet) =>
+    app.inject({ method: "GET", url: `/owners/v1/pets/${id}/record`, headers: c ? { cookie: c } : {} });
+  const guardar = (sobre: string, version: number, c: string | null = cookieDuena, id = pet) =>
+    app.inject({ method: "PUT", url: `/owners/v1/pets/${id}/record`, headers: c ? { cookie: c } : {}, payload: { sobre, version } });
+  const placa = (id: string, sobre: string, c: string | null = cookieDuena, mascota = pet) =>
+    app.inject({ method: "PUT", url: `/owners/v1/pets/${mascota}/tag`, headers: c ? { cookie: c } : {}, payload: { id, sobre } });
+  const quitarPlaca = (c: string | null = cookieDuena) =>
+    app.inject({ method: "DELETE", url: `/owners/v1/pets/${pet}/tag`, headers: c ? { cookie: c } : {} });
+  const escanear = (id: string) => app.inject({ method: "GET", url: `/e/v1/${id}` });
+  const mia = async () =>
+    (await app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie: cookieDuena } })).json().mascotas[0];
+
+  it("la ficha empieza vacía y solo la ve su dueño", async () => {
+    ({ cookie: cookieDuena, petId: pet } = await abrir("duena-ficha@correo.example", "724098100008811"));
+    ({ cookie: cookieOtro, petId: petOtro } = await abrir("otro-ficha@correo.example", "724098100008812"));
+
+    assert.equal((await ficha(null)).statusCode, 401);
+    assert.equal((await ficha(cookieOtro)).statusCode, 404);
+    const r = await ficha(cookieDuena);
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.json(), { sobre: null, version: 0 });
+    const m = await mia();
+    assert.equal(m.ficha, false);
+    assert.equal(m.placa, false);
+  });
+
+  it("se guarda cifrada y con versión: dos sitios a la vez no se pisan", async () => {
+    const primera = b64(900);
+    assert.equal((await guardar(primera, 0, null)).statusCode, 401);
+    assert.equal((await guardar(primera, 0, cookieOtro)).statusCode, 404);
+    assert.equal((await guardar("no es base64 !!", 0)).statusCode, 400);
+    assert.equal((await guardar(b64(70 * 1024), 0)).statusCode, 400);
+
+    const r = await guardar(primera, 0);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().version, 1);
+    assert.deepEqual((await ficha(cookieDuena)).json(), { sobre: primera, version: 1 });
+
+    // El portal y la app leyeron la versión 1: gana el primero, el otro vuelve a leer.
+    const segunda = b64(900);
+    assert.equal((await guardar(segunda, 1)).json().version, 2);
+    const tarde = await guardar(b64(900), 1);
+    assert.equal(tarde.statusCode, 409);
+    assert.equal(tarde.json().motivo, "version");
+    assert.equal((await guardar(b64(900), 0)).statusCode, 409);
+    assert.deepEqual((await ficha(cookieDuena)).json(), { sobre: segunda, version: 2 });
+    assert.equal((await mia()).ficha, true);
+  });
+
+  it("la placa responde a quien la escanea y se actualiza sin cambiar de placa", async () => {
+    const id = randomUUID();
+    const resumen = b64(400);
+    assert.equal((await placa(id, resumen, null)).statusCode, 401);
+    assert.equal((await placa(id, resumen, cookieOtro)).statusCode, 404);
+    assert.equal((await placa("no-es-un-id", resumen)).statusCode, 400);
+    assert.equal((await escanear(id)).statusCode, 404);
+
+    const r = await placa(id, resumen);
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.json(), { id, version: 1 });
+    const leida = await escanear(id);
+    assert.equal(leida.statusCode, 200);
+    assert.equal(leida.json().sobre, resumen);
+    assert.equal((await mia()).placa, true);
+
+    // Cambia la ficha: mismo QR, resumen nuevo.
+    const nuevo = b64(400);
+    assert.deepEqual((await placa(id, nuevo)).json(), { id, version: 2 });
+    assert.equal((await escanear(id)).json().sobre, nuevo);
+    assert.equal((await escanear(id)).json().version, 2);
+  });
+
+  it("nadie pone su placa encima de la de otra mascota", async () => {
+    const [mi] = await sql`SELECT id FROM blobs WHERE pet_id = ${pet} AND kind = 'emergency'`;
+    const antes = (await escanear(mi.id)).json().sobre;
+    const r = await placa(mi.id, b64(400), cookieOtro, petOtro);
+    assert.equal(r.statusCode, 409);
+    assert.equal(r.json().motivo, "id");
+    assert.equal((await escanear(mi.id)).json().sobre, antes);
+    const ajenas = await sql`SELECT id FROM blobs WHERE pet_id = ${petOtro} AND kind = 'emergency'`;
+    assert.equal(ajenas.length, 0);
+  });
+
+  it("una placa perdida se sustituye: la vieja deja de responder", async () => {
+    const [vieja] = await sql`SELECT id FROM blobs WHERE pet_id = ${pet} AND kind = 'emergency'`;
+    const nueva = randomUUID();
+    assert.deepEqual((await placa(nueva, b64(400))).json(), { id: nueva, version: 1 });
+    assert.equal((await escanear(vieja.id)).statusCode, 404);
+    assert.equal((await escanear(nueva)).statusCode, 200);
+    const vivas = await sql`SELECT id FROM blobs WHERE pet_id = ${pet} AND kind = 'emergency'`;
+    assert.equal(vivas.length, 1);
+  });
+
+  it("retirar la placa la apaga, y retirarla dos veces no cuela", async () => {
+    const [viva] = await sql`SELECT id FROM blobs WHERE pet_id = ${pet} AND kind = 'emergency'`;
+    assert.equal((await quitarPlaca(null)).statusCode, 401);
+    assert.equal((await quitarPlaca()).statusCode, 200);
+    assert.equal((await escanear(viva.id)).statusCode, 404);
+    assert.equal((await quitarPlaca()).statusCode, 404);
+    assert.equal((await mia()).placa, false);
+    // La ficha sigue ahí: retirar la placa no la toca.
+    assert.equal((await ficha(cookieDuena)).json().version, 2);
+  });
+});
+
 describe("login de clínica", () => {
   it("frena la fuerza bruta por cuenta sin bloquear las demás", async () => {
     const intento = (email: string) =>

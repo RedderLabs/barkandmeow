@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, desc, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
 import {
+  blobs,
   clinicApiKeys,
   clinics,
   inbox,
@@ -114,6 +115,9 @@ async function sesionDe(req: FastifyRequest, estado: "pendiente" | "abierta") {
   if (!s || s.estado !== estado || s.expiresAt < new Date()) return null;
   return s;
 }
+
+/** El id del dueño con sesión abierta, para el límite por cuenta. No responde nada. */
+export const idDeDueno = async (req: FastifyRequest) => (await sesionDe(req, "abierta"))?.ownerId ?? null;
 
 /** El dueño con sesión abierta (contraseña y código del correo), o 401. */
 export async function duenoDe(req: FastifyRequest, reply: FastifyReply): Promise<Dueno | null> {
@@ -487,6 +491,16 @@ export default async function rutasDuenos(app: FastifyInstance) {
           .groupBy(inbox.petId)
       : [];
 
+    // Si hay ficha de salud y placa. Solo que existen: van cifradas.
+    const bloques = ids.length
+      ? await db
+          .select({ petId: blobs.petId, kind: blobs.kind })
+          .from(blobs)
+          .where(and(inArray(blobs.petId, ids), inArray(blobs.kind, ["record", "emergency"])))
+      : [];
+    const tiene = (petId: string, kind: "record" | "emergency") =>
+      bloques.some((b) => b.petId === petId && b.kind === kind);
+
     return {
       correo: o.email,
       pubKey: o.pubKey.toString("base64"),
@@ -504,6 +518,8 @@ export default async function rutasDuenos(app: FastifyInstance) {
           chipPista: m.chipPista,
           activada: m.activada,
           mensajes: enBandeja.find((x) => x.petId === m.petId)?.n ?? 0,
+          ficha: tiene(m.petId, "record"),
+          placa: tiene(m.petId, "emergency"),
           perfil: {
             nombre: m.nombre ?? "",
             bio: m.bio ?? "",

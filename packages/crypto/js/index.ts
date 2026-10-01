@@ -198,6 +198,8 @@ export const ad = {
   pasaporte: (petId: string) => `bm:p:v1:${petId}`,
   /** El pasaporte compartido para un viaje, con la clave del fragmento. */
   pasaporteCompartido: (id: string) => `bm:pv:v1:${id}`,
+  /** La ficha de salud del dueño, cifrada con la clave de la mascota (ver claveFicha). */
+  ficha: (petId: string) => `bm:f:v1:${petId}`,
   /** La etiqueta con la que una clínica reconoce a un paciente. */
   etiqueta: (clinicId: string, petId: string) => `bm:ce:v1:${clinicId}:${petId}`,
 };

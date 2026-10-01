@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "blobs_record_uq" ON "blobs" USING btree ("pet_id") WHERE "blobs"."kind" = 'record';--> statement-breakpoint
+CREATE UNIQUE INDEX "blobs_emergency_uq" ON "blobs" USING btree ("pet_id") WHERE "blobs"."kind" = 'emergency';

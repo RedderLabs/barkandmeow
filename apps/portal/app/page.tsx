@@ -3,7 +3,7 @@ import ui from "@barkandmeow/ui-web/ui.module.css";
 import { NuevaMascota } from "@/components/Acciones";
 import { Cabecera } from "@/components/Cabecera";
 import { RellenoRecuperacion } from "@/components/RellenoRecuperacion";
-import { FichaMascota } from "@/components/FichaMascota";
+import { TarjetaMascota } from "@/components/TarjetaMascota";
 import { Placa } from "@/components/Placa";
 import s from "@/components/portal.module.css";
 import { exigirSesion } from "@/lib/servidor";
@@ -23,7 +23,9 @@ export default async function Page() {
           <div>
             <h1 className={ui.pageTitle}>Mis mascotas</h1>
             <p className={ui.lede}>
-              Has entrado como <span className={s.correo}>{yo.correo}</span>.
+              {vacia
+                ? "Añade a tu mascota para empezar."
+                : "Entra en cada una para ver su ficha de salud, su placa y lo que le falta."}
             </p>
           </div>
 
@@ -41,7 +43,13 @@ export default async function Page() {
               </div>
             </section>
           ) : (
-            yo.mascotas.map((m) => <FichaMascota key={m.petId} m={m} />)
+            <ul className={s.tarjetas}>
+              {yo.mascotas.map((m) => (
+                <li key={m.petId}>
+                  <TarjetaMascota m={m} />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 

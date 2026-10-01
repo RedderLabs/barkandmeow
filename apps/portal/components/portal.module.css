@@ -51,45 +51,6 @@
   }
 }
 
-.fichaCabecera {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas:
-    "foto identidad"
-    "foto insignia";
-  column-gap: 16px;
-  row-gap: 8px;
-  align-items: center;
-}
-.fichaCabecera > :first-child {
-  grid-area: foto;
-}
-.fichaIdentidad {
-  grid-area: identidad;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  align-self: end;
-}
-.fichaInsignia {
-  grid-area: insignia;
-  align-self: start;
-}
-/* Con sitio, la insignia se va a la derecha: se lee antes que nada. */
-@media (min-width: 560px) {
-  .fichaCabecera {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "foto identidad insignia";
-  }
-  .fichaIdentidad {
-    align-self: center;
-  }
-  .fichaInsignia {
-    align-self: center;
-  }
-}
-
 .foto {
   width: 64px;
   height: 64px;
@@ -102,6 +63,13 @@
 .fotoGrande {
   width: 72px;
   height: 72px;
+}
+.fotoMedia {
+  width: 52px;
+  height: 52px;
+}
+.fotoMedia.fotoInicial {
+  font-size: 22px;
 }
 .fotoVacia {
   display: grid;
@@ -169,19 +137,6 @@
 
 /* ── Los pasos: qué hace falta para que te llamen ─────────── */
 
-.pasos {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.pasosEtiqueta {
-  font-family: var(--font-text);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 .pasosLista {
   list-style: none;
   display: flex;
@@ -259,19 +214,6 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
-}
-
-.fichaPie {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--divider);
-}
-@media (max-width: 479px) {
-  .fichaPie > * {
-    flex: 1 1 100%;
-  }
 }
 
 /* ── Sin mascotas todavía ─────────────────────────────────── */
@@ -630,4 +572,422 @@
 .adjuntoPeso {
   color: var(--ink-soft);
   font-size: 0.8125rem;
+}
+
+/* ── Lista de mascotas ────────────────────────────────────── */
+
+.tarjetas {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Toda la tarjeta es el enlace: un solo sitio donde tocar. */
+.tarjeta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "foto texto"
+    "insignia insignia";
+  gap: 14px 16px;
+  align-items: center;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease);
+}
+.tarjeta:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.tarjeta > :first-child {
+  grid-area: foto;
+}
+.tarjetaTexto {
+  grid-area: texto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tarjetaSiguiente {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.tarjetaInsignia {
+  grid-area: insignia;
+}
+@media (min-width: 560px) {
+  .tarjeta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "foto texto insignia";
+    padding: 22px 24px;
+  }
+  .tarjetaInsignia {
+    align-self: start;
+  }
+}
+
+/* ── Cabecera de una mascota y sus secciones ──────────────── */
+
+.mascotaCabecera {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 16px var(--relleno) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mascotaIdentidad {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "foto nombre"
+    "insignia insignia";
+  gap: 10px 14px;
+  align-items: center;
+}
+.mascotaIdentidad > :first-child {
+  grid-area: foto;
+}
+.mascotaNombre {
+  grid-area: nombre;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mascotaInsignia {
+  grid-area: insignia;
+}
+@media (min-width: 560px) {
+  .mascotaIdentidad {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "foto nombre insignia";
+  }
+}
+.volver {
+  align-self: flex-start;
+  font-size: 13px;
+}
+.volver::before {
+  content: "‹ ";
+}
+
+/* En el teléfono, una fila que se desplaza con el dedo. */
+.pestanas {
+  display: flex;
+  gap: 4px;
+  margin: 0 calc(var(--relleno) * -1);
+  padding: 0 var(--relleno);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pestanas::-webkit-scrollbar {
+  display: none;
+}
+.pestana {
+  flex-shrink: 0;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 15px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.pestana:hover {
+  color: var(--ink);
+}
+/* Activa: color, peso y la raya. El significado no va solo en el color. */
+.pestanaActiva,
+.pestanaActiva:hover {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* ── Resumen de una mascota ───────────────────────────────── */
+
+.grupoTitulo {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+/* Algo que espera al dueño: una fila entera que lleva a ello. */
+.aviso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid var(--info);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+.aviso:hover {
+  color: var(--ink);
+  background: var(--info-soft);
+}
+.avisoIr {
+  flex-shrink: 0;
+  color: var(--info);
+  font-weight: 600;
+}
+.enlaces {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.enlace {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 60px;
+  justify-content: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--divider);
+  color: var(--ink);
+  text-decoration: none;
+}
+.enlace:hover .pasoTitulo {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Ficha de salud ───────────────────────────────────────── */
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+@media (max-width: 480px) {
+  .campos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.grupo {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grupoEtiqueta {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.opciones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 22rem;
+}
+.opciones3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: none;
+}
+.opcion {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease);
+}
+.opcion:hover {
+  background: var(--ground);
+}
+/* Elegida: relleno suave, borde de 2px y peso. No solo color. */
+.opcion:has(:checked) {
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.opcion:has(:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.opcionDoble {
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.opcionDato {
+  font-family: var(--font-data);
+  font-size: 15px;
+}
+.opcionNota {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.opcion:has(:checked) .opcionNota {
+  color: var(--accent-soft-ink);
+}
+
+.ninguna {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* El bloque de alergias, en voz baja: el dueño ya las conoce. Es el único
+   rojo de la pantalla, y solo existe si hay alguna. */
+.alergias {
+  padding: 14px 16px;
+  border: 1px solid var(--alert-soft-line);
+  border-radius: var(--r-card);
+  background: var(--alert-soft);
+  color: var(--alert-soft-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.alergiasEtiqueta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--alert-ink);
+}
+.alergiasLista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.alergia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--alert-soft-line);
+}
+.alergiaTexto {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.alergiaSustancia {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--alert-ink);
+  overflow-wrap: anywhere;
+}
+
+/* El formulario de añadir, separado de la lista por una hairline. */
+.anadir {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--divider);
+}
+
+/* Etiqueta muda sobre dato: como una ficha impresa. */
+.datos {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.datos > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid var(--divider);
+}
+.datos > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.datos dt {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.datos dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* ── Navegación: arriba en un monitor, abajo en el teléfono ── */
+
+.navAbajo {
+  display: none;
+}
+@media (max-width: 720px) {
+  .navArriba {
+    display: none;
+  }
+  /* Cuatro pestañas de 76px al alcance del pulgar, como en la app. */
+  .navAbajo {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    height: calc(76px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .navAbajoEnlace {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    text-decoration: none;
+  }
+  .navAbajoEnlace:hover {
+    color: var(--ink);
+  }
+  /* Activa: color y peso, no solo color. */
+  .navAbajoActivo,
+  .navAbajoActivo:hover {
+    color: var(--accent);
+    font-weight: 600;
+  }
 }

@@ -134,3 +134,10 @@
     }
   }
 }
+
+/* En el teléfono la navegación va en una barra fija abajo: el contenido deja su hueco. */
+@media (max-width: 720px) {
+  body:has([data-nav-movil]) {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}

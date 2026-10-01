@@ -517,6 +517,10 @@ paths:
                           type: integer
                           minimum: 0
                           maximum: 9007199254740991
+                        ficha:
+                          type: boolean
+                        placa:
+                          type: boolean
                         perfil:
                           type: object
                           properties:
@@ -585,6 +589,8 @@ paths:
                         - chipPista
                         - activada
                         - mensajes
+                        - ficha
+                        - placa
                         - perfil
                         - reclamacion
                       additionalProperties: false
@@ -1525,6 +1531,238 @@ paths:
                 $ref: "#/components/schemas/Error"
         "503":
           description: Error 503
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/record:
+    get:
+      tags:
+        - Dueño (portal y app)
+      summary: La ficha de salud cifrada con la clave de la mascota, o null si aún no hay (versión 0).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  sobre:
+                    anyOf:
+                      - type: string
+                        pattern: ^[A-Za-z0-9+/]+={0,2}$
+                      - type: "null"
+                  version:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - sobre
+                  - version
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: "Guarda la ficha de salud. `version` es la leída: si el portal o la app la cambiaron entre medias, 409."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                sobre:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+                version:
+                  type: integer
+                  minimum: 0
+                  maximum: 9007199254740991
+              required:
+                - sobre
+                - version
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  version:
+                    type: integer
+                    exclusiveMinimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - version
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+  /owners/v1/pets/{id}/tag:
+    put:
+      tags:
+        - Dueño (portal y app)
+      summary: Pone la placa del collar o actualiza su resumen de emergencia, cifrado con la clave del QR. Con otro id sustituye a la anterior, que deja de responder.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                sobre:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - id
+                - sobre
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  version:
+                    type: integer
+                    exclusiveMinimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - id
+                  - version
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Error 409
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: dueno
+    delete:
+      tags:
+        - Dueño (portal y app)
+      summary: "Retira la placa: su QR deja de abrir nada."
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a2
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                required:
+                  - ok
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
           content:
             application/json:
               schema:

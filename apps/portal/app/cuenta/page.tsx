@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ui from "@barkandmeow/ui-web/ui.module.css";
+import { Button } from "@barkandmeow/ui-web/components/button";
 import { Cabecera } from "@/components/Cabecera";
 import { SegundoFactor } from "@/components/Cuenta";
 import s from "@/components/portal.module.css";
@@ -25,6 +26,19 @@ export default async function Page() {
               Código de entrada
             </h2>
             <SegundoFactor canal={yo.segundoFactor} telefono={yo.telefono} />
+          </section>
+          <section className={ui.panel} aria-labelledby="salir">
+            <h2 id="salir" className={ui.panelTitle}>
+              Cerrar la sesión
+            </h2>
+            <p className={ui.panelNote}>
+              En un ordenador que no es tuyo, sal al terminar. Tu clave se queda guardada en este
+              navegador; para quitarla también, borra los datos del sitio.
+            </p>
+            <Button asChild variant="outline" size="md" className="self-start">
+              {/* Un enlace normal: la salida la resuelve el servidor. */}
+              <a href="/mi-mascota/salir">Salir</a>
+            </Button>
           </section>
         </div>
       </main>

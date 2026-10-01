@@ -201,7 +201,9 @@ export const blobs = pgTable(
       .references(() => pets.id, { onDelete: "cascade" })
       .notNull(),
     kind: text("kind")
-      /* passport: el pasaporte de viaje del dueño, cifrado con su clave. */
+      /* passport: el pasaporte de viaje del dueño, cifrado con su clave.
+         record: su ficha de salud, cifrada con la clave de la mascota.
+         emergency: el resumen de la placa del collar, con la clave del QR. */
       .$type<"record" | "emergency" | "document" | "share" | "passport">()
       .notNull(),
     /* Fase actual: el bloque cifrado vive en Postgres. Cuando entre Garage S3,
@@ -216,6 +218,9 @@ export const blobs = pgTable(
     index("blobs_pet_kind_ix").on(t.petId, t.kind),
     // Un solo pasaporte por mascota: dos navegadores que lo crean a la vez no lo duplican.
     uniqueIndex("blobs_passport_uq").on(t.petId).where(sql`${t.kind} = 'passport'`),
+    // Lo mismo con la ficha de salud y con la placa: una de cada por mascota.
+    uniqueIndex("blobs_record_uq").on(t.petId).where(sql`${t.kind} = 'record'`),
+    uniqueIndex("blobs_emergency_uq").on(t.petId).where(sql`${t.kind} = 'emergency'`),
   ],
 );
 

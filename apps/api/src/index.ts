@@ -8,7 +8,7 @@ import { vigilarContrato } from "./contrato.js";
 import { env } from "./core.js";
 import rutasChip, { caducarPeticiones } from "./routes/chip.js";
 import rutasClinicas, { sesionDe } from "./routes/clinics.js";
-import rutasDuenos from "./routes/duenos.js";
+import rutasDuenos, { idDeDueno } from "./routes/duenos.js";
 import rutasPasaporte, { rutasFirmas } from "./routes/pasaporte.js";
 import rutasRecuperacion from "./routes/recuperacion.js";
 import rutasFicha from "./routes/ficha.js";
@@ -16,6 +16,7 @@ import { purgarSinVerificar } from "./limpieza.js";
 import rutasMascotas, { resolverReclamaciones } from "./routes/mascotas.js";
 import rutasOperador from "./routes/operador.js";
 import rutasPacientes from "./routes/pacientes.js";
+import rutasSalud from "./routes/salud.js";
 import { idDeClave, rutasApiSoftware, rutasSoftware } from "./routes/software.js";
 
 /* apps/api NO depende de packages/crypto, y es a propósito: el servidor guarda
@@ -145,11 +146,25 @@ export async function crearApp() {
   });
 
   /* Portal del dueño: límite propio y más estricto, porque la entrada prueba
-     contraseñas contra números de chip que cualquiera puede leer. */
+     contraseñas contra números de chip que cualquiera puede leer. Ese límite
+     corto es por IP y vale para quien aún no ha entrado. Con la sesión abierta
+     se cuenta por cuenta y con más margen: escribir la ficha de salud guarda a
+     cada cambio, y las páginas del portal piden los datos desde su servidor,
+     que para la API es siempre la misma IP. */
+  const limiteSinSesion = Number(process.env.LIMITE_DUENOS ?? 20);
+  const limiteConSesion = Number(process.env.LIMITE_DUENO_SESION ?? 240);
   await app.register(async (scope) => {
-    await scope.register(rateLimit, { max: Number(process.env.LIMITE_DUENOS ?? 20), timeWindow: "1 minute" });
+    await scope.register(rateLimit, {
+      timeWindow: "1 minute",
+      keyGenerator: async (req) => {
+        const id = await idDeDueno(req);
+        return id ? `dueno:${id}` : `ip:${req.ip}`;
+      },
+      max: (_req, clave) => (clave.startsWith("dueno:") ? limiteConSesion : limiteSinSesion),
+    });
     await scope.register(rutasDuenos);
     await scope.register(rutasPasaporte);
+    await scope.register(rutasSalud);
   });
 
   /* Recuperar la contraseña, de dueños y de clínicas: el límite más corto,

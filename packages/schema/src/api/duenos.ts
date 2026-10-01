@@ -17,6 +17,7 @@ import {
   segundoFactorBody,
   telefonoBody,
 } from "../contracts";
+import { fichaBody, placaBody } from "../ficha";
 import { compartirBody, pasaporteBody } from "../pasaporte";
 import { fecha, ok, ruta } from "./tipos";
 
@@ -59,6 +60,10 @@ export const mascota = z.object({
   activada: fecha.nullable(),
   /** Mensajes esperando en la bandeja. Solo el número: el contenido va sellado. */
   mensajes: z.number().int().nonnegative(),
+  /** Si ya hay ficha de salud guardada. Qué dice, el servidor no lo sabe. */
+  ficha: z.boolean(),
+  /** Si tiene una placa de collar viva. */
+  placa: z.boolean(),
   perfil: z.object({
     nombre: z.string(),
     bio: z.string(),
@@ -363,6 +368,47 @@ export const rutasDuenos = {
     resumen: "Un PDF adjunto, sellado. Se abre en el navegador o el móvil del dueño.",
     respuestaBinaria: "application/octet-stream",
     errores: [401, 404, 503],
+  }),
+
+  /* ── Ficha de salud y placa del collar ────────────────────── */
+
+  leerFicha: ruta({
+    metodo: "GET",
+    ruta: "/owners/v1/pets/:id/record",
+    acceso: "dueno",
+    resumen: "La ficha de salud cifrada con la clave de la mascota, o null si aún no hay (versión 0).",
+    respuesta: z.object({ sobre: base64.nullable(), version: z.number().int().nonnegative() }),
+    errores: [401, 404],
+  }),
+
+  guardarFicha: ruta({
+    metodo: "PUT",
+    ruta: "/owners/v1/pets/:id/record",
+    acceso: "dueno",
+    resumen: "Guarda la ficha de salud. `version` es la leída: si el portal o la app la cambiaron entre medias, 409.",
+    cuerpo: fichaBody,
+    respuesta: z.object({ version: z.number().int().positive() }),
+    errores: [400, 401, 404, 409],
+  }),
+
+  ponerPlaca: ruta({
+    metodo: "PUT",
+    ruta: "/owners/v1/pets/:id/tag",
+    acceso: "dueno",
+    resumen:
+      "Pone la placa del collar o actualiza su resumen de emergencia, cifrado con la clave del QR. Con otro id sustituye a la anterior, que deja de responder.",
+    cuerpo: placaBody,
+    respuesta: z.object({ id: z.string().uuid(), version: z.number().int().positive() }),
+    errores: [400, 401, 404, 409],
+  }),
+
+  quitarPlaca: ruta({
+    metodo: "DELETE",
+    ruta: "/owners/v1/pets/:id/tag",
+    acceso: "dueno",
+    resumen: "Retira la placa: su QR deja de abrir nada.",
+    respuesta: ok,
+    errores: [401, 404],
   }),
 
   /* ── Pasaporte de viaje ───────────────────────────────────── */

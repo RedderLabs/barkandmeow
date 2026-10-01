@@ -119,6 +119,19 @@ export const leerBandeja = () => cliente.llamar(d.leerBandeja, { cache: "no-stor
 
 export const borrarMensaje = (id: string) => cliente.llamar(d.borrarMensaje, { params: { id } });
 
+/* ── Ficha de salud y placa del collar ─────────────────────── */
+
+export const leerFicha = (petId: string) => cliente.llamar(d.leerFicha, { params: { id: petId }, cache: "no-store" });
+
+export const guardarFicha = (petId: string, sobre: string, version: number) =>
+  cliente.llamar(d.guardarFicha, { params: { id: petId }, cuerpo: { sobre, version } });
+
+/** `sobre`: el resumen de emergencia ya cifrado con la clave del QR. */
+export const ponerPlaca = (petId: string, id: string, sobre: string) =>
+  cliente.llamar(d.ponerPlaca, { params: { id: petId }, cuerpo: { id, sobre } });
+
+export const quitarPlaca = (petId: string) => cliente.llamar(d.quitarPlaca, { params: { id: petId } });
+
 /* ── Pasaporte de viaje ────────────────────────────────────── */
 
 export const leerPasaporte = (petId: string) =>

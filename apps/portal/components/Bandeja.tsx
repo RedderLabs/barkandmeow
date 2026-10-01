@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { cargarCripto, claveDeDueno, deBase64, leerCodigo, type Cripto } from "@barkandmeow/crypto";
 import ui from "@barkandmeow/ui-web/ui.module.css";
@@ -406,7 +407,7 @@ function Tarjeta({
           <p className={s.mensajeTexto}>{c.detalle}</p>
           <p className={s.mensajeOrigen}>
             Firma de la clínica comprobada. Se guarda en el pasaporte de viaje de {nombre} al abrirlo.{" "}
-            <a href={`/mi-mascota/mascota/${m.petId}/pasaporte`}>Abrir el pasaporte</a>
+            <Link href={`/mascota/${m.petId}/pasaporte`}>Abrir el pasaporte</Link>
           </p>
         </>
       )}

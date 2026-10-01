@@ -1,21 +1,28 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ui from "@barkandmeow/ui-web/ui.module.css";
-import { Cabecera } from "@/components/Cabecera";
-import { EditorPerfil } from "@/components/EditorPerfil";
-import { exigirSesion, urlFoto } from "@/lib/servidor";
+import { ResumenMascota } from "@/components/ResumenMascota";
+import { exigirSesion } from "@/lib/servidor";
 
-export const metadata: Metadata = { title: "Perfil público · Mi mascota · Bark & Meow" };
+export const metadata: Metadata = { title: "Resumen · Mi mascota · Bark & Meow" };
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const yo = await exigirSesion();
   const m = yo.mascotas.find((x) => x.petId === id);
   if (!m) notFound();
+  const nombre = m.perfil.nombre.trim();
   return (
-    <div className={ui.shell}>
-      <Cabecera conSesion />
-      <EditorPerfil petId={m.petId} inicial={{ ...m.perfil, foto: urlFoto(m.perfil.foto) }} />
-    </div>
+    <main className={ui.reading}>
+      <div className={ui.readingMain}>
+        <div>
+          <h1 className={ui.pageTitle}>{nombre ? `${nombre}, de un vistazo` : "De un vistazo"}</h1>
+          <p className={ui.lede}>
+            Lo que ya está hecho y lo que falta, por si se pierde o le pasa algo lejos de casa.
+          </p>
+        </div>
+        <ResumenMascota m={m} />
+      </div>
+    </main>
   );
 }
