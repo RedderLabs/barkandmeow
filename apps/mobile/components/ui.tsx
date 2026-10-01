@@ -412,3 +412,38 @@ export function Fila({
     </View>
   );
 }
+
+/** El código de activación: se enseña en la clínica, de un vistazo. Solo se muestra una vez. */
+export function CodigoActivacion({ codigo, caduca, nombre }: { codigo: string; caduca: string; nombre: string }) {
+  const c = useColores();
+  const d = new Date(caduca);
+  const hasta = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  return (
+    <View
+      accessibilityRole="summary"
+      style={{
+        backgroundColor: c.accentSoft,
+        borderColor: c.accent,
+        borderWidth: 1,
+        borderRadius: radio.panel,
+        padding: espacio.xl,
+        gap: espacio.sm,
+      }}
+    >
+      <Text style={{ fontFamily: fuente.textoFuerte, fontSize: 13, letterSpacing: 0.8, color: c.accentSoftInk }}>
+        CÓDIGO DE ACTIVACIÓN
+      </Text>
+      <Text
+        selectable
+        style={{ fontFamily: fuente.datos, fontSize: 34, letterSpacing: 4, color: c.accentInk }}
+      >
+        {codigo}
+      </Text>
+      <Text style={{ fontFamily: fuente.texto, fontSize: 14, lineHeight: 20, color: c.accentSoftInk }}>
+        Llévalo a tu clínica veterinaria junto con {nombre || "tu mascota"}: leerán su chip y teclearán este código.
+        Vale hasta el {hasta}. Apúntalo o hazle una captura: no se puede volver a mostrar, aunque sí puedes generar
+        otro.
+      </Text>
+    </View>
+  );
+}

@@ -137,3 +137,16 @@ export const crearEnlace = (petId: string, id: string, sobre: string, horas: 24 
 
 export const retirarEnlace = (petId: string, id: string) =>
   conSesion.llamar(d.retirarEnlace, { params: { id: petId, shareId: id } });
+
+/* Lo que antes solo se hacía en el portal: mascotas nuevas, código de activación y perfil público. */
+
+export const nuevaMascota = (identificador: Identificador, nombre: string) =>
+  conSesion.llamar(d.nuevaMascota, { cuerpo: { identificador, nombre } });
+
+export const nuevoCodigoActivacion = (petId: string) =>
+  conSesion.llamar(d.nuevoCodigoActivacion, { params: { id: petId } });
+
+export const guardarPerfil = (
+  petId: string,
+  perfil: { nombre: string; bio: string; telefonos: { etiqueta: string; numero: string }[]; publicado: boolean },
+) => conSesion.llamar(d.guardarPerfil, { params: { id: petId }, cuerpo: perfil });

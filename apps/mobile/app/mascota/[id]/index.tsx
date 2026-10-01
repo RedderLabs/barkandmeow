@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, View } from "react-native";
 import { Identidad } from "@/components/Mascota";
-import { Boton, Cargando, Fila, Pantalla, Paso, Seccion, Tarjeta, Texto } from "@/components/ui";
-import { impugnar, yo, type Mascota } from "@/lib/api";
+import { Boton, Cargando, CodigoActivacion, Fila, Pantalla, Paso, Seccion, Tarjeta, Texto } from "@/components/ui";
+import { impugnar, nuevoCodigoActivacion, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
 import { deIso, ir } from "@/lib/salud";
@@ -78,6 +78,30 @@ function Reclamacion({ m, alCambiar }: { m: Mascota; alCambiar: () => void }) {
   );
 }
 
+/** Genera un código de activación nuevo y lo muestra una sola vez. */
+function Activar({ m }: { m: Mascota }) {
+  const [codigo, setCodigo] = useState<{ codigoActivacion: string; caduca: string } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function generar() {
+    setOcupado(true);
+    try {
+      setCodigo(await nuevoCodigoActivacion(m.petId));
+    } catch {
+      Alert.alert("No se ha podido generar el código", "Vuelve a intentarlo en un momento.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  if (codigo) return <CodigoActivacion codigo={codigo.codigoActivacion} caduca={codigo.caduca} nombre={m.perfil.nombre.trim()} />;
+  return (
+    <Boton alPulsar={() => void generar()} ocupado={ocupado}>
+      Generar código de activación
+    </Boton>
+  );
+}
+
 export default function Resumen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { carga, refrescar, refrescando } = useCarga(yo);
@@ -147,12 +171,13 @@ export default function Resumen() {
               titulo="Chip activado en una clínica"
               detalle={
                 m.estado === "pendiente"
-                  ? "Lleva a tu mascota a una clínica con el código de activación que te da el portal web."
+                  ? "Una clínica tiene que leerlo con tu mascota delante. Genera el código cuando vayas a ir: el anterior, si lo había, deja de valer."
                   : m.activada
                     ? `Desde el ${deIso(m.activada)}`
                     : undefined
               }
             />
+            {m.estado === "pendiente" && !m.reclamacion && <Activar m={m} />}
             <Paso
               hecho={m.perfil.publicado}
               titulo="Perfil público visible"
@@ -163,9 +188,17 @@ export default function Resumen() {
               titulo="Un teléfono para llamarte"
               detalle={m.perfil.telefonos.map((t) => t.etiqueta || t.numero).join(" · ") || undefined}
             />
-            <Texto tono="suave">
-              El perfil público, los teléfonos, la foto y el pasaporte de viaje se editan en barkandmeow.app/mi-mascota.
-            </Texto>
+            <Boton variante="secundario" alPulsar={() => ir(`${base}/perfil`)}>
+              Editar el perfil público
+            </Boton>
+            <Texto tono="suave">La foto se sube desde barkandmeow.app/mi-mascota.</Texto>
+          </Seccion>
+
+          <Seccion titulo="Para viajar">
+            <Texto>Qué pide cada destino, qué consta ya y un QR para enseñarlo en la frontera.</Texto>
+            <Boton variante="secundario" alPulsar={() => ir(`${base}/pasaporte`)}>
+              Pasaporte de viaje
+            </Boton>
           </Seccion>
 
           <Seccion titulo="Tu clínica de siempre">

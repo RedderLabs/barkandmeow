@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { enReclamacion, Identidad } from "@/components/Mascota";
-import { Cargando, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
-import { yo, type Mascota } from "@/lib/api";
+import { Boton, Campo, Cargando, CodigoActivacion, Pantalla, Seccion, Tarjeta, Texto, Titulo } from "@/components/ui";
+import { identificar, nuevaMascota, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
 import { ir } from "@/lib/salud";
@@ -52,6 +52,63 @@ function Tarjetita({ m, token }: { m: Mascota; token: string | null }) {
   );
 }
 
+/** Añadir otra mascota a la cuenta: queda pendiente hasta que una clínica active su chip. */
+function Nueva({ vacia, alAnadir }: { vacia: boolean; alAnadir: () => void }) {
+  const [chip, setChip] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [hecho, setHecho] = useState<{ codigoActivacion: string; caduca: string; nombre: string } | null>(null);
+
+  async function anadir() {
+    const id = identificar(chip);
+    if (!id) return setError("Un microchip ISO tiene 15 dígitos.");
+    setError(null);
+    setOcupado(true);
+    try {
+      const r = await nuevaMascota(id, nombre.trim());
+      setHecho({ ...r, nombre: nombre.trim() });
+      setChip("");
+      setNombre("");
+      alAnadir();
+    } catch {
+      setError("No se ha podido añadir. Revisa el número y vuelve a intentarlo.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <Seccion titulo={vacia ? "Añadir tu mascota" : "Añadir otra mascota"}>
+      {hecho ? (
+        <>
+          <CodigoActivacion codigo={hecho.codigoActivacion} caduca={hecho.caduca} nombre={hecho.nombre} />
+          <Boton variante="secundario" alPulsar={() => setHecho(null)}>
+            Añadir otra
+          </Boton>
+        </>
+      ) : (
+        <>
+          <Texto tono="suave">Con el número de su microchip: son 15 cifras y vienen en su pasaporte.</Texto>
+          <Campo
+            etiqueta="Número del microchip"
+            datos
+            keyboardType="number-pad"
+            maxLength={32}
+            value={chip}
+            onChangeText={setChip}
+            error={error}
+          />
+          <Campo etiqueta="Cómo se llama" maxLength={60} value={nombre} onChangeText={setNombre} />
+          <Boton variante="secundario" alPulsar={() => void anadir()} ocupado={ocupado}>
+            Añadir mascota
+          </Boton>
+        </>
+      )}
+    </Seccion>
+  );
+}
+
 export default function Mascotas() {
   const { carga, refrescar, refrescando } = useCarga(yo);
   const [token, setToken] = useState<string | null>(null);
@@ -73,10 +130,13 @@ export default function Mascotas() {
       )}
       {carga.estado === "listo" &&
         (carga.datos.mascotas.length === 0 ? (
-          <Texto tono="suave">No tienes mascotas en esta cuenta. Añádelas desde barkandmeow.app/mi-mascota.</Texto>
+          <Texto tono="suave">Tu cuenta aún no tiene ninguna mascota.</Texto>
         ) : (
           carga.datos.mascotas.map((m) => <Tarjetita key={m.petId} m={m} token={token} />)
         ))}
+      {carga.estado === "listo" && (
+        <Nueva vacia={carga.datos.mascotas.length === 0} alAnadir={() => void refrescar()} />
+      )}
     </Pantalla>
   );
 }

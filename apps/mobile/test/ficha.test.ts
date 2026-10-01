@@ -145,3 +145,72 @@ test("el historial lleva la ficha, lo del pasaporte y las notas, y lo abre la we
     ["n1", "d1"],
   );
 });
+
+test("el pasaporte del portal se abre en el móvil, se evalúa y lo que comparte lo abre la web", async () => {
+  const { abrirPasaporte, firmadosDeBandeja, registrosDeViaje, sobrePasaporte, PASAPORTE_VACIO } = await import("../lib/pasaporte.ts");
+  const { evaluarViaje, pasaporteCompartido } = await import("@barkandmeow/schema");
+  const { firmarRegistro } = await import("@barkandmeow/crypto");
+  const secreta = azar(32);
+  const publica = wasm.publica(secreta);
+
+  const guardado = pasaporteDueno.parse({
+    version: 1,
+    especie: "dog",
+    chip: "724098060143113",
+    numeroPasaporte: "ES012345678",
+    declarados: [
+      { id: "d1", registro: { version: 1, tipo: "vacuna", fecha: "2026-03-14", enfermedad: "rabia", producto: "Rabisin", lote: "L1", validaHasta: "2027-03-14" } },
+    ],
+  });
+  const sobre = aBase64(wasm.cerrar(clavePasaporte(wasm, secreta), ad.pasaporte(PET), enc.encode(JSON.stringify(guardado))));
+  const datos = abrirPasaporte(secreta, PET, sobre);
+  assert.deepEqual(datos, guardado);
+  assert.deepEqual(abrirPasaporte(secreta, PET, null), PASAPORTE_VACIO);
+  assert.throws(() => abrirPasaporte(azar(32), PET, sobre));
+
+  // Una vacuna firmada por la clínica que espera en la bandeja: cuenta, aunque el portal aún no la haya copiado.
+  const semilla = azar(32);
+  const firmado = firmarRegistro(wasm, semilla, {
+    version: 1,
+    tipo: "vacuna",
+    chip: "724098060143113",
+    fecha: "2026-09-01",
+    clinica: "Clínica Demo",
+    enfermedad: "rabia",
+    producto: "Nobivac",
+    lote: "A77",
+    validaHasta: "2027-09-01",
+  });
+  const mensaje = (id: string, firma: string, clave: string | null) =>
+    ({
+      id,
+      petId: PET,
+      sellado: aBase64(wasm.sellar(publica, enc.encode(JSON.stringify(firmado)))),
+      llegada: "2026-09-01T10:00:00.000Z",
+      adjuntos: [],
+      origen: { clinica: "Clínica Demo", pais: "ES", dominio: null, firma: clave },
+    }) as never;
+  const deBandeja = firmadosDeBandeja(secreta, PET, "3113", datos, [
+    mensaje("ok", firmado.firma, firmado.clave),
+    // La misma firma, pero el servidor dice que la envió otra conexión: no cuenta.
+    mensaje("otra-clave", firmado.firma, aBase64(azar(32))),
+  ]);
+  assert.deepEqual(deBandeja.map((x) => x.id), ["ok"]);
+  // Con el chip de otra mascota, tampoco.
+  assert.deepEqual(firmadosDeBandeja(secreta, PET, "9999", datos, [mensaje("ok", firmado.firma, firmado.clave)]), []);
+
+  const { evaluables, filas } = registrosDeViaje(datos, deBandeja);
+  assert.deepEqual(filas.map((f) => [f.id, f.certificado]), [["ok", true], ["d1", false]]);
+  const requisitos = evaluarViaje(datos, evaluables, "ue", new Date("2026-10-20T10:00:00"));
+  const rabia = requisitos.find((r) => r.clave === "rabia") ?? requisitos.find((r) => /rabia/i.test(r.titulo));
+  assert.equal(rabia?.estado, "ok");
+  assert.equal(rabia?.origen, "certificado");
+
+  const id = "9b1f0c1e-4b7a-4d55-9d0e-2f7c7b3a1a10";
+  const c = sobrePasaporte("https://barkandmeow.app", datos, "Kira", HOY, { id, clave: azar(32), nonce: azar(24) });
+  assert.ok(c.url.startsWith(`https://barkandmeow.app/p/${id}#`));
+  const k = claveDeFragmento(c.url.split("#")[1])!;
+  const abierto = pasaporteCompartido.parse(JSON.parse(dec.decode(wasm.abrir(k, ad.pasaporteCompartido(id), deBase64(c.sobre)!))));
+  assert.equal(abierto.nombre, "Kira");
+  assert.equal(abierto.numeroPasaporte, "ES012345678");
+});

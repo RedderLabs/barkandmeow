@@ -54,6 +54,8 @@ function Navegacion() {
             ["mascota/[id]/salud", "Ficha de salud"],
             ["mascota/[id]/placa", "Placa del collar"],
             ["mascota/[id]/compartir", "Compartir"],
+            ["mascota/[id]/perfil", "Perfil público"],
+            ["mascota/[id]/pasaporte", "Pasaporte de viaje"],
           ] as const
         ).map(([name, title]) => (
           <Stack.Screen
