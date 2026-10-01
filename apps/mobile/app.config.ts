@@ -42,6 +42,8 @@ const config: ExpoConfig = {
   experiments: { typedRoutes: true },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "https://barkandmeow.app/api",
+    // La web del veterinario: a ella llevan el QR de la placa y los enlaces temporales.
+    webUrl: process.env.EXPO_PUBLIC_WEB_URL ?? "https://barkandmeow.app",
     ...(process.env.EAS_PROJECT_ID ? { eas: { projectId: process.env.EAS_PROJECT_ID } } : {}),
   },
 };

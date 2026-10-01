@@ -13,6 +13,7 @@ import { borrarToken, leerToken } from "./almacen";
 export { ErrorApi };
 export type {
   AdjuntoSellado,
+  Enlace,
   EnvioCodigo as Pendiente,
   EstadoMascota,
   Mascota,
@@ -21,8 +22,10 @@ export type {
   Yo,
 } from "@barkandmeow/schema/api";
 
-const extra = (Constants.expoConfig?.extra ?? {}) as { apiUrl?: string };
+const extra = (Constants.expoConfig?.extra ?? {}) as { apiUrl?: string; webUrl?: string };
 export const API = (process.env.EXPO_PUBLIC_API_URL ?? extra.apiUrl ?? "https://barkandmeow.app/api").replace(/\/$/, "");
+/** Dónde vive la web del veterinario: a ella apuntan el QR de la placa y los enlaces temporales. */
+export const WEB = (process.env.EXPO_PUBLIC_WEB_URL ?? extra.webUrl ?? "https://barkandmeow.app").replace(/\/$/, "");
 
 /** Se llama cuando el servidor dice que la sesión ya no vale (401). */
 let alCaducar: () => void = () => {};
@@ -112,3 +115,25 @@ export const registrarDispositivo = (token: string) =>
 
 export const retirarDispositivo = (token: string) =>
   conSesion.llamar(d.retirarDispositivo, { cuerpo: { token } });
+
+/* Ficha de salud, placa del collar y enlaces temporales: todo sube ya cifrado. */
+
+export const leerFicha = (petId: string) => conSesion.llamar(d.leerFicha, { params: { id: petId } });
+
+export const guardarFicha = (petId: string, sobre: string, version: number) =>
+  conSesion.llamar(d.guardarFicha, { params: { id: petId }, cuerpo: { sobre, version } });
+
+export const ponerPlaca = (petId: string, id: string, sobre: string) =>
+  conSesion.llamar(d.ponerPlaca, { params: { id: petId }, cuerpo: { id, sobre } });
+
+export const quitarPlaca = (petId: string) => conSesion.llamar(d.quitarPlaca, { params: { id: petId } });
+
+export const leerPasaporte = (petId: string) => conSesion.llamar(d.leerPasaporte, { params: { id: petId } });
+
+export const listarEnlaces = (petId: string) => conSesion.llamar(d.listarEnlaces, { params: { id: petId } });
+
+export const crearEnlace = (petId: string, id: string, sobre: string, horas: 24 | 72 | 168) =>
+  conSesion.llamar(d.crearEnlace, { params: { id: petId }, cuerpo: { id, sobre, horas } });
+
+export const retirarEnlace = (petId: string, id: string) =>
+  conSesion.llamar(d.retirarEnlace, { params: { id: petId, shareId: id } });

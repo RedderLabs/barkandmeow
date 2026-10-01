@@ -5,12 +5,15 @@
 
    - derivar la clave X25519 del código de recuperación en papel,
    - abrir lo sellado (crypto_box_seal de libsodium),
-   - comprobar firmas Ed25519 de los registros de la clínica.
+   - comprobar firmas Ed25519 de los registros de la clínica,
+   - abrir y cerrar sobres (XChaCha20-Poly1305): la ficha de salud, el resumen
+     de la placa y el historial que se comparte.
 
    test/cripto.test.ts lo compara contra el .wasm real: si alguien cambia el
-   Rust sin cambiar esto, el test lo dice. Abre y comprueba; lo único que
-   sella es la clave de una ficha al aprobar un permiso de nivel 3. */
+   Rust sin cambiar esto, el test lo dice. Hermes no trae azar: los nonces y
+   las claves efímeras los da quien llama, con expo-crypto. */
 
+import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { hsalsa, xsalsa20poly1305 } from "@noble/ciphers/salsa.js";
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { blake2b } from "@noble/hashes/blake2.js";
@@ -143,6 +146,45 @@ export function sellar(destino: Uint8Array, efimeraSecreta: Uint8Array, texto: U
 export const claveFicha = (secretaDueno: Uint8Array, petId: string) =>
   derivar(secretaDueno, `bm:dueno:ficha:v1:${petId}`);
 
+/** Clave del pasaporte de viaje: lo mismo que `clavePasaporte` de packages/crypto. */
+export const clavePasaporte = (secretaDueno: Uint8Array) => derivar(secretaDueno, "bm:dueno:pasaporte:v1");
+
+/* ── Sobre (XChaCha20-Poly1305) ─────────────────────────────
+   sobre = 0x01 ‖ nonce (24) ‖ cifrado con etiqueta. Los datos asociados atan
+   el bloque a su id: la ficha de una mascota no abre con el id de otra. Igual
+   que `cerrar` y `abrir` en lib.rs. */
+
+const VERSION_SOBRE = 0x01;
+
+export function cerrar(clave: Uint8Array, datos: string, nonce: Uint8Array, texto: Uint8Array): Uint8Array {
+  if (clave.length !== 32) throw new TypeError("clave: se esperaban 32 bytes");
+  if (nonce.length !== 24) throw new TypeError("nonce: se esperaban 24 bytes");
+  const cifrado = xchacha20poly1305(clave, nonce, enc.encode(datos)).encrypt(texto);
+  const sobre = new Uint8Array(1 + 24 + cifrado.length);
+  sobre[0] = VERSION_SOBRE;
+  sobre.set(nonce, 1);
+  sobre.set(cifrado, 25);
+  return sobre;
+}
+
+export function abrir(clave: Uint8Array, datos: string, sobre: Uint8Array): Uint8Array {
+  if (clave.length !== 32) throw new TypeError("clave: se esperaban 32 bytes");
+  if (sobre.length < 1 + 24 + 16 || sobre[0] !== VERSION_SOBRE) throw new ErrorCripto("formato");
+  try {
+    return xchacha20poly1305(clave, sobre.subarray(1, 25), enc.encode(datos)).decrypt(sobre.subarray(25));
+  } catch {
+    throw new ErrorCripto("autenticacion");
+  }
+}
+
+/** Datos asociados: los mismos que `ad` en packages/crypto/js/index.ts. */
+export const ad = {
+  emergencia: (id: string) => `bm:e:v1:${id}`,
+  historial: (id: string) => `bm:s:v1:${id}`,
+  pasaporte: (petId: string) => `bm:p:v1:${petId}`,
+  ficha: (petId: string) => `bm:f:v1:${petId}`,
+};
+
 /* ── Firmas Ed25519 ─────────────────────────────────────────── */
 
 /** true si la firma es de esa clave sobre ese mensaje. Modo estricto, como verify_strict. */
@@ -178,6 +220,9 @@ export function aBase64(b: Uint8Array): string {
   }
   return s;
 }
+
+/** Para la clave que va tras el # de un enlace: base64url sin relleno. */
+export const aBase64Url = (b: Uint8Array) => aBase64(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 /** Acepta base64 estándar o base64url, con o sin relleno. null si no lo es. */
 export function deBase64(s: string): Uint8Array | null {

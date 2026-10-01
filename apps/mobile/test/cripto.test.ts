@@ -7,6 +7,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  aBase64Url as aBase64UrlWasm,
+  ad as adWasm,
+  clavePasaporte as clavePasaporteWasm,
   aBase64 as aBase64Wasm,
   cargarCripto,
   claveDeDueno as claveDeDuenoWasm,
@@ -17,7 +20,12 @@ import {
 } from "@barkandmeow/crypto";
 import {
   aBase64,
+  aBase64Url,
+  abrir,
   abrirSellado,
+  ad,
+  cerrar,
+  clavePasaporte,
   claveDeDueno,
   claveDeRecuperacion,
   claveFicha,
@@ -143,4 +151,41 @@ test("la clave de recuperación del móvil es la misma que la de la web", () => 
     const m = enc.encode("bm:dueno:recuperacion:v1\nid\nreto");
     assert.ok(verificar(movil.publica, m, wasm.firmar(web.semilla, m)));
   }
+});
+
+test("sobre: lo que cierra el móvil lo abre la web, y al revés", () => {
+  const k = azar(32);
+  const texto = enc.encode(JSON.stringify({ version: 1, alergias: ["Amoxicilina"], nota: "ñ á ü €" }));
+
+  // Mismo nonce, mismos bytes: no es solo compatible, es idéntico.
+  const nonce = azar(24);
+  const delMovil = cerrar(k, ad.ficha("pet-1"), nonce, texto);
+  assert.equal(delMovil[0], 0x01);
+  assert.equal(delMovil.length, 1 + 24 + texto.length + 16);
+  assert.deepEqual(wasm.abrir(k, adWasm.ficha("pet-1"), delMovil), texto);
+
+  const deLaWeb = wasm.cerrar(k, adWasm.ficha("pet-1"), texto);
+  assert.deepEqual(abrir(k, ad.ficha("pet-1"), deLaWeb), texto);
+  assert.deepEqual(cerrar(k, ad.ficha("pet-1"), deLaWeb.subarray(1, 25), texto), deLaWeb);
+
+  // Atado a su id, a su clave y a sus bytes.
+  assert.throws(() => abrir(k, ad.ficha("pet-2"), deLaWeb), (e) => e instanceof ErrorCripto && e.fallo === "autenticacion");
+  assert.throws(() => abrir(azar(32), ad.ficha("pet-1"), deLaWeb), ErrorCripto);
+  const tocado = new Uint8Array(deLaWeb);
+  tocado[tocado.length - 1] ^= 1;
+  assert.throws(() => abrir(k, ad.ficha("pet-1"), tocado), ErrorCripto);
+  assert.throws(() => abrir(k, ad.ficha("pet-1"), deLaWeb.subarray(0, 30)), (e) => e instanceof ErrorCripto && e.fallo === "formato");
+  const otraVersion = new Uint8Array(deLaWeb);
+  otraVersion[0] = 0x02;
+  assert.throws(() => abrir(k, ad.ficha("pet-1"), otraVersion), (e) => e instanceof ErrorCripto && e.fallo === "formato");
+});
+
+test("los datos asociados, la clave del pasaporte y la del enlace son los de la web", () => {
+  for (const f of ["emergencia", "historial", "pasaporte", "ficha"] as const) assert.equal(ad[f]("x-1"), adWasm[f]("x-1"));
+  const secreta = azar(32);
+  assert.deepEqual(clavePasaporte(secreta), clavePasaporteWasm(wasm, secreta));
+  const k = azar(32);
+  assert.equal(aBase64Url(k), aBase64UrlWasm(k));
+  assert.equal(aBase64Url(k).length, 43);
+  assert.deepEqual(deBase64(aBase64Url(k)), k);
 });

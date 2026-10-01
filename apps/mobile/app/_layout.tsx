@@ -10,7 +10,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProveedorSesion, useSesion } from "@/lib/sesion";
-import { useColores } from "@/lib/tema";
+import { fuente, useColores } from "@/lib/tema";
 import type { DatosPush } from "@/lib/push";
 
 void SplashScreen.preventAutoHideAsync();
@@ -47,6 +47,29 @@ function Navegacion() {
       <Stack.Protected guard={estado === "dentro"}>
         <Stack.Screen name="(dentro)" />
         <Stack.Screen name="clave" options={{ presentation: "modal" }} />
+        {/* Lo de una mascota va encima de las pestañas, con su flecha de volver. */}
+        {(
+          [
+            ["mascota/[id]/index", "Mi mascota"],
+            ["mascota/[id]/salud", "Ficha de salud"],
+            ["mascota/[id]/placa", "Placa del collar"],
+            ["mascota/[id]/compartir", "Compartir"],
+          ] as const
+        ).map(([name, title]) => (
+          <Stack.Screen
+            key={name}
+            name={name}
+            options={{
+              headerShown: true,
+              title,
+              headerBackButtonDisplayMode: "minimal",
+              headerStyle: { backgroundColor: c.surface },
+              headerTintColor: c.accent,
+              headerTitleStyle: { fontFamily: fuente.textoFuerte, fontSize: 17, color: c.ink },
+              headerShadowVisible: false,
+            }}
+          />
+        ))}
       </Stack.Protected>
       <Stack.Protected guard={estado !== "dentro"}>
         <Stack.Screen name="entrar" />

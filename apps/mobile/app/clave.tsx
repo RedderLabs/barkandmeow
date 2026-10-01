@@ -50,7 +50,7 @@ export default function Clave() {
         <Titulo>Tu código de recuperación</Titulo>
         <Texto tono="suave">
           Son 8 bloques de 4 caracteres que apuntaste en papel al darte de alta. Con él, este móvil puede abrir tu
-          bandeja.
+          bandeja y la ficha de salud de tus mascotas.
         </Texto>
       </View>
       <Campo
@@ -67,7 +67,7 @@ export default function Clave() {
         error={error}
       />
       <Boton alPulsar={() => void alEnviar()} ocupado={comprobando} desactivado={!codigo.trim()}>
-        Abrir la bandeja
+        Guardar la clave en este móvil
       </Boton>
       <Boton variante="secundario" alPulsar={() => router.back()}>
         Ahora no
