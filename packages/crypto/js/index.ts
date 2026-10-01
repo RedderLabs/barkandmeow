@@ -221,6 +221,12 @@ export function firmaValida(cripto: Cripto, f: { registro: string; firma: string
 export const clavePasaporte = (cripto: Cripto, secretaDueno: Uint8Array) =>
   cripto.derivar(secretaDueno, "bm:dueno:pasaporte:v1");
 
+/** Clave de la ficha de una mascota (`K`), una por mascota y derivada de la
+    secreta X25519 del dueño. Es la que el dueño envuelve para la clínica al
+    aprobar el nivel 3: dar la de una mascota no da la de las demás. */
+export const claveFicha = (cripto: Cripto, secretaDueno: Uint8Array, petId: string) =>
+  cripto.derivar(secretaDueno, `bm:dueno:ficha:v1:${petId}`);
+
 export function aBase64(b: Uint8Array): string {
   let s = "";
   for (const x of b) s += String.fromCharCode(x);

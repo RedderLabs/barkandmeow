@@ -8,8 +8,8 @@
    - comprobar firmas Ed25519 de los registros de la clínica.
 
    test/cripto.test.ts lo compara contra el .wasm real: si alguien cambia el
-   Rust sin cambiar esto, el test lo dice. Solo abre y comprueba: el dueño no
-   sella ni firma desde aquí, así que no hace falta aleatoriedad. */
+   Rust sin cambiar esto, el test lo dice. Abre y comprueba; lo único que
+   sella es la clave de una ficha al aprobar un permiso de nivel 3. */
 
 import { hsalsa, xsalsa20poly1305 } from "@noble/ciphers/salsa.js";
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
@@ -122,6 +122,26 @@ export function abrirSellado(secreta: Uint8Array, sellado: Uint8Array): Uint8Arr
     throw new ErrorCripto("autenticacion");
   }
 }
+
+/** Sella para una clave pública: lo único que el dueño sella desde el móvil es
+    la clave de una ficha, al aprobar el nivel 3. Hermes no trae azar: la
+    secreta efímera (32 bytes, de un solo uso) la da quien llama, con
+    expo-crypto. */
+export function sellar(destino: Uint8Array, efimeraSecreta: Uint8Array, texto: Uint8Array): Uint8Array {
+  if (destino.length !== 32) throw new TypeError("clave de destino: se esperaban 32 bytes");
+  if (efimeraSecreta.length !== 32) throw new TypeError("clave efímera: se esperaban 32 bytes");
+  const efimera = publica(efimeraSecreta);
+  const nonce = blake2b(new Uint8Array([...efimera, ...destino]), { dkLen: 24 });
+  const caja = xsalsa20poly1305(claveDeCaja(efimeraSecreta, destino), nonce).encrypt(texto);
+  const sellado = new Uint8Array(32 + caja.length);
+  sellado.set(efimera);
+  sellado.set(caja, 32);
+  return sellado;
+}
+
+/** Clave de la ficha de una mascota: lo mismo que `claveFicha` de packages/crypto. */
+export const claveFicha = (secretaDueno: Uint8Array, petId: string) =>
+  derivar(secretaDueno, `bm:dueno:ficha:v1:${petId}`);
 
 /* ── Firmas Ed25519 ─────────────────────────────────────────── */
 

@@ -447,6 +447,72 @@ describe("nivel 0 y número de comparación", () => {
     assert.equal(ajeno.statusCode, 410);
   });
 
+  const permisosDe = (c?: string) =>
+    app.inject({ method: "GET", url: "/grants/v1/owner", headers: c ? { cookie: c } : {} });
+
+  it("el dueño ve la petición con el mismo número; otro dueño, nada", async () => {
+    assert.equal((await permisosDe()).statusCode, 401);
+    assert.equal((await permisosDe(cookie)).statusCode, 401);
+
+    const r = await permisosDe(cookieDueno);
+    assert.equal(r.statusCode, 200);
+    const p = r.json().peticiones.find((x: { requestId: string }) => x.requestId === requestId);
+    assert.ok(p, "la petición no aparece en la lista del dueño");
+    assert.equal(p.sas, sas);
+    assert.equal(p.petId, petId);
+    assert.equal(p.vetPubKey, vetPubKey.toString("base64"));
+    assert.equal(typeof p.clinica.nombre, "string");
+    assert.equal(r.json().permisos.length, 0);
+
+    const ajeno = (await permisosDe(cookieAjeno)).json();
+    assert.deepEqual(ajeno, { peticiones: [], permisos: [] });
+  });
+
+  it("el dueño rechaza una petición y ya no se puede aprobar", async () => {
+    const movil = "ExponentPushToken[movil-permisos-nivel3]";
+    const reg = await app.inject({
+      method: "POST",
+      url: "/owners/v1/devices",
+      headers: { cookie: cookieDueno },
+      payload: { plataforma: "expo", token: movil },
+    });
+    assert.equal(reg.statusCode, 201);
+    pushes.length = 0;
+
+    const nueva =await app.inject({
+      method: "POST",
+      url: "/grants/v1/request",
+      headers: { cookie },
+      payload: { identificador: { tipo: "iso", valor: CHIP }, vetPubKey: vetPubKey.toString("base64") },
+    });
+    assert.equal(nueva.statusCode, 201);
+    // Al móvil del dueño le llega un aviso sin contenido: ni la clínica ni el número.
+    assert.deepEqual(
+      pushes.map((m) => [m.to, m.data.tipo, m.data.petId]),
+      [[movil, "permiso", petId]],
+    );
+    assert.ok(!JSON.stringify(pushes).includes(nueva.json().sas));
+    await sql`DELETE FROM owner_devices WHERE token = ${movil}`;
+    const id = nueva.json().requestId;
+    const rechazar = (c?: string) =>
+      app.inject({ method: "POST", url: "/grants/v1/reject", headers: c ? { cookie: c } : {}, payload: { requestId: id } });
+
+    assert.equal((await rechazar()).statusCode, 401);
+    assert.equal((await rechazar(cookieAjeno)).statusCode, 410);
+    assert.equal((await rechazar(cookieDueno)).statusCode, 200);
+    assert.equal((await rechazar(cookieDueno)).statusCode, 410);
+
+    const estado = await app.inject({ method: "GET", url: `/grants/v1/request/${id}`, headers: { cookie } });
+    assert.equal(estado.json().estado, "rejected");
+    const aprobar = await app.inject({
+      method: "POST",
+      url: "/grants/v1/approve",
+      headers: { cookie: cookieDueno },
+      payload: { requestId: id, wrappedKey: b64(48) },
+    });
+    assert.equal(aprobar.statusCode, 410);
+  });
+
   it("el dueño aprueba y nace el permiso de nivel 3", async () => {
     const r = await app.inject({
       method: "POST",
@@ -463,6 +529,11 @@ describe("nivel 0 y número de comparación", () => {
       headers: { cookie },
     });
     assert.equal(mios.json().total, 1);
+
+    const dueno = (await permisosDe(cookieDueno)).json();
+    assert.equal(dueno.permisos.length, 1);
+    assert.equal(dueno.permisos[0].grantId, r.json().grantId);
+    assert.ok(!dueno.peticiones.some((x: { requestId: string }) => x.requestId === requestId));
   });
 
   it("aprobar dos veces la misma petición no cuela", async () => {
@@ -511,6 +582,15 @@ describe("nivel 0 y número de comparación", () => {
       headers: { cookie },
     });
     assert.equal(despues.json().total, 0);
+    assert.equal((await permisosDe(cookieDueno)).json().permisos.length, 0);
+    // Retirar lo ya retirado no cuela.
+    const otraVez = await app.inject({
+      method: "POST",
+      url: "/grants/v1/revoke",
+      headers: { cookie: cookieDueno },
+      payload: { grantId },
+    });
+    assert.equal(otraVez.statusCode, 404);
     // Los tests siguientes esperan la ficha de prueba sin dueño en el portal.
     await sql`UPDATE pets SET owner_id = NULL WHERE id = ${petId}`;
   });

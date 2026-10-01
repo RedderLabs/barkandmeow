@@ -66,6 +66,11 @@ export const grantRevokeBody = z.object({
   grantId: z.string().uuid(),
 });
 
+/** El dueño rechaza la petición: el número no coincide, o no conoce la clínica. */
+export const grantRejectBody = z.object({
+  requestId: z.string().uuid(),
+});
+
 export const estadoPeticion = z.enum([
   "pending",
   "approved",

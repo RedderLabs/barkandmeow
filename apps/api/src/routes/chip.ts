@@ -1,10 +1,11 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { and, eq, gt, inArray, lt } from "drizzle-orm";
-import { accessLog, grantRequests, grants, petIdentifiers, pets } from "@barkandmeow/db";
+import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import { accessLog, clinics, grantRequests, grants, petIdentifiers, pets } from "@barkandmeow/db";
 import {
   chipLookupBody,
   grantApproveBody,
+  grantRejectBody,
   grantRequestBody,
   grantRevokeBody,
   normalizarChip,
@@ -19,6 +20,7 @@ import {
   numeroComparacion,
   senueloAviso,
 } from "../core.js";
+import { avisarPush } from "../push.js";
 import { sesionDe } from "./clinics.js";
 import { duenoDe } from "./duenos.js";
 import { perfilPublico } from "./ficha.js";
@@ -106,6 +108,8 @@ export default async function rutasChip(app: FastifyInstance) {
         .returning({ id: grantRequests.id });
       requestId = peticion.id;
       sas = numeroComparacion(vetPubKey, encontrado.ownerPubKey, requestId);
+      // Sin esperar: el aviso no puede alargar una respuesta de tiempo fijo.
+      void avisarPush({ tipo: "permiso", petId: encontrado.petId }, req.log);
     }
 
     const o = origenChip(valor);
@@ -161,6 +165,8 @@ export default async function rutasChip(app: FastifyInstance) {
       })
       .returning({ id: grantRequests.id, expiresAt: grantRequests.expiresAt });
 
+    // El dueño tiene diez minutos: se le avisa al móvil, sin contenido.
+    await avisarPush({ tipo: "permiso", petId: filas[0].petId }, req.log);
     await gastarPresupuesto(t0, env.lookupBudgetMs);
     return reply.code(201).send({
       requestId: peticion.id,
@@ -252,6 +258,7 @@ export default async function rutasChip(app: FastifyInstance) {
       .where(
         and(
           eq(grants.id, parsed.data.grantId),
+          isNull(grants.revokedAt),
           inArray(
             grants.petId,
             db.select({ id: pets.id }).from(pets).where(eq(pets.ownerId, d.ownerId)),
@@ -263,6 +270,109 @@ export default async function rutasChip(app: FastifyInstance) {
 
     /* Honesto: borra la copia del servidor, no lo que ya se descargó. */
     return { ok: true, descargadoNoVuelve: true };
+  });
+
+  /** El dueño dice que no: el número no coincide o no conoce a la clínica. */
+  app.post("/grants/v1/reject", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const parsed = grantRejectBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "cuerpo inválido" });
+
+    const r = await db
+      .update(grantRequests)
+      .set({ state: "rejected" })
+      .where(
+        and(
+          eq(grantRequests.id, parsed.data.requestId),
+          eq(grantRequests.state, "pending"),
+          gt(grantRequests.expiresAt, new Date()),
+          inArray(
+            grantRequests.petId,
+            db.select({ id: pets.id }).from(pets).where(eq(pets.ownerId, d.ownerId)),
+          ),
+        ),
+      )
+      .returning({ id: grantRequests.id });
+    // Misma respuesta si la petición es de otra mascota: no se confirma que exista.
+    if (!r.length) return reply.code(410).send({ error: "petición caducada o ya resuelta" });
+    return { ok: true };
+  });
+
+  /**
+   * Lo que el dueño necesita para decidir: las peticiones que esperan, con el
+   * número de comparación y la clave para la que envolver K, y los permisos
+   * que tiene dados. El número se deriva aquí igual que al pedir el alta.
+   */
+  app.get("/grants/v1/owner", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+
+    const clinica = {
+      nombre: clinics.name,
+      pais: clinics.country,
+      dominio: clinics.domain,
+      verificada: clinics.domainVerifiedAt,
+    };
+    const verClinica = (c: { nombre: string; pais: string; dominio: string | null; verificada: Date | null }) => ({
+      nombre: c.nombre,
+      pais: c.pais,
+      dominio: c.verificada ? c.dominio : null,
+    });
+
+    const pendientes = await db
+      .select({
+        requestId: grantRequests.id,
+        petId: grantRequests.petId,
+        vetPubKey: grantRequests.vetPubKey,
+        ownerPubKey: pets.ownerPubKey,
+        caduca: grantRequests.expiresAt,
+        ...clinica,
+      })
+      .from(grantRequests)
+      .innerJoin(pets, eq(pets.id, grantRequests.petId))
+      .innerJoin(clinics, eq(clinics.id, grantRequests.clinicId))
+      .where(
+        and(
+          eq(pets.ownerId, d.ownerId),
+          eq(pets.estado, "activa"),
+          eq(grantRequests.state, "pending"),
+          gt(grantRequests.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(grantRequests.createdAt));
+
+    const dados = await db
+      .select({ grantId: grants.id, petId: grants.petId, desde: grants.createdAt, ...clinica })
+      .from(grants)
+      .innerJoin(pets, eq(pets.id, grants.petId))
+      .innerJoin(clinics, eq(clinics.id, grants.clinicId))
+      .where(
+        and(
+          eq(pets.ownerId, d.ownerId),
+          eq(grants.level, 3),
+          isNull(grants.revokedAt),
+          or(isNull(grants.expiresAt), gt(grants.expiresAt, new Date())),
+        ),
+      )
+      .orderBy(desc(grants.createdAt));
+
+    return {
+      peticiones: pendientes.map((p) => ({
+        requestId: p.requestId,
+        petId: p.petId,
+        clinica: verClinica(p),
+        vetPubKey: p.vetPubKey.toString("base64"),
+        sas: numeroComparacion(p.vetPubKey, p.ownerPubKey, p.requestId),
+        caduca: p.caduca,
+      })),
+      permisos: dados.map((g) => ({
+        grantId: g.grantId,
+        petId: g.petId,
+        clinica: verClinica(g),
+        desde: g.desde,
+      })),
+    };
   });
 
   /** Lo que la clínica puede ver: sus permisos vivos. Nunca contenido. */

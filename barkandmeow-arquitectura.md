@@ -143,8 +143,12 @@ sequenceDiagram
 | --- | --- | --- |
 | `POST /grants/v1/request` | SaaS de la clínica | Pide alta de nivel 3 para un chip; devuelve id de petición y número de comparación |
 | `GET /grants/v1/request/{id}` | SaaS de la clínica | Estado: pendiente, aprobada, rechazada o caducada |
-| `POST /grants/v1/approve` | App del dueño | Sube `K` envuelta para la clave pública del veterinario |
-| `POST /grants/v1/revoke` | App del dueño | Retira el nivel 3 |
+| `GET /grants/v1/owner` | App y portal del dueño | Peticiones que esperan respuesta (clínica, número de comparación, clave para la que envolver `K`) y permisos concedidos |
+| `POST /grants/v1/approve` | App y portal del dueño | Sube `K` envuelta para la clave pública de la clínica |
+| `POST /grants/v1/reject` | App y portal del dueño | Rechaza la petición: el número no coincide o no conoce a la clínica |
+| `POST /grants/v1/revoke` | App y portal del dueño | Retira el nivel 3 |
+
+**Dónde está cada pantalla (2026-10-01).** La clínica pide el alta en `apps/clinic/app/altas` con la clave pública de la clínica y espera la respuesta sondeando el estado. El dueño decide en `apps/portal/app/permisos` o en la pestaña «Permisos» de la app. `K` es una clave por mascota, `HKDF(secreta X25519 del dueño, "bm:dueno:ficha:v1:<petId>")` (`claveFicha` en `packages/crypto` y en `apps/mobile/lib/cripto.ts`): el papel del dueño la reconstruye, y dar la de una mascota no da la de las demás. Se envuelve con `crypto_box_seal`. Al abrir la petición el servidor manda un push sin contenido (ni la clínica ni el número pasan por Expo, Apple o Google); tocarlo abre «Permisos», donde la identidad de la clínica llega por la sesión del dueño.
 
 ```ts
 export const grantRequests = pgTable('grant_requests', {

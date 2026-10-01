@@ -11,6 +11,7 @@ import {
   cargarCripto,
   claveDeDueno as claveDeDuenoWasm,
   claveDeRecuperacion as claveDeRecuperacionWasm,
+  claveFicha as claveFichaWasm,
   firmarRegistro,
   nuevoCodigo,
 } from "@barkandmeow/crypto";
@@ -19,12 +20,14 @@ import {
   abrirSellado,
   claveDeDueno,
   claveDeRecuperacion,
+  claveFicha,
   deBase64,
   derivar,
   ErrorCripto,
   firmaValida,
   leerCodigo,
   publica,
+  sellar,
   verificar,
 } from "../lib/cripto.ts";
 
@@ -72,6 +75,21 @@ test("lo que sella la web (crypto_box_seal) se abre en el móvil", () => {
     const s = wasm.sellar(wasm.publica(dueno), enc.encode(texto));
     assert.equal(dec.decode(abrirSellado(dueno, s)), texto);
   }
+});
+
+test("lo que sella el móvil lo abre la web, y la clave de la ficha es la misma", () => {
+  const clinica = azar(32);
+  const dueno = azar(32);
+  const petId = "7b0f6a52-0c1e-4b7a-9a57-3f1f4f0f9a11";
+  const k = claveFicha(dueno, petId);
+  assert.deepEqual(k, claveFichaWasm(wasm, dueno, petId));
+  assert.notDeepEqual(k, claveFicha(dueno, "7b0f6a52-0c1e-4b7a-9a57-3f1f4f0f9a12"));
+
+  const s = sellar(wasm.publica(clinica), azar(32), k);
+  assert.equal(s.length, 32 + 16 + 32);
+  assert.deepEqual(wasm.abrirSellado(clinica, s), k);
+  assert.deepEqual(abrirSellado(clinica, s), k);
+  assert.throws(() => wasm.abrirSellado(azar(32), s));
 });
 
 test("sellado para otra clave o manipulado no se abre", () => {

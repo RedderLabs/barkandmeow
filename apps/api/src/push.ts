@@ -13,13 +13,15 @@ import { db } from "./core.js";
    donde el mensaje se descifra en el móvil. PUSH=off lo desactiva. Un fallo
    del push nunca tumba la petición que lo provoca. */
 
-export type AvisoPush = { tipo: "bandeja" | "reclamacion"; petId: string };
+export type AvisoPush = { tipo: "bandeja" | "reclamacion" | "permiso"; petId: string };
 type Mensaje = { to: string; title: string; body: string; data: AvisoPush; sound: "default"; priority: "high" };
 export type Pushero = (m: Mensaje[]) => Promise<{ token: string; caducado: boolean }[]>;
 
 const TEXTO: Record<AvisoPush["tipo"], string> = {
   bandeja: "Tienes un mensaje nuevo en Bark & Meow.",
   reclamacion: "Hay una reclamación sobre el chip de tu mascota. Ábrela para responder.",
+  // Sin el nombre de la clínica: el aviso pasa por Expo, Apple y Google.
+  permiso: "Una clínica pide acceso a la ficha de tu mascota. Tienes diez minutos para responder.",
 };
 
 let pushero: Pushero = async (mensajes) => {

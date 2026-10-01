@@ -1,8 +1,8 @@
 /* Avisos push.
 
    El servidor manda por Expo un push sin contenido («Tienes un mensaje nuevo
-   en Bark & Meow») cuando llega algo a la bandeja o abren una reclamación
-   sobre el chip. Lo que dice el mensaje va sellado y solo se lee al abrir la
+   en Bark & Meow») cuando llega algo a la bandeja, abren una reclamación
+   sobre el chip o una clínica pide el alta de nivel 3. Lo que dice el mensaje va sellado y solo se lee al abrir la
    app: ni Expo, ni Apple, ni Google ven nada de la ficha. */
 
 import Constants from "expo-constants";
@@ -12,7 +12,7 @@ import { Platform } from "react-native";
 import { registrarDispositivo, retirarDispositivo } from "./api";
 import { borrarPush, guardarPush, leerPush } from "./almacen";
 
-export type DatosPush = { tipo?: "bandeja" | "reclamacion"; petId?: string };
+export type DatosPush = { tipo?: "bandeja" | "reclamacion" | "permiso"; petId?: string };
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

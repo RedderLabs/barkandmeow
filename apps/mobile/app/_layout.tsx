@@ -15,15 +15,16 @@ import type { DatosPush } from "@/lib/push";
 
 void SplashScreen.preventAutoHideAsync();
 
-/* Tocar un aviso push abre la bandeja (o la lista de mascotas, si es una
-   reclamación), también con la app cerrada. */
+/* Tocar un aviso push abre la bandeja (la lista de mascotas si es una
+   reclamación, los permisos si una clínica pide el alta), también con la app
+   cerrada. */
 function useAbrirDesdeAviso() {
   const { estado } = useSesion();
   const ultima = Notifications.useLastNotificationResponse();
   useEffect(() => {
     if (estado !== "dentro" || !ultima) return;
     const datos = ultima.notification.request.content.data as DatosPush;
-    router.navigate(datos?.tipo === "reclamacion" ? "/" : "/bandeja");
+    router.navigate(datos?.tipo === "reclamacion" ? "/" : datos?.tipo === "permiso" ? "/permisos" : "/bandeja");
     void Notifications.clearLastNotificationResponseAsync();
   }, [estado, ultima]);
 }

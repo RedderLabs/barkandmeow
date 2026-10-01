@@ -7,6 +7,7 @@ import {
   chipLookupRespuesta,
   estadoPeticion,
   grantApproveBody,
+  grantRejectBody,
   grantRequestBody,
   grantRevokeBody,
   notaBody,
@@ -22,7 +23,15 @@ import { fecha, ok, ruta } from "./tipos";
 
 const numeroComparacion = z.string().regex(/^\d{6}$/);
 
-const estadoReclamacion = z.enum(["abierta", "impugnada", "a-favor-reclamante", "a-favor-titular"]);
+/** La clínica tal como la ve el dueño al decidir un permiso de nivel 3. */
+const clinicaPermiso = z.object({
+  nombre: z.string(),
+  pais: z.string(),
+  /** Dominio verificado por correo, o null si aún no lo está. */
+  dominio: z.string().nullable(),
+});
+
+const estadoReclamacion =z.enum(["abierta", "impugnada", "a-favor-reclamante", "a-favor-titular"]);
 
 /** Una reclamación de chip vista por el operador: incluye correos de las dos partes. */
 const reclamacionOperador = z.object({
@@ -139,6 +148,47 @@ export const rutasPublicas = {
     cuerpo: grantRevokeBody,
     respuesta: z.object({ ok: z.literal(true), descargadoNoVuelve: z.literal(true) }),
     errores: [400, 401, 404],
+  }),
+
+  rechazarAlta: ruta({
+    metodo: "POST",
+    ruta: "/grants/v1/reject",
+    acceso: "dueno",
+    resumen:
+      "El dueño rechaza una petición de alta: el número no coincide o no conoce a la clínica. Misma respuesta si la petición es de otra mascota.",
+    cuerpo: grantRejectBody,
+    respuesta: ok,
+    errores: [400, 401, 410],
+  }),
+
+  permisosDueno: ruta({
+    metodo: "GET",
+    ruta: "/grants/v1/owner",
+    acceso: "dueno",
+    resumen:
+      "Lo que el dueño tiene que ver para decidir: las peticiones de alta que esperan su respuesta, con el número de comparación y la clave pública a la que envolver K, y los permisos de nivel 3 que tiene concedidos.",
+    respuesta: z.object({
+      peticiones: z.array(
+        z.object({
+          requestId: z.string().uuid(),
+          petId: z.string().uuid(),
+          clinica: clinicaPermiso,
+          /** Clave pública X25519 para la que se envuelve K. */
+          vetPubKey: base64,
+          sas: numeroComparacion,
+          caduca: fecha,
+        }),
+      ),
+      permisos: z.array(
+        z.object({
+          grantId: z.string().uuid(),
+          petId: z.string().uuid(),
+          clinica: clinicaPermiso,
+          desde: fecha,
+        }),
+      ),
+    }),
+    errores: [401],
   }),
 
   permisosClinica: ruta({

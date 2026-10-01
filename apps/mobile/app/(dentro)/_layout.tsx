@@ -17,7 +17,8 @@ export default function Dentro() {
     >
       <Tabs.Screen name="index" options={{ title: "Mis mascotas" }} />
       <Tabs.Screen name="bandeja" options={{ title: "Bandeja" }} />
-      <Tabs.Screen name="cuenta" options={{ title: "Cuenta" }} />
+      <Tabs.Screen name="permisos" options={{ title: "Permisos" }} />
+      <Tabs.Screen name="cuenta"options={{ title: "Cuenta" }} />
     </Tabs>
   );
 }

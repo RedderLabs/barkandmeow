@@ -2,7 +2,7 @@ import Link from "next/link";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { Logotipo } from "@barkandmeow/ui-web/marca";
 
-type Destino = "mascotas" | "bandeja" | "cuenta";
+type Destino = "mascotas" | "bandeja" | "permisos" | "cuenta";
 
 /* Cabecera del portal del dueño: logotipo, insignia y, con sesión, sus
    destinos. Nada más: el dueño viene a hacer una cosa y se va. */
@@ -28,7 +28,10 @@ export function Cabecera({ conSesion = false, activo }: { conSesion?: boolean; a
           <Link href="/bandeja" className={enlace("bandeja")} aria-current={activo === "bandeja" ? "page" : undefined}>
             Bandeja
           </Link>
-          <Link href="/cuenta" className={enlace("cuenta")} aria-current={activo === "cuenta" ? "page" : undefined}>
+          <Link href="/permisos" className={enlace("permisos")} aria-current={activo === "permisos" ? "page" : undefined}>
+            Permisos
+          </Link>
+          <Link href="/cuenta"className={enlace("cuenta")} aria-current={activo === "cuenta" ? "page" : undefined}>
             Cuenta
           </Link>
           {/* Un enlace normal: la salida la resuelve el servidor. */}

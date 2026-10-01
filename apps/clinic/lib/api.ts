@@ -32,6 +32,13 @@ export const activarMascota = (identificador: Identificador, codigo: string) =>
 export const abrirReclamacion = (identificador: Identificador, codigo: string) =>
   cliente.llamar(p.reclamarChip, { cuerpo: { identificador, codigo } });
 
+/* ── Alta de nivel 3 ───────────────────────────────────────── */
+
+export const pedirAlta = (identificador: Identificador, vetPubKey: string) =>
+  cliente.llamar(p.pedirAlta, { cuerpo: { identificador, vetPubKey } });
+
+export const estadoAlta = (id: string) => cliente.llamar(p.estadoAlta, { params: { id }, cache: "no-store" });
+
 /* ── Sesión y equipo ───────────────────────────────────────── */
 
 export const entrar = (email: string, password: string) =>

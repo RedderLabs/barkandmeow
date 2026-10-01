@@ -88,6 +88,18 @@ export const leerBandeja = () => conSesion.llamar(d.leerBandeja);
 
 export const borrarMensaje = (id: string) => conSesion.llamar(d.borrarMensaje, { params: { id } });
 
+/* Permisos de nivel 3: lo que piden las clínicas y lo que el dueño ha dado. */
+
+export const leerPermisos = () => conSesion.llamar(api.publicas.permisosDueno);
+
+export const aprobarAlta = (requestId: string, wrappedKey: string) =>
+  conSesion.llamar(api.publicas.aprobarAlta, { cuerpo: { requestId, wrappedKey } });
+
+export const rechazarAlta = (requestId: string) =>
+  conSesion.llamar(api.publicas.rechazarAlta, { cuerpo: { requestId } });
+
+export const retirarAlta = (grantId: string) => conSesion.llamar(api.publicas.retirarAlta, { cuerpo: { grantId } });
+
 export const impugnar = (reclamacionId: string) =>
   conSesion.llamar(d.impugnar, { params: { id: reclamacionId } });
 

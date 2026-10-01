@@ -163,8 +163,12 @@ export async function registrarPendiente(opciones: {
 }
 
 export default async function rutasMascotas(app: FastifyInstance) {
+  /* Sin sesión y sin coste para quien llama: límite propio por IP, más corto
+     que el del grupo, para que nadie llene la base de registros pendientes. */
+  const registros = { max: Number(process.env.LIMITE_REGISTRO_MASCOTA ?? 5), timeWindow: "1 minute" };
+
   /** El dueño registra el chip desde la app. Queda pendiente hasta que lo active una clínica. */
-  app.post("/pets/v1/register", async (req, reply) => {
+  app.post("/pets/v1/register", { config: { rateLimit: registros } }, async (req, reply) => {
     const cuerpo = petRegisterBody.safeParse(req.body);
     if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
     const r = await registrarPendiente({

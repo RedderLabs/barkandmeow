@@ -97,6 +97,18 @@ export const quitarFoto = (petId: string) => cliente.llamar(d.quitarFoto, { para
 
 export const impugnar = (reclamacionId: string) => cliente.llamar(d.impugnar, { params: { id: reclamacionId } });
 
+/* ── Permisos de nivel 3 ───────────────────────────────────── */
+
+export const leerPermisos = () => cliente.llamar(api.publicas.permisosDueno, { cache: "no-store" });
+
+export const aprobarAlta = (requestId: string, wrappedKey: string) =>
+  cliente.llamar(api.publicas.aprobarAlta, { cuerpo: { requestId, wrappedKey } });
+
+export const rechazarAlta = (requestId: string) =>
+  cliente.llamar(api.publicas.rechazarAlta, { cuerpo: { requestId } });
+
+export const retirarAlta = (grantId: string) => cliente.llamar(api.publicas.retirarAlta, { cuerpo: { grantId } });
+
 /* ── Bandeja ───────────────────────────────────────────────── */
 
 /** Los bytes sellados de un adjunto. */

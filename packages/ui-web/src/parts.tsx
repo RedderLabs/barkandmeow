@@ -74,7 +74,7 @@ export function IconInvite({ size = 20 }: { size?: number }) {
   );
 }
 
-type Surface = "consola" | "activar" | "equipo" | "conexion";
+type Surface = "consola" | "activar" | "altas" | "equipo" | "conexion";
 
 /* Un paquete compartido no puede saber de qué clínica se trata: la recibe.
    Antes importaba los datos de demostración de apps/clinic, que era una
@@ -112,6 +112,12 @@ export function AppHeader({
           className={`${ui.navLink} ${active === "activar" ? ui.navLinkActive : ""}`}
         >
           Activar
+        </Link>
+        <Link
+          href="/altas"
+          className={`${ui.navLink} ${active === "altas" ? ui.navLinkActive : ""}`}
+        >
+          Altas
         </Link>
         <Link
           href="/equipo"
