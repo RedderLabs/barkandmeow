@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { ETIQUETA_MAX, limpiarEtiqueta } from "@barkandmeow/crypto";
 import ui from "@barkandmeow/ui-web/ui.module.css";
@@ -217,6 +218,9 @@ export function Pacientes({
             <span role="columnheader">Chip</span>
             <span role="columnheader">Alta</span>
             <span role="columnheader">Último informe</span>
+            <span role="columnheader" className="sr-only">
+              Ficha
+            </span>
           </div>
           {visibles.map((p) => {
             const nombre = nombreDe(p);
@@ -288,6 +292,16 @@ export function Pacientes({
                 </span>
                 <span className={s.dato} role="cell" data-etiqueta="Último informe">
                   {p.ultimoEnvio ? dia(p.ultimoEnvio) : <span className={s.sinDato}>Ninguno</span>}
+                </span>
+                <span role="cell" className={s.celdaFicha}>
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={`/paciente/${p.petId}`}
+                      aria-label={`Ver la ficha de salud de ${nombre ?? `el paciente del chip ···${p.chipPista ?? ""}`}`}
+                    >
+                      Ficha
+                    </Link>
+                  </Button>
                 </span>
               </div>
             );

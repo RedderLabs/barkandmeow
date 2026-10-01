@@ -315,6 +315,24 @@ export const rutasClinicas = {
     respuesta: z.object({ pacientes: z.array(pacienteConsola) }),
     errores: [401],
   }),
+  leerFichaPaciente: ruta({
+    metodo: "GET",
+    ruta: "/clinics/v1/patients/:petId/record",
+    acceso: "clinica",
+    resumen:
+      "La ficha de salud de un paciente, tal como la guardó su dueño: cifrada con la clave de la mascota. Va con esa clave envuelta para la clave pública de la clínica, que el dueño subió al dar el nivel 3. El servidor entrega dos bloques que no puede abrir; sin nivel 3 vivo, 404.",
+    respuesta: z.object({
+      /** La ficha cifrada, o null si el dueño aún no la ha escrito. */
+      sobre: z.string().nullable(),
+      version: z.number().int().nonnegative(),
+      /** La clave de la ficha, sellada para la clínica. null en permisos antiguos sin clave. */
+      claveEnvuelta: z.string().nullable(),
+      chipPista: z.string().nullable(),
+      /** Desde cuándo tiene la clínica el nivel 3. */
+      desde: fecha,
+    }),
+    errores: [401, 404],
+  }),
   etiquetarPaciente: ruta({
     metodo: "PUT",
     ruta: "/clinics/v1/patients/:petId/label",

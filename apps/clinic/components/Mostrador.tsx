@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ui from "@barkandmeow/ui-web/ui.module.css";
@@ -588,6 +589,11 @@ export function Mostrador({
               </div>
             )}
             <div className={ui.actions}>
+              {paso.petId && (
+                <Button asChild size="md">
+                  <Link href={`/paciente/${paso.petId}`}>Ver su ficha de salud</Link>
+                </Button>
+              )}
               {leerOtro}
               {paso.petId && etiquetas.estado === "con-clave" && nombre && !renombrando && (
                 <Button type="button" variant="ghost" size="md" onClick={() => setRenombrando(true)}>

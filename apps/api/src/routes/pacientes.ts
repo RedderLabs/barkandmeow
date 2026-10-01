@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { and, asc, eq, gt, inArray, isNotNull, isNull, max, notExists, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, notExists, or, sql } from "drizzle-orm";
 import {
   accessLog,
+  blobs,
   clinicMembers,
   dispositivosMiembro,
   envios,
@@ -170,6 +171,51 @@ export default async function rutasPacientes(app: FastifyInstance) {
       .limit(1);
     return !!p;
   };
+
+  /**
+   * La ficha de salud de un paciente, para la clínica que tiene su nivel 3.
+   *
+   * Salen dos bloques cifrados: la ficha, con la clave de la mascota, y esa
+   * clave, sellada por el dueño para la clave pública de la clínica al aprobar
+   * el alta. Quien tenga la clave de la clínica en su navegador abre la ficha;
+   * el servidor, no. Si el dueño retira el permiso, esto vuelve a ser un 404.
+   */
+  app.get("/clinics/v1/patients/:petId/record", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    const { petId } = req.params as { petId: string };
+    // Misma respuesta si la mascota no existe o no es paciente de esta clínica.
+    const noEs = () => reply.code(404).send({ error: "no es paciente de la clínica" });
+    if (!UUID.test(petId)) return noEs();
+
+    const [permiso] = await db
+      .select({ claveEnvuelta: grants.wrappedKey, desde: grants.createdAt, chipPista: pets.chipPista })
+      .from(grants)
+      .innerJoin(pets, eq(pets.id, grants.petId))
+      .where(and(eq(grants.petId, petId), permisoVivo(s.clinicId), eq(pets.estado, "activa")))
+      // El permiso más reciente lleva la clave buena: los antiguos pueden no llevarla.
+      .orderBy(desc(grants.createdAt))
+      .limit(1);
+    if (!permiso) return noEs();
+
+    const [ficha] = await db
+      .select({ sealed: blobs.sealed, version: blobs.version })
+      .from(blobs)
+      .where(and(eq(blobs.petId, petId), eq(blobs.kind, "record")))
+      .limit(1);
+
+    // Queda apuntado que esta clínica abrió la ficha. Qué dice, no lo sabe nadie más.
+    await db.insert(accessLog).values({ clinicId: s.clinicId, action: "ficha_nivel3", found: ficha?.sealed ? "yes" : "no" });
+
+    reply.header("cache-control", "no-store");
+    return {
+      sobre: ficha?.sealed ? ficha.sealed.toString("base64") : null,
+      version: ficha?.version ?? 0,
+      claveEnvuelta: permiso.claveEnvuelta ? permiso.claveEnvuelta.toString("base64") : null,
+      chipPista: permiso.chipPista,
+      desde: permiso.desde,
+    };
+  });
 
   /** Cualquier miembro etiqueta; solo abre la etiqueta quien tiene la clave. */
   app.put("/clinics/v1/patients/:petId/label", async (req, reply) => {

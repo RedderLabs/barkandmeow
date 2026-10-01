@@ -49,6 +49,10 @@ export const consultarChip = (identificador: Identificador) =>
 export const guardarEtiqueta = (petId: string, etiqueta: string) =>
   cliente.llamar(c.etiquetarPaciente, { params: { petId }, cuerpo: { etiqueta } });
 
+/** La ficha de salud de un paciente y su clave, las dos cerradas: se abren en lib de quien llama. */
+export const leerFichaPaciente = (petId: string) =>
+  cliente.llamar(c.leerFichaPaciente, { params: { petId }, cache: "no-store" });
+
 export const quitarEtiqueta = (petId: string) => cliente.llamar(c.quitarEtiquetaPaciente, { params: { petId } });
 
 /* ── Los nombres, para todo el equipo ──────────────────────── */

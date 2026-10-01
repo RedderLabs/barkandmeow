@@ -1026,6 +1026,41 @@ describe("portada de la consola: el chip dice qué toca y los pacientes se recon
     await sql`DELETE FROM grants WHERE id = ${doble.id}`;
   });
 
+  it("la clínica recibe la ficha del paciente y su clave, las dos cerradas", async () => {
+    const leer = (petId: string, c: string | null = cookie) =>
+      app.inject({ method: "GET", url: `/clinics/v1/patients/${petId}/record`, headers: c ? { cookie: c } : {} });
+    assert.equal((await leer(pet, null)).statusCode, 401);
+    assert.equal((await leer(randomUUID())).statusCode, 404);
+    assert.equal((await leer("no-es-un-id")).statusCode, 404);
+    // Con sesión de dueño no se entra por la puerta de la clínica.
+    assert.equal((await leer(pet, cookieDueno)).statusCode, 401);
+
+    // El dueño aún no ha escrito la ficha: la clave llega, la ficha no.
+    const vacia = await leer(pet);
+    assert.equal(vacia.statusCode, 200);
+    assert.equal(vacia.json().sobre, null);
+    assert.equal(vacia.json().version, 0);
+    assert.equal(vacia.json().chipPista, "8801");
+    const [g] = await sql`SELECT wrapped_key FROM grants WHERE id = ${grantId}`;
+    assert.equal(vacia.json().claveEnvuelta, (g.wrapped_key as Buffer).toString("base64"));
+
+    const ficha = b64(700);
+    const guardada = await app.inject({
+      method: "PUT",
+      url: `/owners/v1/pets/${pet}/record`,
+      headers: { cookie: cookieDueno },
+      payload: { sobre: ficha, version: 0 },
+    });
+    assert.equal(guardada.statusCode, 200);
+    const llena = (await leer(pet)).json();
+    assert.equal(llena.sobre, ficha);
+    assert.equal(llena.version, 1);
+
+    // Queda apuntado que la clínica la abrió.
+    const [n] = await sql`SELECT count(*)::int AS n FROM access_log WHERE action = 'ficha_nivel3'`;
+    assert.equal(n.n, 2);
+  });
+
   it("la etiqueta entra y sale tal cual: el servidor no la toca", async () => {
     const primera = b64(297);
     assert.equal((await etiquetar(pet, primera)).statusCode, 200);
@@ -1064,6 +1099,9 @@ describe("portada de la consola: el chip dice qué toca y los pacientes se recon
     const quedan = await sql`SELECT 1 FROM etiquetas_paciente WHERE pet_id = ${pet}`;
     assert.equal(quedan.length, 0);
     assert.equal((await etiquetar(pet, b64(297))).statusCode, 404);
+    // Y la ficha deja de salir por la puerta de la clínica.
+    const ficha = await app.inject({ method: "GET", url: `/clinics/v1/patients/${pet}/record`, headers: { cookie } });
+    assert.equal(ficha.statusCode, 404);
   });
 });
 

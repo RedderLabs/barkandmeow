@@ -283,7 +283,7 @@
 
 .fila {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 7rem 9.5rem 8.5rem;
+  grid-template-columns: minmax(0, 1fr) 7rem 9.5rem 8.5rem auto;
   gap: var(--s-lg);
   align-items: center;
   min-height: 60px;
@@ -412,6 +412,148 @@
   line-height: 1.55;
   color: var(--ink-soft);
   max-width: 62ch;
+}
+
+.celdaFicha {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Ficha de un paciente ─────────────────────────────────── */
+
+.pacienteCabecera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-xs);
+}
+.pacienteCabecera .enlace {
+  align-self: flex-start;
+}
+.pacienteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-xs) var(--s-xl);
+  font-family: var(--font-data);
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* El único relleno saturado del sistema: las alergias, en voz alta. Solo
+   existe si hay alguna: un rojo que dice «ninguna» enseña a ignorar el rojo. */
+.alergiasAlto {
+  padding: var(--s-xl);
+  border-radius: var(--r-panel);
+  background: var(--alert);
+  color: var(--alert-on);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-md);
+}
+.alergiasAltoTitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.alergiasAltoLista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.alergiasAltoLista li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-md) 0;
+  border-top: 1px solid rgb(255 255 255 / 0.3);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.alergiasAltoLista li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.alergiasAltoLista li:last-child {
+  padding-bottom: 0;
+}
+.alergiasAltoSustancia {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* Etiqueta muda sobre dato, como una ficha impresa. */
+.fichaDatos {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fichaDatos > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--s-md) 0;
+  border-top: 1px solid var(--divider);
+}
+.fichaDatos > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.fichaDatos dt {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.fichaDatos dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.fichaLinea {
+  display: block;
+}
+.fichaMono {
+  font-family: var(--font-data);
+  font-size: 15px;
+  font-weight: 400;
+}
+.fichaDatosRejilla {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-lg) var(--s-section);
+}
+.fichaDatosRejilla > div,
+.fichaDatosRejilla > div:first-child {
+  border-top: 0;
+  padding: 0;
+}
+
+/* De dónde sale el dato: lo declarado por el dueño no pesa como un informe. */
+.procedencia {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-sm);
+  font-size: 13px;
+  color: var(--muted);
+}
+.procedenciaInsignia {
+  padding: 3px 8px;
+  border-radius: var(--r-badge);
+  background: var(--owner-soft);
+  color: var(--owner);
+  font-size: 12px;
 }
 
 /* ── Columna del software de gestión ──────────────────────── */
@@ -592,6 +734,13 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: var(--s-sm);
+  }
+  .celdaFicha {
+    justify-content: flex-start;
+    padding-top: var(--s-xs);
+  }
+  .fichaDatosRejilla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .dato::before {
     content: attr(data-etiqueta);

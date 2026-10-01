@@ -3514,6 +3514,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
       x-acceso: clinica
+  /clinics/v1/patients/{petId}/record:
+    get:
+      tags:
+        - Clínica
+      summary: "La ficha de salud de un paciente, tal como la guardó su dueño: cifrada con la clave de la mascota. Va con esa clave envuelta para la clave pública de la clínica, que el dueño subió al dar el nivel 3. El servidor entrega dos bloques que no puede abrir; sin nivel 3 vivo, 404."
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  sobre:
+                    type:
+                      - string
+                      - "null"
+                  version:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                  claveEnvuelta:
+                    type:
+                      - string
+                      - "null"
+                  chipPista:
+                    type:
+                      - string
+                      - "null"
+                  desde:
+                    type: string
+                    format: date-time
+                    pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+                required:
+                  - sobre
+                  - version
+                  - claveEnvuelta
+                  - chipPista
+                  - desde
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
   /clinics/v1/patients/{petId}/label:
     put:
       tags:
