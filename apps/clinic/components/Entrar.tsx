@@ -89,7 +89,7 @@ export function Entrar() {
       <aside className={`${ui.panel} ${ui.readingAside}`}>
         <h2 className={ui.panelTitle}>¿Tu clínica aún no está?</h2>
         <p className={ui.panelNote}>
-          Regístrala en unos minutos. Si te han invitado, usa el enlace que te llegó por
+          Regístrala en unos minutos. Si te han añadido a un equipo, usa el enlace que te llegó por
           correo.
         </p>
         <Button asChild variant="outline" size="md">

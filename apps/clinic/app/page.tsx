@@ -26,6 +26,7 @@ export default async function Page() {
       <Portada
         clinicId={yo.clinicId}
         pubKeyClinica={yo.clinica.pubKey}
+        esAdmin={yo.role === "admin"}
         activa={yo.clinicaActiva}
         pacientes={pacientes}
         envios={envios}
@@ -35,7 +36,7 @@ export default async function Page() {
             {!yo.clinicaActiva && (
               <div className={styles.pendingNote} role="status">
                 La clínica aún no está activa: confirma el correo del administrador para activar
-                mascotas, pedir altas e invitar al equipo. <Link href="/verificar">Confirmar el correo</Link>
+                mascotas, pedir altas y añadir gente al equipo. <Link href="/verificar">Confirmar el correo</Link>
               </div>
             )}
             {yo.role === "admin" && (

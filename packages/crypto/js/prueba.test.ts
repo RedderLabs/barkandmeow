@@ -117,3 +117,37 @@ test("la etiqueta de un paciente: solo la abre su clínica, atada al paciente y 
   const ajena = claveEtiquetas(cripto, claveDeClinica(cripto, (await nuevoCodigo()).semilla).secreta);
   assert.equal(abrirEtiqueta(cripto, ajena, "clinica-1", "pet-1", corta), null);
 });
+
+test("la clave de las etiquetas llega a un navegador del equipo solo si viene de su clínica", async () => {
+  const { claveEtiquetas, entregarClaveEtiquetas, recibirClaveEtiquetas } = await import("./index.ts");
+  const clinica = claveDeClinica(cripto, (await nuevoCodigo()).semilla);
+  const dispositivo = crypto.getRandomValues(new Uint8Array(32));
+  const publicaDispositivo = cripto.publica(dispositivo);
+
+  const sellada = entregarClaveEtiquetas(cripto, clinica.secreta, publicaDispositivo);
+  assert.equal(sellada.length, 80);
+  // Los primeros 32 bytes son la pública de la clínica: de ahí sabe el navegador quién se la da.
+  assert.deepEqual(sellada.subarray(0, 32), clinica.publica);
+  assert.deepEqual(
+    recibirClaveEtiquetas(cripto, dispositivo, clinica.publica, sellada),
+    claveEtiquetas(cripto, clinica.secreta),
+  );
+
+  // Otro navegador no la abre.
+  const otro = crypto.getRandomValues(new Uint8Array(32));
+  assert.equal(recibirClaveEtiquetas(cripto, otro, clinica.publica, sellada), null);
+
+  // Alguien sin la secreta de la clínica (el servidor, por ejemplo) le sella otra clave.
+  const falsa = cripto.sellar(publicaDispositivo, crypto.getRandomValues(new Uint8Array(32)));
+  assert.equal(falsa.length, 80);
+  assert.equal(recibirClaveEtiquetas(cripto, dispositivo, clinica.publica, falsa), null);
+  // Y si además le pega delante la pública de la clínica, el sello no cuadra.
+  const pegada = new Uint8Array(falsa);
+  pegada.set(clinica.publica);
+  assert.equal(recibirClaveEtiquetas(cripto, dispositivo, clinica.publica, pegada), null);
+
+  // La de otra clínica tampoco vale para esta.
+  const ajena = claveDeClinica(cripto, (await nuevoCodigo()).semilla);
+  const deOtra = entregarClaveEtiquetas(cripto, ajena.secreta, publicaDispositivo);
+  assert.equal(recibirClaveEtiquetas(cripto, dispositivo, clinica.publica, deOtra), null);
+});

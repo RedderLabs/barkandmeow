@@ -300,3 +300,21 @@ export const recuperacionMiembroBody = z.object({ email: z.string().email().max(
 /** Lo que firma el dueño: separa el uso y ata la firma a esta recuperación. */
 export const mensajeRecuperacion = (recuperacionId: string, reto: string) =>
   `bm:dueno:recuperacion:v1\n${recuperacionId}\n${reto}`;
+
+/* ── Nombres de pacientes para todo el equipo ─────────────── */
+
+/** El navegador de un miembro se presenta con su clave pública X25519. */
+export const dispositivoClinicaBody = z.object({ devicePubKey: clavePublica32 });
+
+/** La clave de las etiquetas, cifrada de la clínica a cada dispositivo (80 bytes). */
+export const entregaEtiquetasBody = z.object({
+  entregas: z
+    .array(
+      z.object({
+        dispositivoId: z.string().uuid(),
+        sellada: base64.refine((s) => s.length === 108, "80 bytes"),
+      }),
+    )
+    .min(1)
+    .max(50),
+});

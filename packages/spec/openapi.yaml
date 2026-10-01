@@ -2628,7 +2628,7 @@ paths:
     post:
       tags:
         - Clínica
-      summary: Un administrador invita por correo a un miembro nuevo.
+      summary: "Un administrador añade a alguien al equipo: le llega un correo para elegir su contraseña."
       security: *a3
       requestBody:
         required: true
@@ -2788,7 +2788,7 @@ paths:
     post:
       tags:
         - Clínica
-      summary: Acepta la invitación con el token del correo, elige contraseña y abre sesión.
+      summary: Quien ha sido añadido al equipo elige su contraseña con el token del correo y abre sesión.
       requestBody:
         required: true
         content:
@@ -3369,6 +3369,168 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/me/devices:
+    post:
+      tags:
+        - Clínica
+      summary: "El navegador de un miembro se presenta con su clave pública. Devuelve la clave de las etiquetas cifrada para él, si un administrador ya se la dejó. Se puede repetir: no duplica."
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                devicePubKey:
+                  type: string
+                  pattern: ^[A-Za-z0-9+/]+={0,2}$
+              required:
+                - devicePubKey
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  claveEtiquetas:
+                    type:
+                      - string
+                      - "null"
+                required:
+                  - claveEtiquetas
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/label-keys/pending:
+    get:
+      tags:
+        - Clínica
+      summary: "Para un administrador: los navegadores del equipo que aún no pueden leer los nombres de los pacientes."
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  dispositivos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        devicePubKey:
+                          type: string
+                      required:
+                        - id
+                        - devicePubKey
+                      additionalProperties: false
+                required:
+                  - dispositivos
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/label-keys:
+    post:
+      tags:
+        - Clínica
+      summary: Un administrador deja la clave de las etiquetas cifrada para cada navegador del equipo. Solo abre nombres de pacientes, nunca una ficha.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                entregas:
+                  minItems: 1
+                  maxItems: 50
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      dispositivoId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      sellada:
+                        type: string
+                        pattern: ^[A-Za-z0-9+/]+={0,2}$
+                    required:
+                      - dispositivoId
+                      - sellada
+              required:
+                - entregas
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  entregadas:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - entregadas
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
           content:
             application/json:
               schema:

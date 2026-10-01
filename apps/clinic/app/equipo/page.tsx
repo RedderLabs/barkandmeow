@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ui from "@barkandmeow/ui-web/ui.module.css";
 import { AppHeader, IconAlert, IconInvite } from "@barkandmeow/ui-web/parts";
+import { AnadirMiembro } from "@/components/AnadirMiembro";
 import { BajaMiembro } from "@/components/BajaMiembro";
 import { EntregarClave } from "@/components/Custodia";
-import { InvitarForm } from "@/components/InvitarForm";
 import { apiServidor, exigirSesion } from "@/lib/servidor";
 import { api } from "@barkandmeow/schema/api";
 import type { Rol } from "@barkandmeow/schema";
@@ -46,14 +46,14 @@ export default async function Equipo() {
             <h1 className={ui.sectionTitle}>Equipo</h1>
             <span className={ui.sectionMeta}>
               {activos} {activos === 1 ? "activo" : "activos"}
-              {miembros.length > activos && ` · ${miembros.length - activos} sin aceptar`}
+              {miembros.length > activos && ` · ${miembros.length - activos} sin entrar todavía`}
             </span>
           </div>
 
           {!yo.clinicaActiva && (
             <div className={`${ui.pendingBlock} ${ui.stacked}`} role="status">
               La clínica aún no está activa: confirma el correo del administrador para poder
-              invitar al equipo. <Link href="/verificar">Confirmar el correo</Link>
+              añadir a nadie al equipo. <Link href="/verificar">Confirmar el correo</Link>
             </div>
           )}
 
@@ -65,7 +65,7 @@ export default async function Equipo() {
               <p className={ui.panelNote}>
                 La clave de la clínica solo está en el navegador de un administrador y en su
                 código en papel. Si se pierden los dos, se pierden todos los permisos
-                concedidos y cada dueño tendría que autorizaros otra vez, uno por uno. Invita a
+                concedidos y cada dueño tendría que autorizaros otra vez, uno por uno. Añade a
                 un segundo administrador y entrégale la clave.
               </p>
             </div>
@@ -85,7 +85,7 @@ export default async function Equipo() {
                     </div>
                   </div>
                   <div className={ui.actions}>
-                    {!m.aceptado && <span className={`${ui.tag} ${ui.tagPending}`}>SIN ACEPTAR</span>}
+                    {!m.aceptado && <span className={`${ui.tag} ${ui.tagPending}`}>AÚN NO HA ENTRADO</span>}
                     {m.custodia === "pendiente" && (
                       <span className={`${ui.tag} ${ui.tagPending}`}>SIN CLAVE</span>
                     )}
@@ -114,14 +114,14 @@ export default async function Equipo() {
           </div>
         </section>
 
-        <aside className={ui.panel} id="invitar">
+        <aside className={ui.panel} id="anadir">
           <h2 className={ui.panelTitle}>
-            <IconInvite /> Invitar
+            <IconInvite /> Añadir a alguien
           </h2>
           {esAdmin ? (
-            <InvitarForm rolInicial={custodios < 2 ? "admin" : "vet"} activa={yo.clinicaActiva} />
+            <AnadirMiembro rolInicial={custodios < 2 ? "admin" : "vet"} activa={yo.clinicaActiva} />
           ) : (
-            <p className={ui.panelNote}>Solo un administrador puede invitar al equipo.</p>
+            <p className={ui.panelNote}>Solo un administrador puede añadir a alguien al equipo.</p>
           )}
         </aside>
       </main>

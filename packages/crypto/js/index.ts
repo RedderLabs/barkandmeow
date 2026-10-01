@@ -42,6 +42,11 @@ export type Cripto = {
   cerrarDocumento(clave: Uint8Array, ad: string, texto: Uint8Array): Uint8Array;
   /** Sella para una clave pública X25519: solo su dueño lo abre. */
   sellar(destino: Uint8Array, texto: Uint8Array): Uint8Array;
+  /** Cifra de una clave secreta X25519 a una pública: quien lo abre sabe de
+      quién viene, porque los primeros 32 bytes son la pública del remitente y
+      sin su secreta no se puede fabricar. Para el mismo par y el mismo texto
+      sale siempre igual: solo para entregar una clave fija, no mensajes. */
+  sellarDesde(secreta: Uint8Array, destino: Uint8Array, texto: Uint8Array): Uint8Array;
   /** Abre lo sellado con la clave secreta X25519 (lado del dueño). */
   abrirSellado(secreta: Uint8Array, sellado: Uint8Array): Uint8Array;
   /** Clave pública X25519 de una secreta. */
@@ -149,6 +154,11 @@ export async function cargarCripto(
       exigir(destino, 32, "clave pública");
       return llamar([{ b: destino, fijo: true }, { b: azar(32), fijo: true }, { b: t }], w.bm_sellar);
     },
+    sellarDesde(secreta, destino, t) {
+      exigir(secreta, 32, "clave secreta");
+      exigir(destino, 32, "clave pública");
+      return llamar([{ b: destino, fijo: true }, { b: secreta, fijo: true }, { b: t }], w.bm_sellar);
+    },
   };
 }
 
@@ -249,6 +259,35 @@ const ETIQUETA_BYTES = 256;
 
 export const claveEtiquetas = (cripto: Cripto, secretaClinica: Uint8Array) =>
   cripto.derivar(secretaClinica, "bm:clinica:etiquetas:v1");
+
+/* Los nombres los lee todo el equipo, no solo quien tiene la clave de la
+   clínica. Un administrador entrega la clave de las etiquetas a cada navegador
+   cifrándola de la clínica al dispositivo: el navegador comprueba que viene de
+   la clave pública de su clínica antes de usarla, así que nadie sin la secreta
+   de la clínica puede colarle otra. */
+
+/** La clave de las etiquetas para un navegador del equipo: 80 bytes. */
+export const entregarClaveEtiquetas = (cripto: Cripto, secretaClinica: Uint8Array, dispositivo: Uint8Array) =>
+  cripto.sellarDesde(secretaClinica, dispositivo, claveEtiquetas(cripto, secretaClinica));
+
+/** La clave de las etiquetas que dejó un administrador, o null si no viene de
+    la clínica o no es para este dispositivo. */
+export function recibirClaveEtiquetas(
+  cripto: Cripto,
+  secretaDispositivo: Uint8Array,
+  publicaClinica: Uint8Array,
+  sellada: Uint8Array,
+): Uint8Array | null {
+  if (sellada.length !== 80 || publicaClinica.length !== 32) return null;
+  if (!publicaClinica.every((x, i) => x === sellada[i])) return null;
+  try {
+    const clave = cripto.abrirSellado(secretaDispositivo, sellada);
+    return clave.length === 32 ? clave : null;
+  } catch (e) {
+    if (e instanceof ErrorCripto) return null;
+    throw e;
+  }
+}
 
 /** Normaliza lo tecleado: sin espacios de más y sin pasar del tope. */
 export const limpiarEtiqueta = (texto: string) =>

@@ -128,7 +128,7 @@ export function CustodiaClave({
       </h2>
       <p className={ui.panelNote}>
         Sin ella no podréis abrir las fichas que los dueños os autoricen. Si tienes el
-        código de recuperación en papel, escríbelo aquí. Si te invitaron como
+        código de recuperación en papel, escríbelo aquí. Si te añadieron como
         administrador, pide a otro administrador que te la entregue desde Equipo.
       </p>
       <form className="flex flex-col gap-3" onSubmit={recuperar} noValidate>

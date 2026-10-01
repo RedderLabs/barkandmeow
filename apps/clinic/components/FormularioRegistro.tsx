@@ -481,13 +481,13 @@ function VerificarCorreo({
               <strong>
                 <IconCheck /> Clínica creada y clave guardada en este navegador
               </strong>
-              Falta confirmar el correo para activarla: hasta entonces no puedes invitar al
-              equipo ni pedir acceso a fichas.
+              Falta confirmar el correo para activarla: hasta entonces no puedes añadir a
+              nadie al equipo ni pedir acceso a fichas.
             </div>
           ) : (
             <div className={ui.pendingBlock} role="status">
               Falta confirmar el correo para activar la clínica: hasta entonces no puedes
-              invitar al equipo ni pedir acceso a fichas.
+              añadir a nadie al equipo ni pedir acceso a fichas.
             </div>
           )}
 
@@ -605,7 +605,7 @@ function ClinicaCreada({ resultado }: { resultado: CorreoVerificado }) {
         </p>
         <div className="flex flex-col gap-3">
           <Button asChild>
-            <Link href="/equipo">Invitar a un segundo administrador</Link>
+            <Link href="/equipo">Añadir a un segundo administrador</Link>
           </Button>
           <Button asChild variant="outline" size="md">
             <Link href="/">Ir a la consola</Link>

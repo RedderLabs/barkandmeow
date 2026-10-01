@@ -99,6 +99,13 @@
       "when": 1790865043157,
       "tag": "0013_etiquetas_paciente",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790868467918,
+      "tag": "0014_dispositivos_miembro",
+      "breakpoints": true
     }
   ]
 }

@@ -451,6 +451,26 @@ export const etiquetasPaciente = pgTable(
   (t) => [primaryKey({ columns: [t.clinicId, t.petId] })],
 );
 
+/* Navegadores desde los que entra cada miembro (decidido 2026-10-01: los
+   nombres de los pacientes los lee todo el equipo, no solo los
+   administradores). Cada navegador tiene su par X25519 y aquí va la pública.
+   Un administrador con la clave de la clínica le deja en `claveEtiquetas` la
+   clave de las etiquetas, cifrada de clínica a dispositivo: el servidor la
+   guarda sin poder abrirla. Esa clave solo abre nombres, nunca una ficha. */
+export const dispositivosMiembro = pgTable(
+  "dispositivos_miembro",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    memberId: uuid("member_id")
+      .references(() => clinicMembers.id, { onDelete: "cascade" })
+      .notNull(),
+    pubKey: bytea("pub_key").notNull(),
+    claveEtiquetas: bytea("clave_etiquetas"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("dispositivos_miembro_uq").on(t.memberId, t.pubKey)],
+);
+
 /* Ficha preparada por la clínica para un dueño que todavía no usa Bark & Meow.
    Cifrada con la clave de la clínica y caducada a 90 días. No responde a
    búsquedas de nivel 0 hasta que el dueño la reclama. */

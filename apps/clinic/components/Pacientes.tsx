@@ -123,7 +123,9 @@ export function Pacientes({
   nombreDe,
   onNombre,
   destacado,
+  esAdmin,
 }: {
+  esAdmin: boolean;
   pacientes: PacienteConsola[];
   etiquetas: Etiquetas;
   nombreDe: (p: PacienteConsola) => string | null;
@@ -137,7 +139,6 @@ export function Pacientes({
   const [ahora] = useState(() => Date.now());
   const ids = useId();
   const conClave = etiquetas.estado === "con-clave";
-  const hayCifradas = pacientes.some((p) => p.etiqueta);
 
   const visibles = useMemo(() => {
     const q = plano(busca.trim());
@@ -186,11 +187,12 @@ export function Pacientes({
         )}
       </div>
 
-      {etiquetas.estado === "sin-clave" && hayCifradas && (
-        <p className={s.avisoClave}>
+      {etiquetas.estado === "esperando" && pacientes.length > 0 && (
+        <p className={s.avisoClave} role="status">
           <IconSealed />
-          Los nombres de los pacientes están cifrados con la clave de la clínica, y este navegador no la
-          tiene. Se leen en el de un administrador.
+          {esAdmin
+            ? "Los nombres de los pacientes van cifrados. Para leerlos y escribirlos aquí, recupera arriba la clave de la clínica con el código en papel."
+            : "Los nombres de los pacientes van cifrados. Este navegador podrá leerlos y escribirlos en cuanto un administrador abra la consola: no tienes que hacer nada más."}
         </p>
       )}
 

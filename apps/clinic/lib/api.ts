@@ -51,6 +51,17 @@ export const guardarEtiqueta = (petId: string, etiqueta: string) =>
 
 export const quitarEtiqueta = (petId: string) => cliente.llamar(c.quitarEtiquetaPaciente, { params: { petId } });
 
+/* ── Los nombres, para todo el equipo ──────────────────────── */
+
+/** Este navegador se presenta; vuelve la clave de las etiquetas si ya se la dejaron. */
+export const presentarDispositivo = (devicePubKey: string) =>
+  cliente.llamar(c.registrarDispositivo, { cuerpo: { devicePubKey }, cache: "no-store" });
+
+export const clavesPendientes = () => cliente.llamar(c.dispositivosSinClave, { cache: "no-store" });
+
+export const entregarClaves = (entregas: { dispositivoId: string; sellada: string }[]) =>
+  cliente.llamar(c.entregarClaveEtiquetas, { cuerpo: { entregas } });
+
 /* ── Alta de nivel 3 ───────────────────────────────────────── */
 
 export const pedirAlta = (identificador: Identificador, vetPubKey: string) =>
@@ -74,7 +85,8 @@ export const terminarRecuperacion = (recuperacionId: string, codigo: string, pas
 export const aceptarInvitacion = (token: string, password: string, devicePubKey: string) =>
   cliente.llamar(c.aceptarInvitacion, { cuerpo: { token, password, devicePubKey } });
 
-export const invitar = (nombre: string, email: string, rol: Rol) =>
+/** Añade a alguien al equipo: le llega un correo para elegir su contraseña. */
+export const anadirMiembro = (nombre: string, email: string, rol: Rol) =>
   cliente.llamar(c.invitarMiembro, { cuerpo: { nombre, email, rol } });
 
 export const darDeBaja = (id: string) => cliente.llamar(c.darDeBajaMiembro, { params: { id } });

@@ -21,6 +21,7 @@ const ENVIOS_VISIBLES = 6;
 export function Portada({
   clinicId,
   pubKeyClinica,
+  esAdmin,
   activa,
   pacientes,
   envios,
@@ -29,6 +30,8 @@ export function Portada({
 }: {
   clinicId: string;
   pubKeyClinica: string;
+  /** Un administrador con la clave reparte la de los nombres al resto del equipo. */
+  esAdmin: boolean;
   activa: boolean;
   pacientes: PacienteConsola[];
   envios: Envio[];
@@ -38,7 +41,7 @@ export function Portada({
   avisos?: ReactNode;
 }) {
   const router = useRouter();
-  const etiquetas = useEtiquetas(clinicId, pubKeyClinica);
+  const etiquetas = useEtiquetas(clinicId, pubKeyClinica, esAdmin);
   /* Lo que se acaba de escribir se ve al momento, sin esperar a que el
      servidor devuelva la lista: null es «se ha quitado». */
   const [propias, setPropias] = useState<Record<string, string | null>>({});
@@ -77,6 +80,7 @@ export function Portada({
           onNombre={onNombre}
         />
         <Pacientes
+          esAdmin={esAdmin}
           pacientes={pacientes}
           etiquetas={etiquetas}
           nombreDe={nombreDe}

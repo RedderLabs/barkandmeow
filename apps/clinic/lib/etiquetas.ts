@@ -7,56 +7,112 @@ import {
   cerrarEtiqueta,
   claveEtiquetas,
   deBase64,
+  entregarClaveEtiquetas,
+  recibirClaveEtiquetas,
   type Cripto,
 } from "@barkandmeow/crypto";
-import { leerClaves } from "@/lib/claves";
+import { clavesPendientes, entregarClaves, presentarDispositivo } from "@/lib/api";
+import { guardarClaves, leerClaves } from "@/lib/claves";
 import { CLAVE_LISTA, cripto, igual } from "@/lib/cripto";
 
-/* Las etiquetas de los pacientes se abren y se cierran aquí, en el navegador,
-   con una clave que sale de la clave de la clínica. Un navegador que no la
-   tiene ve que hay etiqueta, pero no lo que dice. */
+/* Las etiquetas de los pacientes se abren y se cierran aquí, en el navegador.
+
+   La clave con que se cifran sale de la clave de la clínica, que solo tienen
+   los administradores. El resto del equipo la recibe de ellos: cada navegador
+   se presenta con su clave pública y, la próxima vez que un administrador abre
+   la consola, su navegador le deja la clave de las etiquetas cifrada para él.
+   No hay que pulsar nada. Hasta entonces el navegador ve que hay nombre, pero
+   no lo que dice. */
 
 export type Etiquetas = {
-  /** `sin-clave`: este navegador no tiene la clave de la clínica. */
-  estado: "mirando" | "con-clave" | "sin-clave";
+  /** `esperando`: este navegador aún no ha recibido la clave de un administrador. */
+  estado: "mirando" | "con-clave" | "esperando";
   /** El texto de una etiqueta, o null si no hay o no se puede abrir. */
   abrir(petId: string, sellada: string | null): string | null;
   /** La etiqueta cifrada, en base64, lista para enviar. */
   cerrar(petId: string, texto: string): string;
 };
 
-export function useEtiquetas(clinicId: string, pubKeyClinica: string): Etiquetas {
-  const [llave, setLlave] = useState<{ c: Cripto; clave: Uint8Array } | "mirando" | null>("mirando");
+/** Cada cuánto vuelve a preguntar un navegador que espera, y a repartir uno que tiene la clave. */
+const VUELTA_MS = 20_000;
+
+type Llave = { c: Cripto; clave: Uint8Array; secretaClinica: Uint8Array | null };
+
+/** Con la clave de la clínica en la mano, deja la de las etiquetas a los navegadores que esperan. */
+async function repartir(c: Cripto, secretaClinica: Uint8Array) {
+  const { dispositivos } = await clavesPendientes();
+  const entregas = dispositivos.flatMap((d) => {
+    const publica = deBase64(d.devicePubKey);
+    return publica?.length === 32
+      ? [{ dispositivoId: d.id, sellada: aBase64(entregarClaveEtiquetas(c, secretaClinica, publica)) }]
+      : [];
+  });
+  if (entregas.length) await entregarClaves(entregas);
+}
+
+export function useEtiquetas(clinicId: string, pubKeyClinica: string, esAdmin: boolean): Etiquetas {
+  const [llave, setLlave] = useState<Llave | "mirando" | null>("mirando");
 
   useEffect(() => {
     let vivo = true;
+    let reloj: ReturnType<typeof setTimeout> | undefined;
+
     const mirar = async () => {
+      clearTimeout(reloj);
+      let encontrada: Llave | null = null;
       try {
         const c = await cripto();
-        const local = await leerClaves(clinicId).catch(() => null);
         const publica = deBase64(pubKeyClinica);
-        // Una clave que no corresponde a esta clínica no sirve para nada.
-        const vale = !!local?.clinica && igual(c.publica(local.clinica), publica);
-        if (vivo) setLlave(vale ? { c, clave: claveEtiquetas(c, local.clinica!) } : null);
+        if (!publica) throw new Error("clave pública de la clínica inválida");
+        let local = await leerClaves(clinicId).catch(() => null);
+
+        if (local?.clinica && igual(c.publica(local.clinica), publica)) {
+          // Administrador con la clave de la clínica: la de las etiquetas sale de ella.
+          encontrada = { c, clave: claveEtiquetas(c, local.clinica), secretaClinica: local.clinica };
+        } else {
+          // El resto: este navegador se presenta y recoge la clave si ya se la dejaron.
+          if (!local) {
+            local = {
+              clinicId,
+              clinica: null,
+              dispositivo: crypto.getRandomValues(new Uint8Array(32)),
+              guardada: new Date().toISOString(),
+            };
+            await guardarClaves(local);
+          }
+          const r = await presentarDispositivo(aBase64(c.publica(local.dispositivo)));
+          const sellada = r.claveEtiquetas ? deBase64(r.claveEtiquetas) : null;
+          const clave = sellada ? recibirClaveEtiquetas(c, local.dispositivo, publica, sellada) : null;
+          if (clave) encontrada = { c, clave, secretaClinica: null };
+        }
       } catch {
-        if (vivo) setLlave(null);
+        // Sin red o sin almacén: se queda esperando y lo reintenta.
       }
+      if (!vivo) return;
+      setLlave(encontrada);
+
+      if (encontrada?.secretaClinica && esAdmin)
+        await repartir(encontrada.c, encontrada.secretaClinica).catch(() => undefined);
+      // Quien espera vuelve a preguntar; quien reparte vuelve a mirar si alguien se ha presentado.
+      if (vivo && (!encontrada || (encontrada.secretaClinica && esAdmin))) reloj = setTimeout(mirar, VUELTA_MS);
     };
+
     void mirar();
     window.addEventListener(CLAVE_LISTA, mirar);
     return () => {
       vivo = false;
+      clearTimeout(reloj);
       window.removeEventListener(CLAVE_LISTA, mirar);
     };
-  }, [clinicId, pubKeyClinica]);
+  }, [clinicId, pubKeyClinica, esAdmin]);
 
   return useMemo<Etiquetas>(() => {
     if (llave === "mirando" || !llave)
       return {
-        estado: llave === "mirando" ? "mirando" : "sin-clave",
+        estado: llave === "mirando" ? "mirando" : "esperando",
         abrir: () => null,
         cerrar: () => {
-          throw new Error("este navegador no tiene la clave de la clínica");
+          throw new Error("este navegador aún no tiene la clave de los nombres");
         },
       };
     const { c, clave } = llave;

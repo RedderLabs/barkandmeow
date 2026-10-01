@@ -17,7 +17,7 @@ const b64 = (b: Uint8Array) => {
   return btoa(s);
 };
 
-/* Aceptar la invitación del correo. Este navegador genera la clave de su
+/* Quien ha sido añadido al equipo elige aquí su contraseña, desde el enlace del correo. Este navegador genera la clave de su
    dispositivo; al servidor solo va la pública. Si la persona es
    administradora, otro administrador le entregará la clave de la clínica
    sellada para ese dispositivo. */
@@ -45,7 +45,7 @@ export function Aceptar({ token }: { token: string }) {
     } catch (e) {
       setError(
         e instanceof ErrorApi && e.estado === 400
-          ? "Esta invitación ya se usó o ya no es válida. Pide otra a un administrador de la clínica."
+          ? "Este enlace ya se usó o ha caducado. Pide a un administrador de la clínica que te añada de nuevo."
           : "No hay conexión con Bark & Meow. Vuelve a intentarlo.",
       );
       setEnviando(false);
@@ -56,10 +56,10 @@ export function Aceptar({ token }: { token: string }) {
     return (
       <main className={ui.reading}>
         <div className={ui.readingMain}>
-          <h1 className={ui.pageTitle}>Falta la invitación</h1>
+          <h1 className={ui.pageTitle}>Falta parte del enlace</h1>
           <div className={ui.alertBlock} role="alert">
             <strong>El enlace está incompleto.</strong>
-            Ábrelo desde el correo de invitación, sin copiarlo a mano.
+            Ábrelo desde el correo que te llegó, sin copiarlo a mano.
           </div>
         </div>
       </main>
@@ -69,8 +69,11 @@ export function Aceptar({ token }: { token: string }) {
     <main className={ui.reading}>
       <div className={ui.readingMain}>
         <div>
-          <h1 className={ui.pageTitle}>Unirte a la clínica</h1>
-          <p className={ui.lede}>Elige tu contraseña para entrar en Bark & Meow.</p>
+          <h1 className={ui.pageTitle}>Elige tu contraseña</h1>
+          <p className={ui.lede}>
+            Tu clínica te ha añadido a su equipo en Bark & Meow. Con esta contraseña y tu correo
+            entrarás a partir de ahora.
+          </p>
         </div>
         <form className={ui.panel} onSubmit={alEnviar} noValidate>
           <div className={ui.field}>
@@ -100,7 +103,7 @@ export function Aceptar({ token }: { token: string }) {
           )}
           <div className={ui.actions}>
             <Button type="submit" disabled={enviando}>
-              {enviando ? "Uniéndote…" : "Aceptar la invitación"}
+              {enviando ? "Entrando…" : "Guardar y entrar"}
             </Button>
           </div>
         </form>

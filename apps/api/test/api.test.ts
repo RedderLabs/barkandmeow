@@ -3,7 +3,7 @@ import { generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto"
 import { after, before, describe, it } from "node:test";
 import { crearCliente } from "@barkandmeow/db";
 import { crearApp } from "../src/index.js";
-import { cerrarDb, indexar, usarCartero, type Carta } from "../src/core.js";
+import { cerrarDb, hashToken, indexar, usarCartero, type Carta } from "../src/core.js";
 import { almacenEnMemoria, usarAlmacen } from "../src/almacen.js";
 import { usarPushero } from "../src/push.js";
 import { usarSmsista, type Sms } from "../src/sms.js";
@@ -1064,6 +1064,119 @@ describe("portada de la consola: el chip dice qué toca y los pacientes se recon
     const quedan = await sql`SELECT 1 FROM etiquetas_paciente WHERE pet_id = ${pet}`;
     assert.equal(quedan.length, 0);
     assert.equal((await etiquetar(pet, b64(297))).statusCode, 404);
+  });
+});
+
+describe("los nombres de los pacientes los lee todo el equipo", () => {
+  const correo = "mostrador@prueba.example";
+  const navegador = b64();
+  let cookieVet = "";
+  let vetId = "";
+  let dispositivoId = "";
+  const sellada = b64(80);
+
+  const presentar = (devicePubKey: string, c: string | null) =>
+    app.inject({ method: "POST", url: "/clinics/v1/me/devices", headers: c ? { cookie: c } : {}, payload: { devicePubKey } });
+  const pendientes = (c: string | null) =>
+    app.inject({ method: "GET", url: "/clinics/v1/label-keys/pending", headers: c ? { cookie: c } : {} });
+  const entregar = (entregas: { dispositivoId: string; sellada: string }[], c: string | null) =>
+    app.inject({ method: "POST", url: "/clinics/v1/label-keys", headers: c ? { cookie: c } : {}, payload: { entregas } });
+
+  it("se añade a alguien al equipo y elige su contraseña desde el correo", async () => {
+    const alta = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/members",
+      headers: { cookie },
+      payload: { nombre: "Vet del mostrador", email: correo, rol: "vet" },
+    });
+    assert.equal(alta.statusCode, 201);
+    vetId = alta.json().memberId;
+    const carta = [...buzon].reverse().find((c) => c.para === correo)!;
+    assert.match(carta.asunto, /añadido/);
+    assert.ok(!/invit/i.test(carta.asunto + carta.texto), "el correo sigue hablando de invitaciones");
+
+    const acc = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/members/accept",
+      payload: { token: tokenInvitacion(correo), password: "clave-del-mostrador-larga", devicePubKey: b64() },
+    });
+    assert.equal(acc.statusCode, 200);
+    cookieVet = acc.cookies[0].name + "=" + acc.cookies[0].value;
+  });
+
+  it("sin sesión no hay nada que presentar ni que repartir", async () => {
+    assert.equal((await presentar(navegador, null)).statusCode, 401);
+    assert.equal((await pendientes(null)).statusCode, 401);
+    assert.equal((await entregar([{ dispositivoId: randomUUID(), sellada }], null)).statusCode, 401);
+  });
+
+  it("el navegador de un miembro se presenta y espera; presentarse dos veces no duplica", async () => {
+    assert.equal((await presentar("corta", cookieVet)).statusCode, 400);
+    const r = await presentar(navegador, cookieVet);
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(r.json(), { claveEtiquetas: null });
+    assert.deepEqual((await presentar(navegador, cookieVet)).json(), { claveEtiquetas: null });
+    const filas = await sql`SELECT id FROM dispositivos_miembro WHERE member_id = ${vetId}`;
+    assert.equal(filas.length, 1);
+    dispositivoId = filas[0].id;
+  });
+
+  it("solo un administrador ve quién espera y reparte la clave", async () => {
+    assert.equal((await pendientes(cookieVet)).statusCode, 403);
+    assert.equal((await entregar([{ dispositivoId, sellada }], cookieVet)).statusCode, 403);
+
+    const lista = (await pendientes(cookie)).json().dispositivos;
+    assert.deepEqual(
+      lista.filter((d: { id: string }) => d.id === dispositivoId),
+      [{ id: dispositivoId, devicePubKey: navegador }],
+    );
+  });
+
+  it("el administrador de otra clínica no puede dejarle una clave a este navegador", async () => {
+    const [otra] = await sql`INSERT INTO clinics (name, country, pub_key) VALUES ('Otra clínica', 'ES', ${randomBytes(32)}) RETURNING id`;
+    const [intruso] = await sql`INSERT INTO clinic_members (clinic_id, name, email, role, accepted_at, email_verified_at)
+      VALUES (${otra.id}, 'Admin ajeno', 'admin@otra-etiquetas.example', 'admin', now(), now()) RETURNING id`;
+    const token = b64(32);
+    await sql`INSERT INTO clinic_sessions (member_id, token_hash, expires_at)
+      VALUES (${intruso.id}, ${hashToken(token)}, ${new Date(Date.now() + 864e5)})`;
+    const cookieAjena = `bam_clinic=${token}`;
+
+    assert.deepEqual((await pendientes(cookieAjena)).json(), { dispositivos: [] });
+    const r = await entregar([{ dispositivoId, sellada: b64(80) }], cookieAjena);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().entregadas, 0);
+    assert.deepEqual((await presentar(navegador, cookieVet)).json(), { claveEtiquetas: null });
+    await sql`DELETE FROM clinics WHERE id = ${otra.id}`;
+  });
+
+  it("entregada la clave, el navegador se la lleva tal cual y nadie la pisa después", async () => {
+    // 80 bytes justos: la pública de la clínica, la clave y su sello.
+    assert.equal((await entregar([{ dispositivoId, sellada: b64(48) }], cookie)).statusCode, 400);
+    const r = await entregar([{ dispositivoId, sellada }], cookie);
+    assert.equal(r.statusCode, 200);
+    assert.equal(r.json().entregadas, 1);
+
+    assert.deepEqual((await presentar(navegador, cookieVet)).json(), { claveEtiquetas: sellada });
+    assert.equal((await entregar([{ dispositivoId, sellada: b64(80) }], cookie)).json().entregadas, 0);
+    assert.deepEqual((await presentar(navegador, cookieVet)).json(), { claveEtiquetas: sellada });
+    const quedan = (await pendientes(cookie)).json().dispositivos;
+    assert.ok(!quedan.some((d: { id: string }) => d.id === dispositivoId));
+  });
+
+  it("un miembro tiene pocos navegadores: el más antiguo cede el sitio", async () => {
+    await sql`UPDATE dispositivos_miembro SET created_at = now() - interval '1 day' WHERE id = ${dispositivoId}`;
+    for (let i = 0; i < 5; i++) assert.equal((await presentar(b64(), cookieVet)).statusCode, 200);
+    const filas = await sql`SELECT id FROM dispositivos_miembro WHERE member_id = ${vetId}`;
+    assert.equal(filas.length, 5);
+    assert.ok(!filas.some((f) => f.id === dispositivoId));
+  });
+
+  it("al dar de baja a alguien, sus navegadores dejan de contar", async () => {
+    const r = await app.inject({ method: "DELETE", url: `/clinics/v1/members/${vetId}`, headers: { cookie } });
+    assert.equal(r.statusCode, 200);
+    const filas = await sql`SELECT id FROM dispositivos_miembro WHERE member_id = ${vetId}`;
+    assert.equal(filas.length, 0);
+    assert.equal((await presentar(b64(), cookieVet)).statusCode, 401);
   });
 });
 

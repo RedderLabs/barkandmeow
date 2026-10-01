@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, eq, gt, isNotNull, isNull, lt, sql } from "drizzle-orm";
-import { clinicMembers, clinicSessions, clinics, drafts } from "@barkandmeow/db";
+import { clinicMembers, clinicSessions, clinics, dispositivosMiembro, drafts } from "@barkandmeow/db";
 import {
   clinicKeyBody,
   clinicRegisterBody,
@@ -457,16 +457,16 @@ export default async function rutasClinicas(app: FastifyInstance) {
       await enviarCorreo({
         para: m.email,
         // El asunto no lleva el nombre de la clínica: lo escribe quien se registra.
-        asunto: "Te han invitado a Bark & Meow",
+        asunto: "Te han añadido a un equipo en Bark & Meow",
         texto: [
           `Hola, ${m.name}:`,
           "",
-          `${c.name} te ha dado de alta en Bark & Meow como ${ROL[m.role]}.`,
-          "Para aceptar y elegir tu contraseña, abre este enlace:",
+          `${c.name} te ha añadido a su equipo en Bark & Meow como ${ROL[m.role]}.`,
+          "Para elegir tu contraseña y entrar, abre este enlace:",
           "",
           `    ${enlace}`,
           "",
-          "Si no esperabas esta invitación, ignora este correo: sin aceptarla no se activa nada.",
+          "Si no esperabas este correo, ignóralo: sin elegir contraseña no se activa nada.",
         ].join("\n"),
       });
     } catch {
@@ -564,6 +564,8 @@ export default async function rutasClinicas(app: FastifyInstance) {
     if (!r.length) return reply.code(404).send({ error: "no encontrado" });
 
     await db.delete(clinicSessions).where(eq(clinicSessions.memberId, id));
+    // Sus navegadores dejan de recibir la clave de los nombres de pacientes.
+    await db.delete(dispositivosMiembro).where(eq(dispositivosMiembro.memberId, id));
     return { ok: true, descargadoNoVuelve: true };
   });
 

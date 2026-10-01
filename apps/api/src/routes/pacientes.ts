@@ -1,7 +1,16 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq, gt, inArray, isNull, max, notExists, or, sql } from "drizzle-orm";
-import { accessLog, envios, etiquetasPaciente, grants, petIdentifiers, pets } from "@barkandmeow/db";
-import { chipClinicaBody, etiquetaBody, normalizarChip } from "@barkandmeow/schema";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, max, notExists, or, sql } from "drizzle-orm";
+import {
+  accessLog,
+  clinicMembers,
+  dispositivosMiembro,
+  envios,
+  etiquetasPaciente,
+  grants,
+  petIdentifiers,
+  pets,
+} from "@barkandmeow/db";
+import { chipClinicaBody, dispositivoClinicaBody, entregaEtiquetasBody, etiquetaBody, normalizarChip } from "@barkandmeow/schema";
 import { db, indexar } from "../core.js";
 import { sesionDe } from "./clinics.js";
 
@@ -12,6 +21,9 @@ import { sesionDe } from "./clinics.js";
    y una etiqueta que escribe ella («Kira, de Ana»). La etiqueta va cifrada en
    su navegador con una clave que sale de la clave de la clínica: aquí llegan
    y salen bytes opacos, y este archivo no sabe qué dicen. */
+
+/** Navegadores por miembro: el de casa, el del mostrador y alguno más. */
+const DISPOSITIVOS_POR_MIEMBRO = 5;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -191,5 +203,99 @@ export default async function rutasPacientes(app: FastifyInstance) {
       .returning({ petId: etiquetasPaciente.petId });
     if (!r.length) return reply.code(404).send({ error: "sin etiqueta" });
     return { ok: true };
+  });
+
+  /* ── Los nombres, para todo el equipo ──────────────────────
+     La clave de las etiquetas sale de la clave de la clínica, que solo tienen
+     los administradores. Para que el resto del equipo lea los nombres, cada
+     navegador se presenta con su clave pública y un administrador le deja la
+     clave de las etiquetas cifrada de clínica a dispositivo. Aquí solo se
+     guardan y se reparten esos bytes.
+
+     Lo que esto no cubre: el administrador cifra para las claves públicas que
+     esta API le lista. Protege los nombres de una fuga de la base, no de un
+     servidor que mintiera sobre los dispositivos del equipo; es la misma
+     confianza que ya pide entregar la clave de la clínica a otro administrador. */
+
+  /** El navegador se presenta. Si ya le dejaron la clave de las etiquetas, se la lleva. */
+  app.post("/clinics/v1/me/devices", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    const cuerpo = dispositivoClinicaBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const pubKey = Buffer.from(cuerpo.data.devicePubKey, "base64");
+
+    await db.insert(dispositivosMiembro).values({ memberId: s.memberId, pubKey }).onConflictDoNothing();
+    const mios = await db
+      .select({ id: dispositivosMiembro.id, pubKey: dispositivosMiembro.pubKey, clave: dispositivosMiembro.claveEtiquetas })
+      .from(dispositivosMiembro)
+      .where(eq(dispositivosMiembro.memberId, s.memberId))
+      .orderBy(asc(dispositivosMiembro.createdAt));
+    const este = mios.find((d) => d.pubKey.equals(pubKey));
+
+    // Los navegadores más antiguos ceden el sitio; el que se presenta ahora, nunca.
+    const sobran = mios
+      .filter((d) => d.id !== este?.id)
+      .slice(0, Math.max(0, mios.length - DISPOSITIVOS_POR_MIEMBRO));
+    if (sobran.length)
+      await db.delete(dispositivosMiembro).where(
+        inArray(
+          dispositivosMiembro.id,
+          sobran.map((d) => d.id),
+        ),
+      );
+    return { claveEtiquetas: este?.clave ? este.clave.toString("base64") : null };
+  });
+
+  /** Los navegadores del equipo que todavía no pueden leer los nombres. */
+  app.get("/clinics/v1/label-keys/pending", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    if (s.role !== "admin") return reply.code(403).send({ error: "solo un administrador reparte la clave" });
+    const filas = await db
+      .select({ id: dispositivosMiembro.id, pubKey: dispositivosMiembro.pubKey })
+      .from(dispositivosMiembro)
+      .innerJoin(clinicMembers, eq(clinicMembers.id, dispositivosMiembro.memberId))
+      .where(
+        and(
+          eq(clinicMembers.clinicId, s.clinicId),
+          isNull(clinicMembers.revokedAt),
+          isNotNull(clinicMembers.acceptedAt),
+          isNull(dispositivosMiembro.claveEtiquetas),
+        ),
+      )
+      .limit(50);
+    return { dispositivos: filas.map((f) => ({ id: f.id, devicePubKey: f.pubKey.toString("base64") })) };
+  });
+
+  /** Un administrador deja la clave cifrada para cada navegador. Solo a los de su clínica. */
+  app.post("/clinics/v1/label-keys", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    if (s.role !== "admin") return reply.code(403).send({ error: "solo un administrador reparte la clave" });
+    const cuerpo = entregaEtiquetasBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+
+    const delEquipo = db
+      .select({ id: clinicMembers.id })
+      .from(clinicMembers)
+      .where(and(eq(clinicMembers.clinicId, s.clinicId), isNull(clinicMembers.revokedAt)));
+    let entregadas = 0;
+    for (const e of cuerpo.data.entregas) {
+      const r = await db
+        .update(dispositivosMiembro)
+        .set({ claveEtiquetas: Buffer.from(e.sellada, "base64") })
+        .where(
+          and(
+            eq(dispositivosMiembro.id, e.dispositivoId),
+            // Lo ya entregado no se pisa: nadie cambia la clave de otro navegador.
+            isNull(dispositivosMiembro.claveEtiquetas),
+            inArray(dispositivosMiembro.memberId, delEquipo),
+          ),
+        )
+        .returning({ id: dispositivosMiembro.id });
+      entregadas += r.length;
+    }
+    return { entregadas };
   });
 }

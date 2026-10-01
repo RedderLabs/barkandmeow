@@ -15,7 +15,7 @@ import ui from "@barkandmeow/ui-web/ui.module.css";
 import { Button } from "@barkandmeow/ui-web/components/button";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
-import { ErrorApi, invitar } from "@/lib/api";
+import { anadirMiembro, ErrorApi } from "@/lib/api";
 
 /* El rol no es un detalle administrativo: decide quién firma un diagnóstico y
    quién custodia la clave. Por eso cada opción explica lo que concede, cosa
@@ -39,7 +39,7 @@ const ROLES: { valor: Rol; nombre: string; concede: string }[] = [
   },
 ];
 
-export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: Rol; activa: boolean }) {
+export function AnadirMiembro({ rolInicial = "vet", activa }: { rolInicial?: Rol; activa: boolean }) {
   const router = useRouter();
   const [rol, setRol] = useState<Rol>(rolInicial);
   const [nombre, setNombre] = useState("");
@@ -56,9 +56,9 @@ export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: Rol; 
     setEnviando(true);
     setError(null);
     try {
-      await invitar(nombre.trim(), email.trim().toLowerCase(), rol);
-      toast("Invitación enviada", {
-        description: `${nombre.trim()} recibirá un correo para entrar como ${elegido.nombre.toLowerCase()}.`,
+      await anadirMiembro(nombre.trim(), email.trim().toLowerCase(), rol);
+      toast(`${nombre.trim()} ya está en el equipo`, {
+        description: `Le llega un correo para elegir su contraseña y entrar como ${elegido.nombre.toLowerCase()}.`,
       });
       setNombre("");
       setEmail("");
@@ -69,8 +69,12 @@ export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: Rol; 
         motivo === "correo-sin-verificar"
           ? "Confirma antes el correo de la clínica."
           : motivo === "envio"
-            ? "Se ha creado la invitación, pero el correo no ha salido. Vuelve a intentarlo."
-            : "No se ha podido invitar. Revisa los datos y vuelve a intentarlo.",
+            ? "Está en el equipo, pero el correo para elegir su contraseña no ha salido. Dale de baja y vuelve a añadirle."
+            : motivo === "correo-en-uso"
+              ? "Ese correo ya tiene cuenta en Bark & Meow."
+              : motivo === "tope-diario"
+                ? "Habéis añadido a mucha gente hoy. Seguid mañana."
+                : "No se ha podido añadir. Revisa los datos y vuelve a intentarlo.",
       );
     } finally {
       setEnviando(false);
@@ -122,13 +126,12 @@ export function InvitarForm({ rolInicial = "vet", activa }: { rolInicial?: Rol; 
       )}
 
       <Button type="submit" disabled={enviando || !activa}>
-        {enviando ? "Enviando…" : "Enviar invitación"}
+        {enviando ? "Añadiendo…" : "Añadir al equipo"}
       </Button>
 
       <p className={ui.panelNote}>
-        Le llega un enlace por correo. Al aceptar, su navegador genera su propia clave; si
-        es administrador, luego le entregas la de la clínica desde esta lista. Los dueños
-        no tienen que autorizar nada de nuevo.
+        Queda en el equipo al momento. Le llega un correo para elegir su contraseña: así solo
+        esa persona la conoce. Desde que entra ve los pacientes y sus nombres.
       </p>
     </form>
   );
