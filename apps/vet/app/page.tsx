@@ -95,7 +95,6 @@ export default function Presentacion() {
       <header className={s.bar}>
         <div className={s.brand}>
           <Logotipo alto={40} className={s.brandLogo} />
-          <span className={s.brandDomain}>barkandmeow.app</span>
         </div>
         <nav className={s.barLinks}>
           <a className={`${s.barLink} ${s.barAnchor}`} href="#niveles">
