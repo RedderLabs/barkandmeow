@@ -22,7 +22,7 @@ export default async function Page() {
 
   return (
     <div className={styles.shell}>
-      <AppHeader active="consola" />
+      <AppHeader active="consola" admin={yo.role === "admin"} />
       <Portada
         clinicId={yo.clinicId}
         pubKeyClinica={yo.clinica.pubKey}

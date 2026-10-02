@@ -151,3 +151,29 @@ test("la clave de las etiquetas llega a un navegador del equipo solo si viene de
   const deOtra = entregarClaveEtiquetas(cripto, ajena.secreta, publicaDispositivo);
   assert.equal(recibirClaveEtiquetas(cripto, dispositivo, clinica.publica, deOtra), null);
 });
+
+test("la clave de una ficha cerrada para el equipo: la abre quien tiene la de las etiquetas, atada a clínica y paciente", async () => {
+  const { abrirClaveDeEquipo, cerrarClaveParaEquipo, claveEtiquetas, claveFicha } = await import("./index.ts");
+  const clinica = claveDeClinica(cripto, (await nuevoCodigo()).semilla);
+  const dueno = claveDeDueno(cripto, (await nuevoCodigo()).semilla);
+  const k = claveFicha(cripto, dueno.secreta, "mascota-1");
+
+  // El administrador abre lo que selló el dueño y lo vuelve a cerrar para el equipo.
+  const delDueno = cripto.sellar(clinica.publica, k);
+  const equipo = claveEtiquetas(cripto, clinica.secreta);
+  const cerrada = cerrarClaveParaEquipo(cripto, equipo, "clinica-1", "mascota-1", cripto.abrirSellado(clinica.secreta, delDueno));
+  assert.equal(cerrada.length, 73);
+
+  // Un veterinario, con la clave de las etiquetas y sin la de la clínica, abre la ficha.
+  const recibida = abrirClaveDeEquipo(cripto, equipo, "clinica-1", "mascota-1", cerrada);
+  assert.deepEqual(recibida, k);
+  const ficha = cripto.cerrar(k, ad.ficha("mascota-1"), enc.encode("alergia a la penicilina"));
+  assert.deepEqual(cripto.abrir(recibida!, ad.ficha("mascota-1"), ficha), enc.encode("alergia a la penicilina"));
+
+  // No sirve para otro paciente ni para otra clínica, y la clave de las etiquetas a secas no la abre.
+  assert.equal(abrirClaveDeEquipo(cripto, equipo, "clinica-1", "mascota-2", cerrada), null);
+  assert.equal(abrirClaveDeEquipo(cripto, equipo, "clinica-2", "mascota-1", cerrada), null);
+  const ajena = claveEtiquetas(cripto, claveDeClinica(cripto, (await nuevoCodigo()).semilla).secreta);
+  assert.equal(abrirClaveDeEquipo(cripto, ajena, "clinica-1", "mascota-1", cerrada), null);
+  assert.throws(() => cripto.abrir(equipo, ad.claveEquipo("clinica-1", "mascota-1"), cerrada), ErrorCripto);
+});

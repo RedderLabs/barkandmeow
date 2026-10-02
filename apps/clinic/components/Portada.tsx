@@ -30,7 +30,7 @@ export function Portada({
 }: {
   clinicId: string;
   pubKeyClinica: string;
-  /** Un administrador con la clave reparte la de los nombres al resto del equipo. */
+  /** Un administrador con la clave reparte la de los nombres al resto del equipo, y es quien conecta el software. */
   esAdmin: boolean;
   activa: boolean;
   pacientes: PacienteConsola[];
@@ -92,9 +92,12 @@ export function Portada({
       <aside className={s.lateral} aria-label="Software de gestión">
         <div className={s.lateralCabecera}>
           <h2 className={s.titulo}>Software de gestión</h2>
-          <Link href="/conexion" className={s.enlace}>
-            {conexion.claves > 0 ? "Gestionar" : "Conectar"}
-          </Link>
+          {/* Vincular el software es cosa del administrador: al resto no se le ofrece. */}
+          {esAdmin && (
+            <Link href="/conexion" className={s.enlace}>
+              {conexion.claves > 0 ? "Gestionar" : "Conectar"}
+            </Link>
+          )}
         </div>
 
         {conexion.claves > 0 ? (
@@ -118,7 +121,9 @@ export function Portada({
           <p className={s.lateralNota}>
             {conexion.claves > 0
               ? "Todavía no ha enviado nada. Los informes solo llegan a los dueños de vuestros pacientes."
-              : "Con una clave de API, vuestro software de gestión envía los informes de la consulta a la bandeja del dueño, cifrados para él."}
+              : esAdmin
+                ? "Con una clave de API, vuestro software de gestión envía los informes de la consulta a la bandeja del dueño, cifrados para él."
+                : "Cuando un administrador lo conecte, los informes de la consulta llegarán solos a la bandeja del dueño, cifrados para él."}
           </p>
         ) : (
           <>

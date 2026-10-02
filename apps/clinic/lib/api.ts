@@ -66,7 +66,14 @@ export const clavesPendientes = () => cliente.llamar(c.dispositivosSinClave, { c
 export const entregarClaves = (entregas: { dispositivoId: string; sellada: string }[]) =>
   cliente.llamar(c.entregarClaveEtiquetas, { cuerpo: { entregas } });
 
-/* ── Alta de nivel 3 ───────────────────────────────────────── */
+/* ── Las fichas, para todo el equipo ───────────────────────── */
+
+export const fichasPendientes = () => cliente.llamar(c.fichasSinClaveEquipo, { cache: "no-store" });
+
+export const entregarFichas = (entregas: { permisoId: string; cerrada: string }[]) =>
+  cliente.llamar(c.entregarFichasEquipo, { cuerpo: { entregas } });
+
+/* ── Alta de nivel 3───────────────────────────────────────── */
 
 export const pedirAlta = (identificador: Identificador, vetPubKey: string) =>
   cliente.llamar(p.pedirAlta, { cuerpo: { identificador, vetPubKey } });

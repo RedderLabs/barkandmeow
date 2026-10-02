@@ -113,6 +113,13 @@
       "when": 1790869768452,
       "tag": "0015_ficha_y_placa",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790911766819,
+      "tag": "0016_clave_ficha_equipo",
+      "breakpoints": true
     }
   ]
 }

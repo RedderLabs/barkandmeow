@@ -76,7 +76,10 @@ export function IconInvite({ size = 20 }: { size?: number }) {
 
 type Surface = "consola" | "equipo" | "conexion";
 
-export function AppHeader({ active }: { active?: Surface }) {
+/* `admin` enseña Conexión: vincular el software de gestión es cosa del
+   administrador (decidido 2026-10-02), y al resto del equipo no se le pone
+   delante. */
+export function AppHeader({ active, admin = false }: { active?: Surface; admin?: boolean }) {
   return (
     <header className={ui.header}>
       <div className={ui.brand}>
@@ -98,12 +101,14 @@ export function AppHeader({ active }: { active?: Surface }) {
         >
           Equipo
         </Link>
-        <Link
-          href="/conexion"
-          className={`${ui.navLink} ${ui.navLinkSecundario} ${active === "conexion" ? ui.navLinkActive : ""}`}
-        >
-          Conexión
-        </Link>
+        {admin && (
+          <Link
+            href="/conexion"
+            className={`${ui.navLink} ${ui.navLinkSecundario} ${active === "conexion" ? ui.navLinkActive : ""}`}
+          >
+            Conexión
+          </Link>
+        )}
         {/* Un enlace normal, no de Next: la ruta de salida es del servidor. */}
         <a href="/clinica/salir" className={ui.navLink}>
           Salir

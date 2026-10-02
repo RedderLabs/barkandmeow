@@ -348,6 +348,10 @@ export const grants = pgTable(
     }),
     level: integer("level").notNull(),
     wrappedKey: bytea("wrapped_key"),
+    /* La misma clave de la ficha, cerrada para todo el equipo (decidido
+       2026-10-02: las fichas las lee cualquier rol). La deja el navegador de
+       un administrador, que es quien puede abrir `wrappedKey`. */
+    wrappedKeyEquipo: bytea("wrapped_key_equipo"),
     expiresAt: timestamp("expires_at"),
     revokedAt: timestamp("revoked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -461,7 +465,9 @@ export const etiquetasPaciente = pgTable(
    administradores). Cada navegador tiene su par X25519 y aquí va la pública.
    Un administrador con la clave de la clínica le deja en `claveEtiquetas` la
    clave de las etiquetas, cifrada de clínica a dispositivo: el servidor la
-   guarda sin poder abrirla. Esa clave solo abre nombres, nunca una ficha. */
+   guarda sin poder abrirla. Desde 2026-10-02 esa clave abre también las
+   fichas que un administrador haya cerrado para el equipo
+   (`grants.wrappedKeyEquipo`), nunca la clave de la clínica. */
 export const dispositivosMiembro = pgTable(
   "dispositivos_miembro",
   {

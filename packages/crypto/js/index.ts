@@ -202,6 +202,8 @@ export const ad = {
   ficha: (petId: string) => `bm:f:v1:${petId}`,
   /** La etiqueta con la que una clínica reconoce a un paciente. */
   etiqueta: (clinicId: string, petId: string) => `bm:ce:v1:${clinicId}:${petId}`,
+  /** La clave de una ficha, cerrada para el equipo de una clínica. */
+  claveEquipo: (clinicId: string, petId: string) => `bm:ck:v1:${clinicId}:${petId}`,
 };
 
 /* ── Registros firmados ──────────────────────────────────────
@@ -250,8 +252,8 @@ export function aBase64(b: Uint8Array): string {
 /* ── Etiquetas de paciente ───────────────────────────────────
    La clínica reconoce a un paciente por un nombre que escribe ella («Kira, de
    Ana»). Va cifrado con una clave simétrica que sale de la secreta de la
-   clínica, con otro `info`: quien tenga esta clave lee etiquetas, pero no abre
-   la K de ninguna ficha. El texto se rellena a un tamaño fijo antes de cifrar,
+   clínica, con otro `info`: quien tenga esta clave lee etiquetas y las fichas
+   cerradas para el equipo, pero no abre lo sellado para la clínica. El texto se rellena a un tamaño fijo antes de cifrar,
    para que el servidor no sepa ni cuánto mide el nombre. */
 
 /** Lo más largo que puede ser una etiqueta, en caracteres. */
@@ -285,6 +287,42 @@ export function recibirClaveEtiquetas(
   try {
     const clave = cripto.abrirSellado(secretaDispositivo, sellada);
     return clave.length === 32 ? clave : null;
+  } catch (e) {
+    if (e instanceof ErrorCripto) return null;
+    throw e;
+  }
+}
+
+/* ── Fichas, para todo el equipo ─────────────────────────────
+   El dueño sella la clave de la ficha (`K`) para la clave pública de la
+   clínica, que solo abren sus administradores. Para que la lea cualquier rol,
+   el navegador de un administrador abre `K` y la vuelve a cerrar con una
+   clave que sale de la de las etiquetas, la que ya tiene todo el equipo. El
+   resto del equipo abre fichas sin tener nunca la clave de la clínica. */
+
+const claveFichasEquipo = (cripto: Cripto, claveDeEtiquetas: Uint8Array) =>
+  cripto.derivar(claveDeEtiquetas, "bm:clinica:fichas-equipo:v1");
+
+/** `K` de una mascota, cerrada para el equipo de la clínica. */
+export const cerrarClaveParaEquipo = (
+  cripto: Cripto,
+  claveDeEtiquetas: Uint8Array,
+  clinicId: string,
+  petId: string,
+  k: Uint8Array,
+): Uint8Array => cripto.cerrar(claveFichasEquipo(cripto, claveDeEtiquetas), ad.claveEquipo(clinicId, petId), k);
+
+/** `K` de una mascota, o null si no se cerró para esta clínica y este paciente. */
+export function abrirClaveDeEquipo(
+  cripto: Cripto,
+  claveDeEtiquetas: Uint8Array,
+  clinicId: string,
+  petId: string,
+  cerrada: Uint8Array,
+): Uint8Array | null {
+  try {
+    const k = cripto.abrir(claveFichasEquipo(cripto, claveDeEtiquetas), ad.claveEquipo(clinicId, petId), cerrada);
+    return k.length === 32 ? k : null;
   } catch (e) {
     if (e instanceof ErrorCripto) return null;
     throw e;

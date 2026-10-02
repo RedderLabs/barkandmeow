@@ -1061,6 +1061,41 @@ describe("portada de la consola: el chip dice qué toca y los pacientes se recon
     assert.equal(n.n, 2);
   });
 
+  it("un administrador deja la clave de la ficha cerrada para todo el equipo", async () => {
+    const pendientes = (c: string | null = cookie) =>
+      app.inject({ method: "GET", url: "/clinics/v1/team-keys/pending", headers: c ? { cookie: c } : {} });
+    const entregar = (entregas: { permisoId: string; cerrada: string }[], c: string | null = cookie) =>
+      app.inject({ method: "POST", url: "/clinics/v1/team-keys", headers: c ? { cookie: c } : {}, payload: { entregas } });
+    const leer = async () =>
+      (await app.inject({ method: "GET", url: `/clinics/v1/patients/${pet}/record`, headers: { cookie } })).json();
+    const cerrada = b64(73);
+
+    assert.equal((await pendientes(null)).statusCode, 401);
+    assert.equal((await entregar([{ permisoId: grantId, cerrada }], null)).statusCode, 401);
+    // Con sesión de dueño no se entra por la puerta de la clínica.
+    assert.equal((await pendientes(cookieDueno)).statusCode, 401);
+
+    assert.equal((await leer()).claveEquipo, null);
+    // Un permiso antiguo no lleva una clave sellada (80 bytes): no hay nada que preparar.
+    assert.deepEqual((await pendientes()).json().permisos.filter((p: { id: string }) => p.id === grantId), []);
+    const [g] = await sql`UPDATE grants SET wrapped_key = ${randomBytes(80)} WHERE id = ${grantId} RETURNING wrapped_key`;
+    assert.deepEqual(
+      (await pendientes()).json().permisos.filter((p: { id: string }) => p.id === grantId),
+      [{ id: grantId, petId: pet, claveEnvuelta: (g.wrapped_key as Buffer).toString("base64") }],
+    );
+
+    assert.equal((await entregar([{ permisoId: grantId, cerrada: "corta" }])).statusCode, 400);
+    // El permiso de otra clínica, o uno que no existe, no se toca.
+    assert.deepEqual((await entregar([{ permisoId: randomUUID(), cerrada }])).json(), { entregadas: 0 });
+    assert.deepEqual((await entregar([{ permisoId: grantId, cerrada }])).json(), { entregadas: 1 });
+    assert.equal((await leer()).claveEquipo, cerrada);
+
+    // Lo entregado no se pisa, y deja de estar pendiente.
+    assert.deepEqual((await entregar([{ permisoId: grantId, cerrada: b64(73) }])).json(), { entregadas: 0 });
+    assert.equal((await leer()).claveEquipo, cerrada);
+    assert.deepEqual((await pendientes()).json().permisos.filter((p: { id: string }) => p.id === grantId), []);
+  });
+
   it("la etiqueta entra y sale tal cual: el servidor no la toca", async () => {
     const primera = b64(297);
     assert.equal((await etiquetar(pet, primera)).statusCode, 200);
@@ -1162,6 +1197,16 @@ describe("los nombres de los pacientes los lee todo el equipo", () => {
   it("solo un administrador ve quién espera y reparte la clave", async () => {
     assert.equal((await pendientes(cookieVet)).statusCode, 403);
     assert.equal((await entregar([{ dispositivoId, sellada }], cookieVet)).statusCode, 403);
+    // Lo mismo con las claves de las fichas: el resto del equipo las lee, no las reparte.
+    const fichas = { cookie: cookieVet };
+    assert.equal((await app.inject({ method: "GET", url: "/clinics/v1/team-keys/pending", headers: fichas })).statusCode, 403);
+    const reparto = await app.inject({
+      method: "POST",
+      url: "/clinics/v1/team-keys",
+      headers: fichas,
+      payload: { entregas: [{ permisoId: randomUUID(), cerrada: b64(73) }] },
+    });
+    assert.equal(reparto.statusCode, 403);
 
     const lista = (await pendientes(cookie)).json().dispositivos;
     assert.deepEqual(

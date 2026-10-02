@@ -11,7 +11,14 @@ import {
   petIdentifiers,
   pets,
 } from "@barkandmeow/db";
-import { chipClinicaBody, dispositivoClinicaBody, entregaEtiquetasBody, etiquetaBody, normalizarChip } from "@barkandmeow/schema";
+import {
+  chipClinicaBody,
+  dispositivoClinicaBody,
+  entregaEtiquetasBody,
+  entregaFichasEquipoBody,
+  etiquetaBody,
+  normalizarChip,
+} from "@barkandmeow/schema";
 import { db, indexar } from "../core.js";
 import { sesionDe } from "./clinics.js";
 
@@ -189,7 +196,12 @@ export default async function rutasPacientes(app: FastifyInstance) {
     if (!UUID.test(petId)) return noEs();
 
     const [permiso] = await db
-      .select({ claveEnvuelta: grants.wrappedKey, desde: grants.createdAt, chipPista: pets.chipPista })
+      .select({
+        claveEnvuelta: grants.wrappedKey,
+        claveEquipo: grants.wrappedKeyEquipo,
+        desde: grants.createdAt,
+        chipPista: pets.chipPista,
+      })
       .from(grants)
       .innerJoin(pets, eq(pets.id, grants.petId))
       .where(and(eq(grants.petId, petId), permisoVivo(s.clinicId), eq(pets.estado, "activa")))
@@ -212,9 +224,55 @@ export default async function rutasPacientes(app: FastifyInstance) {
       sobre: ficha?.sealed ? ficha.sealed.toString("base64") : null,
       version: ficha?.version ?? 0,
       claveEnvuelta: permiso.claveEnvuelta ? permiso.claveEnvuelta.toString("base64") : null,
+      claveEquipo: permiso.claveEquipo ? permiso.claveEquipo.toString("base64") : null,
       chipPista: permiso.chipPista,
       desde: permiso.desde,
     };
+  });
+
+  /* ── Las fichas, para todo el equipo ───────────────────────
+     Decidido 2026-10-02: la ficha la lee cualquier rol. El dueño sella la
+     clave de la ficha para la clave pública de la clínica, que solo abren los
+     administradores; el navegador de uno de ellos la vuelve a cerrar con una
+     clave que tiene todo el equipo (sale de la de las etiquetas) y la deja
+     aquí. Nadie recibe la clave de la clínica, y este archivo sigue sin poder
+     abrir nada. Al retirar el permiso se va con él: vive en su misma fila. */
+
+  /** Los permisos cuya clave de ficha aún no está cerrada para el equipo. */
+  app.get("/clinics/v1/team-keys/pending", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    if (s.role !== "admin") return reply.code(403).send({ error: "solo un administrador reparte la clave" });
+    const filas = await db
+      .select({ id: grants.id, petId: grants.petId, clave: grants.wrappedKey })
+      .from(grants)
+      // Una clave sellada mide 80 bytes; los permisos antiguos llevan otra cosa y no se pueden preparar.
+      .where(and(permisoVivo(s.clinicId), sql`length(${grants.wrappedKey}) = 80`, isNull(grants.wrappedKeyEquipo)))
+      .limit(50);
+    return {
+      permisos: filas.flatMap((f) => (f.clave ? [{ id: f.id, petId: f.petId, claveEnvuelta: f.clave.toString("base64") }] : [])),
+    };
+  });
+
+  /** Un administrador deja la clave de cada ficha cerrada para el equipo. Solo en permisos de su clínica. */
+  app.post("/clinics/v1/team-keys", async (req, reply) => {
+    const s = await sesionDe(req);
+    if (!s) return reply.code(401).send({ error: "sin sesión" });
+    if (s.role !== "admin") return reply.code(403).send({ error: "solo un administrador reparte la clave" });
+    const cuerpo = entregaFichasEquipoBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+
+    let entregadas = 0;
+    for (const e of cuerpo.data.entregas) {
+      const r = await db
+        .update(grants)
+        .set({ wrappedKeyEquipo: Buffer.from(e.cerrada, "base64") })
+        // Lo ya entregado no se pisa, igual que la clave de las etiquetas.
+        .where(and(eq(grants.id, e.permisoId), permisoVivo(s.clinicId), isNull(grants.wrappedKeyEquipo)))
+        .returning({ id: grants.id });
+      entregadas += r.length;
+    }
+    return { entregadas };
   });
 
   /** Cualquier miembro etiqueta; solo abre la etiqueta quien tiene la clave. */

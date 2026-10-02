@@ -8,6 +8,7 @@ import {
   dispositivoClinicaBody,
   draftCreateBody,
   entregaEtiquetasBody,
+  entregaFichasEquipoBody,
   etiquetaBody,
   informeBody,
   loginBody,
@@ -327,11 +328,34 @@ export const rutasClinicas = {
       version: z.number().int().nonnegative(),
       /** La clave de la ficha, sellada para la clínica. null en permisos antiguos sin clave. */
       claveEnvuelta: z.string().nullable(),
+      /** La misma clave, cerrada para todo el equipo. null hasta que el navegador de un administrador la prepara. */
+      claveEquipo: z.string().nullable(),
       chipPista: z.string().nullable(),
       /** Desde cuándo tiene la clínica el nivel 3. */
       desde: fecha,
     }),
     errores: [401, 404],
+  }),
+  fichasSinClaveEquipo: ruta({
+    metodo: "GET",
+    ruta: "/clinics/v1/team-keys/pending",
+    acceso: "clinica",
+    resumen:
+      "Para un administrador: los permisos de nivel 3 cuya clave de ficha aún no está cerrada para el equipo, con la clave sellada para la clínica.",
+    respuesta: z.object({
+      permisos: z.array(z.object({ id: z.string().uuid(), petId: z.string().uuid(), claveEnvuelta: z.string() })),
+    }),
+    errores: [401, 403],
+  }),
+  entregarFichasEquipo: ruta({
+    metodo: "POST",
+    ruta: "/clinics/v1/team-keys",
+    acceso: "clinica",
+    resumen:
+      "Un administrador deja la clave de la ficha de cada paciente cerrada para el equipo, para que la lea cualquier rol. El servidor guarda bytes que no puede abrir.",
+    cuerpo: entregaFichasEquipoBody,
+    respuesta: z.object({ entregadas: z.number().int() }),
+    errores: [400, 401, 403],
   }),
   etiquetarPaciente: ruta({
     metodo: "PUT",

@@ -65,30 +65,36 @@ export default async function Conexion() {
     apiServidor(api.clinicas.listarEnvios),
     direccionApi(),
   ]);
+  /* Vincular el software de gestión es cosa del administrador (decidido
+     2026-10-02): el resto del equipo ve aquí solo lo que se ha enviado, sin
+     claves ni instrucciones técnicas. */
   const esAdmin = yo.role === "admin";
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="conexion" />
+      <AppHeader active={esAdmin ? "conexion" : undefined} admin={esAdmin} />
 
       <main className={ui.grid}>
         <section>
           <div className={ui.sectionHead}>
-            <h1 className={ui.sectionTitle}>Software de gestión</h1>
+            <h1 className={ui.sectionTitle}>{esAdmin ? "Software de gestión" : "Envíos a los dueños"}</h1>
             <span className={ui.sectionMeta}>
               {claves.length === 0
                 ? "Sin conectar"
-                : `${claves.length} ${claves.length === 1 ? "clave activa" : "claves activas"}`}
+                : esAdmin
+                  ? `${claves.length} ${claves.length === 1 ? "clave activa" : "claves activas"}`
+                  : "Conectado"}
             </span>
           </div>
 
-          {!yo.clinicaActiva && (
+          {esAdmin && !yo.clinicaActiva && (
             <div className={`${ui.pendingBlock} ${ui.stacked}`} role="status">
               La clínica aún no está activa: confirma el correo del administrador para poder
               crear claves. <Link href="/verificar">Confirmar el correo</Link>
             </div>
           )}
 
+          {esAdmin && (
           <div className={`${ui.panel} ${ui.stacked}`}>
             {claves.length === 0 ? (
               <p className={ui.panelNote}>
@@ -108,16 +114,15 @@ export default async function Conexion() {
                         {!k.firma && " · sin clave de firma: créala de nuevo para certificar lo que envía"}
                       </div>
                     </div>
-                    {esAdmin && (
-                      <div className={ui.actions}>
-                        <RetirarClave id={k.id} nombre={k.nombre} />
-                      </div>
-                    )}
+                    <div className={ui.actions}>
+                      <RetirarClave id={k.id} nombre={k.nombre} />
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+          )}
 
           {/* El registro entero: la portada solo enseña los últimos. */}
           <div className={`${ui.panel} ${ui.stacked}`} id="envios">
@@ -155,6 +160,7 @@ export default async function Conexion() {
             )}
           </div>
 
+          {esAdmin && (
           <div className={ui.panel}>
             <h2 className={ui.panelTitle}>Cómo se conecta</h2>
             <p className={ui.panelNote}>
@@ -205,18 +211,25 @@ export default async function Conexion() {
               Si el dueño retira el acceso, la API responde 404 y el informe no se entrega.
             </p>
           </div>
+          )}
         </section>
 
-        <aside className={ui.panel}>
-          <h2 className={ui.panelTitle}>
-            <IconKey size={20} /> Nueva clave
-          </h2>
-          {esAdmin ? (
+        {esAdmin ? (
+          <aside className={ui.panel}>
+            <h2 className={ui.panelTitle}>
+              <IconKey size={20} /> Nueva clave
+            </h2>
             <NuevaClave activa={yo.clinicaActiva} />
-          ) : (
-            <p className={ui.panelNote}>Solo un administrador puede crear y retirar claves.</p>
-          )}
-        </aside>
+          </aside>
+        ) : (
+          <aside className={ui.panel}>
+            <h2 className={ui.panelTitle}>De dónde salen</h2>
+            <p className={ui.panelNote}>
+              Los envía solo el software de gestión de la clínica al cerrar una consulta. Conectarlo es cosa de un
+              administrador: tú no tienes que hacer nada.
+            </p>
+          </aside>
+        )}
       </main>
     </div>
   );

@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   aBase64,
+  abrirClaveDeEquipo,
   abrirEtiqueta,
+  cerrarClaveParaEquipo,
   cerrarEtiqueta,
   claveEtiquetas,
   deBase64,
@@ -11,7 +13,7 @@ import {
   recibirClaveEtiquetas,
   type Cripto,
 } from "@barkandmeow/crypto";
-import { clavesPendientes, entregarClaves, presentarDispositivo } from "@/lib/api";
+import { clavesPendientes, entregarClaves, entregarFichas, fichasPendientes, presentarDispositivo } from "@/lib/api";
 import { guardarClaves, leerClaves } from "@/lib/claves";
 import { CLAVE_LISTA, cripto, igual } from "@/lib/cripto";
 
@@ -31,6 +33,8 @@ export type Etiquetas = {
   abrir(petId: string, sellada: string | null): string | null;
   /** La etiqueta cifrada, en base64, lista para enviar. */
   cerrar(petId: string, texto: string): string;
+  /** La clave de una ficha que un administrador cerró para el equipo, o null. */
+  claveFicha(petId: string, cerrada: string | null): Uint8Array | null;
 };
 
 /** Cada cuánto vuelve a preguntar un navegador que espera, y a repartir uno que tiene la clave. */
@@ -48,6 +52,24 @@ async function repartir(c: Cripto, secretaClinica: Uint8Array) {
       : [];
   });
   if (entregas.length) await entregarClaves(entregas);
+}
+
+/** Y cierra para el equipo la clave de cada ficha que el dueño selló para la clínica. */
+async function repartirFichas(c: Cripto, secretaClinica: Uint8Array, clinicId: string) {
+  const { permisos } = await fichasPendientes();
+  const clave = claveEtiquetas(c, secretaClinica);
+  const entregas = permisos.flatMap((p) => {
+    const sellada = deBase64(p.claveEnvuelta);
+    if (!sellada) return [];
+    try {
+      const k = c.abrirSellado(secretaClinica, sellada);
+      return [{ permisoId: p.id, cerrada: aBase64(cerrarClaveParaEquipo(c, clave, clinicId, p.petId, k)) }];
+    } catch {
+      // Sellada para otra clave: ese permiso no se abre aquí.
+      return [];
+    }
+  });
+  if (entregas.length) await entregarFichas(entregas);
 }
 
 export function useEtiquetas(clinicId: string, pubKeyClinica: string, esAdmin: boolean): Etiquetas {
@@ -91,8 +113,10 @@ export function useEtiquetas(clinicId: string, pubKeyClinica: string, esAdmin: b
       if (!vivo) return;
       setLlave(encontrada);
 
-      if (encontrada?.secretaClinica && esAdmin)
+      if (encontrada?.secretaClinica && esAdmin) {
         await repartir(encontrada.c, encontrada.secretaClinica).catch(() => undefined);
+        await repartirFichas(encontrada.c, encontrada.secretaClinica, clinicId).catch(() => undefined);
+      }
       // Quien espera vuelve a preguntar; quien reparte vuelve a mirar si alguien se ha presentado.
       if (vivo && (!encontrada || (encontrada.secretaClinica && esAdmin))) reloj = setTimeout(mirar, VUELTA_MS);
     };
@@ -114,6 +138,7 @@ export function useEtiquetas(clinicId: string, pubKeyClinica: string, esAdmin: b
         cerrar: () => {
           throw new Error("este navegador aún no tiene la clave de los nombres");
         },
+        claveFicha: () => null,
       };
     const { c, clave } = llave;
     return {
@@ -123,6 +148,10 @@ export function useEtiquetas(clinicId: string, pubKeyClinica: string, esAdmin: b
         return sobre ? abrirEtiqueta(c, clave, clinicId, petId, sobre) : null;
       },
       cerrar: (petId, texto) => aBase64(cerrarEtiqueta(c, clave, clinicId, petId, texto)),
+      claveFicha(petId, cerrada) {
+        const sobre = cerrada ? deBase64(cerrada) : null;
+        return sobre ? abrirClaveDeEquipo(c, clave, clinicId, petId, sobre) : null;
+      },
     };
   }, [llave, clinicId]);
 }

@@ -38,7 +38,7 @@ export default async function Equipo() {
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="equipo" />
+      <AppHeader active="equipo" admin={esAdmin} />
 
       <main className={ui.grid}>
         <section>

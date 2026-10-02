@@ -19,8 +19,10 @@ export default async function Page({ params }: { params: Promise<{ petId: string
 
   return (
     <div className={ui.shell}>
-      <AppHeader active="consola" />
+      <AppHeader active="consola" admin={yo.role === "admin"} />
       <FichaPaciente
+        // Otro paciente es otra ficha: nada de la anterior se queda en pantalla.
+        key={petId}
         clinicId={yo.clinicId}
         pubKeyClinica={yo.clinica.pubKey}
         esAdmin={yo.role === "admin"}

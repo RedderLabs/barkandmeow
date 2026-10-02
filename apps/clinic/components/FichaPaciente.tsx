@@ -19,20 +19,23 @@ import { IconSealed } from "@/components/iconos";
 import { ErrorApi, leerFichaPaciente, type PacienteConsola } from "@/lib/api";
 import { dia } from "@/lib/chip";
 import { leerClaves } from "@/lib/claves";
-import { CLAVE_LISTA, cripto, igual } from "@/lib/cripto";
+import { cripto, igual } from "@/lib/cripto";
 import { useEtiquetas } from "@/lib/etiquetas";
 
 /* La ficha de salud de un paciente, para la clínica que tiene su nivel 3.
 
    Llega cifrada con la clave de la mascota, y esa clave llega sellada por el
    dueño para la clave pública de la clínica. Las dos se abren aquí, en el
-   navegador: hace falta la clave de la clínica, que custodian sus
-   administradores. La escribe el dueño, así que todo va marcado como
+   navegador. Un administrador abre la clave con la de la clínica; el resto
+   del equipo, con la copia que el navegador de un administrador cerró para
+   todos (decidido 2026-10-02: la ficha la lee cualquier rol). La escribe el dueño, así que todo va marcado como
    declarado por él: no es un informe firmado. */
 
 type Estado =
   | { tipo: "mirando" }
   | { tipo: "sin-clave" }
+  /** El navegador tiene la clave del equipo, pero ningún administrador ha cerrado aún esta ficha para él. */
+  | { tipo: "sin-preparar" }
   | { tipo: "retirado" }
   | { tipo: "red" }
   /** El dueño aún no la ha escrito. */
@@ -58,44 +61,67 @@ export function FichaPaciente({
   paciente: PacienteConsola;
 }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "mirando" });
+  const [recibido, setRecibido] = useState<Awaited<ReturnType<typeof leerFichaPaciente>> | "retirado" | "red" | null>(null);
   const etiquetas = useEtiquetas(clinicId, pubKeyClinica, esAdmin);
   const nombre = etiquetas.abrir(paciente.petId, paciente.etiqueta);
 
+  // Se pide una sola vez: cada lectura queda apuntada en el registro de accesos.
   useEffect(() => {
     let vivo = true;
-    const abrir = async () => {
-      try {
-        const c = await cripto();
-        const local = await leerClaves(clinicId).catch(() => null);
-        const secreta = local?.clinica && igual(c.publica(local.clinica), deBase64(pubKeyClinica)) ? local.clinica : null;
-        if (!secreta) return vivo && setEstado({ tipo: "sin-clave" });
-
-        const r = await leerFichaPaciente(paciente.petId);
-        if (!vivo) return;
-        if (!r.sobre) return setEstado({ tipo: "vacia" });
-        const envuelta = r.claveEnvuelta ? deBase64(r.claveEnvuelta) : null;
-        const sobre = deBase64(r.sobre);
-        if (!envuelta || !sobre) return setEstado({ tipo: "no-abre" });
-        try {
-          const k = c.abrirSellado(secreta, envuelta);
-          const claro = c.abrir(k, ad.ficha(paciente.petId), sobre);
-          setEstado({ tipo: "lista", ficha: fichaDueno.parse(JSON.parse(new TextDecoder().decode(claro))) });
-        } catch {
-          setEstado({ tipo: "no-abre" });
-        }
-      } catch (e) {
-        if (!vivo) return;
-        setEstado({ tipo: e instanceof ErrorApi && e.estado === 404 ? "retirado" : "red" });
-      }
-    };
-    void abrir();
-    // Si la clave llega mientras la página está abierta (código en papel), se vuelve a intentar.
-    window.addEventListener(CLAVE_LISTA, abrir);
+    leerFichaPaciente(paciente.petId)
+      .then((r) => vivo && setRecibido(r))
+      .catch((e) => vivo && setRecibido(e instanceof ErrorApi && e.estado === 404 ? "retirado" : "red"));
     return () => {
       vivo = false;
-      window.removeEventListener(CLAVE_LISTA, abrir);
     };
-  }, [clinicId, pubKeyClinica, paciente.petId]);
+  }, [paciente.petId]);
+
+  // Y se abre con lo que tenga este navegador. Si la clave llega con la página
+  // abierta (código en papel, o la que reparte un administrador), `etiquetas`
+  // cambia y se vuelve a intentar.
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const r = recibido;
+      if (!r) return setEstado({ tipo: "mirando" });
+      if (r === "retirado" || r === "red") return setEstado({ tipo: r });
+      if (!r.sobre) return setEstado({ tipo: "vacia" });
+      const sobre = deBase64(r.sobre);
+      const envuelta = r.claveEnvuelta ? deBase64(r.claveEnvuelta) : null;
+      // Una clave sellada mide 80 bytes: lo que no los mide es de un permiso antiguo y no la lleva.
+      if (!sobre || envuelta?.length !== 80) return setEstado({ tipo: "no-abre" });
+
+      const c = await cripto();
+      const local = await leerClaves(clinicId).catch(() => null);
+      const secreta = local?.clinica && igual(c.publica(local.clinica), deBase64(pubKeyClinica)) ? local.clinica : null;
+      if (!vivo) return;
+
+      // Con la clave de la clínica se abre lo que selló el dueño; sin ella, lo
+      // que un administrador cerró para el equipo.
+      let k: Uint8Array | null = null;
+      if (secreta) {
+        try {
+          k = c.abrirSellado(secreta, envuelta);
+        } catch {
+          return setEstado({ tipo: "no-abre" });
+        }
+      }
+      k ??= etiquetas.claveFicha(paciente.petId, r.claveEquipo);
+      if (!k) {
+        if (etiquetas.estado === "mirando") return setEstado({ tipo: "mirando" });
+        return setEstado({ tipo: etiquetas.estado === "esperando" ? "sin-clave" : "sin-preparar" });
+      }
+      try {
+        const claro = c.abrir(k, ad.ficha(paciente.petId), sobre);
+        setEstado({ tipo: "lista", ficha: fichaDueno.parse(JSON.parse(new TextDecoder().decode(claro))) });
+      } catch {
+        setEstado({ tipo: "no-abre" });
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [recibido, etiquetas, clinicId, pubKeyClinica, paciente.petId]);
 
   const f = estado.tipo === "lista" ? estado.ficha : null;
   const hoy = new Date().toISOString().slice(0, 10);
@@ -127,14 +153,26 @@ export function FichaPaciente({
               <IconKey size={20} /> Este navegador no puede abrir la ficha
             </h2>
             <p className={ui.panelNote}>
-              La ficha llega cerrada para la clave de la clínica, que custodian sus administradores.{" "}
               {esAdmin ? (
                 <>
-                  Recupérala en la <Link href="/">portada</Link> con el código en papel y vuelve aquí.
+                  La ficha llega cerrada para la clave de la clínica. Recupérala en la <Link href="/">portada</Link> con
+                  el código en papel y vuelve aquí.
                 </>
               ) : (
-                "Pide a un administrador que la abra desde su ordenador."
+                "Todavía no ha recibido la clave del equipo. Llega sola en cuanto un administrador abre la consola en su ordenador: no hay que hacer nada más que esperar."
               )}
+            </p>
+          </section>
+        )}
+
+        {estado.tipo === "sin-preparar" && (
+          <section className={`${ui.panel} ${ui.panelWarn}`}>
+            <h2 className={ui.panelTitle}>
+              <IconKey size={20} /> La ficha aún no está lista para el equipo
+            </h2>
+            <p className={ui.panelNote}>
+              El alta de este paciente es reciente. La ficha queda lista para todo el equipo la próxima vez que un
+              administrador abra la consola; después, vuelve a cargar esta página.
             </p>
           </section>
         )}
@@ -318,7 +356,8 @@ export function FichaPaciente({
           <span className={s.selladoIcono}>
             <IconSealed />
           </span>
-          Se abre en este navegador con la clave de la clínica. Bark &amp; Meow guarda la ficha cerrada y no puede leerla.
+          Se abre en este navegador con una clave que solo tiene vuestro equipo. Bark &amp; Meow guarda la ficha cerrada y
+          no puede leerla.
         </p>
         <p className={ui.panelNote}>
           El dueño puede retirar el acceso cuando quiera, y entonces dejáis de verla. Queda apuntado cada vez que la

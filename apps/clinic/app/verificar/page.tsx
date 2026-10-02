@@ -14,7 +14,7 @@ export default async function Page() {
   if (yo.correoVerificado) redirect("/");
   return (
     <div className={ui.shell}>
-      <AppHeader />
+      <AppHeader admin={yo.role === "admin"} />
       <VerificarPendiente correo={yo.correo} dominio={dominioDeCorreo(yo.correo)} />
     </div>
   );

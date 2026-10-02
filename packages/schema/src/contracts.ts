@@ -318,3 +318,16 @@ export const entregaEtiquetasBody = z.object({
     .min(1)
     .max(50),
 });
+
+/** La clave de la ficha de cada paciente, cerrada para el equipo en el navegador de un administrador. */
+export const entregaFichasEquipoBody = z.object({
+  entregas: z
+    .array(
+      z.object({
+        permisoId: z.string().uuid(),
+        cerrada: base64.refine((s) => s.length >= 64 && s.length <= 160, "clave cerrada"),
+      }),
+    )
+    .min(1)
+    .max(50),
+});

@@ -3547,6 +3547,10 @@ paths:
                     type:
                       - string
                       - "null"
+                  claveEquipo:
+                    type:
+                      - string
+                      - "null"
                   chipPista:
                     type:
                       - string
@@ -3559,6 +3563,7 @@ paths:
                   - sobre
                   - version
                   - claveEnvuelta
+                  - claveEquipo
                   - chipPista
                   - desde
                 additionalProperties: false
@@ -3570,6 +3575,125 @@ paths:
                 $ref: "#/components/schemas/Error"
         "404":
           description: Error 404
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/team-keys/pending:
+    get:
+      tags:
+        - Clínica
+      summary: "Para un administrador: los permisos de nivel 3 cuya clave de ficha aún no está cerrada para el equipo, con la clave sellada para la clínica."
+      security: *a3
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  permisos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        petId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        claveEnvuelta:
+                          type: string
+                      required:
+                        - id
+                        - petId
+                        - claveEnvuelta
+                      additionalProperties: false
+                required:
+                  - permisos
+                additionalProperties: false
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      x-acceso: clinica
+  /clinics/v1/team-keys:
+    post:
+      tags:
+        - Clínica
+      summary: Un administrador deja la clave de la ficha de cada paciente cerrada para el equipo, para que la lea cualquier rol. El servidor guarda bytes que no puede abrir.
+      security: *a3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $schema: https://json-schema.org/draft/2020-12/schema
+              type: object
+              properties:
+                entregas:
+                  minItems: 1
+                  maxItems: 50
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      permisoId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      cerrada:
+                        type: string
+                        pattern: ^[A-Za-z0-9+/]+={0,2}$
+                    required:
+                      - permisoId
+                      - cerrada
+              required:
+                - entregas
+      responses:
+        "200":
+          description: Correcto
+          content:
+            application/json:
+              schema:
+                $schema: https://json-schema.org/draft/2020-12/schema
+                type: object
+                properties:
+                  entregadas:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - entregadas
+                additionalProperties: false
+        "400":
+          description: Error 400
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Error 401
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Error 403
           content:
             application/json:
               schema:

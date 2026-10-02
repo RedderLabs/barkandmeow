@@ -1,0 +1,1 @@
+ALTER TABLE "grants" ADD COLUMN "wrapped_key_equipo" "bytea";
