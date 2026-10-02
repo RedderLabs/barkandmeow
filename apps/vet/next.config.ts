@@ -6,6 +6,8 @@ import type { NextConfig } from "next";
 const CLINIC_DEV = process.env.CLINIC_DEV_URL ?? "http://127.0.0.1:4520";
 /** Dónde escucha apps/portal (el portal del dueño) en desarrollo. */
 const PORTAL_DEV = process.env.PORTAL_DEV_URL ?? "http://127.0.0.1:4530";
+/** Dónde escucha apps/api en desarrollo: de ella sale la documentación de /docs. */
+const API_DEV = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4601";
 
 export default function config(phase: string): NextConfig {
   const base: NextConfig = {
@@ -21,7 +23,7 @@ export default function config(phase: string): NextConfig {
   };
 
   /* En desarrollo, vet es la puerta única: /clinica se reenvía a apps/clinic,
-     que tiene basePath /clinica, y /e/<id> y /s/<id> caen en la página única de
+     que tiene basePath /clinica, /docs a la API, y /e/<id> y /s/<id> caen en la página única de
      cada nivel (el id lo lee el navegador). La exportación estática no admite
      rewrites, así que solo existen aquí; en producción el proxy hace el mismo
      reparto. */
@@ -37,6 +39,9 @@ export default function config(phase: string): NextConfig {
           { source: "/clinica/:path*", destination: `${CLINIC_DEV}/clinica/:path*` },
           { source: "/mi-mascota", destination: `${PORTAL_DEV}/mi-mascota` },
           { source: "/mi-mascota/:path*", destination: `${PORTAL_DEV}/mi-mascota/:path*` },
+          // La documentación de la API (Swagger UI), en la misma puerta que todo lo demás.
+          { source: "/docs", destination: `${API_DEV}/docs` },
+          { source: "/docs/:path*", destination: `${API_DEV}/docs/:path*` },
           { source: "/e/:id", destination: "/e" },
           { source: "/s/:id", destination: "/s" },
           { source: "/p/:id", destination: "/p" },
