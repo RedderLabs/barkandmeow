@@ -14,6 +14,7 @@ import { ErrorApi, guardarFicha, leerFicha, ponerPlaca, yo, type Mascota } from 
 import { leerClave } from "./almacen";
 import { deBase64, iguales, publica } from "./cripto";
 import { abrirFicha, cerrarFicha, sobrePlaca } from "./ficha";
+import { useT, type T } from "./idioma";
 
 /** A una pantalla que la app conoce pero cuyos tipos de ruta aún no se han regenerado. */
 export const ir = (ruta: string) => router.push(ruta as never);
@@ -34,6 +35,7 @@ export async function publicarPlaca(petId: string, ficha: FichaDueno, nombre: st
 }
 
 export function useFicha(petId: string) {
+  const t = useT();
   const [estado, setEstado] = useState<EstadoFicha>({ tipo: "cargando" });
   const actual = useRef<{ datos: FichaDueno; version: number } | null>(null);
 
@@ -73,7 +75,7 @@ export function useFicha(petId: string) {
           actual.current = { datos: nuevo, version: r.version };
           setEstado({ tipo: "lista", m, secreta, datos: nuevo, version: r.version });
           await publicarPlaca(petId, nuevo, nombre).catch(() =>
-            Alert.alert("La placa no se ha actualizado", "La ficha se ha guardado. La placa se actualizará la próxima vez que guardes."),
+            Alert.alert(t("salud.placaSinActualizar"), t("salud.placaSinActualizarTexto")),
           );
           return nuevo;
         } catch (e) {
@@ -88,10 +90,10 @@ export function useFicha(petId: string) {
           }
         }
       }
-      Alert.alert("No se ha podido guardar", "Revisa la conexión y vuelve a intentarlo.");
+      Alert.alert(t("salud.noGuardada"), t("salud.noGuardadaTexto"));
       return null;
     },
-    [estado, petId],
+    [estado, petId, t],
   );
 
   return { estado, cambiar, recargar: cargar };
@@ -112,6 +114,20 @@ export function aIso(texto: string): string | null {
   const f = new Date(Date.UTC(a, mes - 1, d));
   if (f.getUTCFullYear() !== a || f.getUTCMonth() !== mes - 1 || f.getUTCDate() !== d) return null;
   return `${a}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** «3 años», «8 meses», en el idioma de la app. Vacío si no hay fecha o es futura. Las cuentas son las de
+    edadTexto (@barkandmeow/schema), que escribe en español para el resumen que se sube. */
+export function edadEn(t: T, nacimiento: string, hoy: Date): string {
+  if (!nacimiento) return "";
+  const [a, m, d] = nacimiento.split("-").map(Number);
+  let meses = (hoy.getFullYear() - a) * 12 + (hoy.getMonth() + 1 - m);
+  if (hoy.getDate() < d) meses -= 1;
+  if (meses < 0) return "";
+  if (meses < 1) return t("salud.edad.menosMes");
+  if (meses < 12) return meses === 1 ? t("salud.edad.mes.uno") : t("salud.edad.mes.varios", { n: meses });
+  const anos = Math.floor(meses / 12);
+  return anos === 1 ? t("salud.edad.ano.uno") : t("salud.edad.ano.varios", { n: anos });
 }
 
 export const hoyIso = () => {

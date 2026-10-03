@@ -6,6 +6,7 @@ import { Boton, Cargando, CodigoActivacion, Fila, Pantalla, Paso, Seccion, Tarje
 import { impugnar, nuevoCodigoActivacion, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
+import { useT } from "@/lib/idioma";
 import { deIso, ir } from "@/lib/salud";
 import { espacio } from "@/lib/tema";
 
@@ -14,65 +15,55 @@ import { espacio } from "@/lib/tema";
    veterinario que no la conoce lo que no puede darle? */
 
 function Reclamacion({ m, alCambiar }: { m: Mascota; alCambiar: () => void }) {
+  const t = useT();
   const r = m.reclamacion;
   const [enviando, setEnviando] = useState(false);
   if (!r) return null;
-  const nombre = m.perfil.nombre || "tu mascota";
+  const nombre = m.perfil.nombre || t("mascota.tuMascota");
   if (r.rol === "reclamante")
     return (
       <Tarjeta tono="aviso">
         <Texto>
-          Has reclamado este chip, que estaba activo a nombre de otra persona.
+          {t("mascota.reclamante")}{" "}
           {r.estado === "abierta"
-            ? ` Si no lo impugna, pasará a ti el ${deIso(r.plazo)}.`
-            : " La otra persona la ha impugnado: revisaremos el caso con la documentación de las dos partes."}
+            ? t("mascota.reclamanteAbierta", { fecha: deIso(r.plazo) })
+            : t("mascota.reclamanteImpugnada")}
         </Texto>
       </Tarjeta>
     );
   if (r.estado === "impugnada")
     return (
       <Tarjeta tono="aviso">
-        <Texto>
-          Has impugnado la reclamación. El chip no cambiará de dueño mientras revisamos el caso; te escribiremos para
-          pedirte la documentación.
-        </Texto>
+        <Texto>{t("mascota.impugnada")}</Texto>
       </Tarjeta>
     );
 
   function alImpugnar() {
-    Alert.alert(
-      `¿Impugnar la reclamación sobre ${nombre}?`,
-      "El chip no cambiará de dueño y revisaremos el caso a mano con la documentación de las dos partes.",
-      [
-        { text: "No, volver", style: "cancel" },
-        {
-          text: "Sí, impugnar",
-          onPress: async () => {
-            setEnviando(true);
-            try {
-              await impugnar(r!.id);
-              alCambiar();
-            } catch {
-              Alert.alert("No se ha podido impugnar", "Vuelve a intentarlo en un momento o entra en el portal web.");
-            } finally {
-              setEnviando(false);
-            }
-          },
+    Alert.alert(t("mascota.impugnarPregunta", { nombre }), t("mascota.impugnarTexto"), [
+      { text: t("comun.volver"), style: "cancel" },
+      {
+        text: t("mascota.impugnarSi"),
+        onPress: async () => {
+          setEnviando(true);
+          try {
+            await impugnar(r!.id);
+            alCambiar();
+          } catch {
+            Alert.alert(t("mascota.impugnarError"), t("mascota.impugnarErrorTexto"));
+          } finally {
+            setEnviando(false);
+          }
         },
-      ],
-    );
+      },
+    ]);
   }
 
   return (
     <Tarjeta tono="alerta">
-      <Texto tono="fuerte">Alguien ha reclamado este chip</Texto>
-      <Texto>
-        Una clínica ha registrado que otra persona dice ser la dueña de {nombre} y ha llevado un animal con este chip.
-        Si no haces nada, el chip pasará a esa persona el {deIso(r.plazo)}. Mientras tanto, tu perfil público no se
-        muestra.
-      </Texto>
+      <Texto tono="fuerte">{t("mascota.reclamadoTitulo")}</Texto>
+      <Texto>{t("mascota.reclamadoTexto", { nombre, fecha: deIso(r.plazo) })}</Texto>
       <Boton variante="peligro" alPulsar={alImpugnar} ocupado={enviando}>
-        Impugnar: el animal es mío
+        {t("mascota.impugnarBoton")}
       </Boton>
     </Tarjeta>
   );
@@ -80,6 +71,7 @@ function Reclamacion({ m, alCambiar }: { m: Mascota; alCambiar: () => void }) {
 
 /** Genera un código de activación nuevo y lo muestra una sola vez. */
 function Activar({ m }: { m: Mascota }) {
+  const t = useT();
   const [codigo, setCodigo] = useState<{ codigoActivacion: string; caduca: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -88,7 +80,7 @@ function Activar({ m }: { m: Mascota }) {
     try {
       setCodigo(await nuevoCodigoActivacion(m.petId));
     } catch {
-      Alert.alert("No se ha podido generar el código", "Vuelve a intentarlo en un momento.");
+      Alert.alert(t("mascota.codigoError"), t("comun.errorReintentar"));
     } finally {
       setOcupado(false);
     }
@@ -97,12 +89,13 @@ function Activar({ m }: { m: Mascota }) {
   if (codigo) return <CodigoActivacion codigo={codigo.codigoActivacion} caduca={codigo.caduca} nombre={m.perfil.nombre.trim()} />;
   return (
     <Boton alPulsar={() => void generar()} ocupado={ocupado}>
-      Generar código de activación
+      {t("mascota.generarCodigo")}
     </Boton>
   );
 }
 
 export default function Resumen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { carga, refrescar, refrescando } = useCarga(yo);
   const [token, setToken] = useState<string | null>(null);
@@ -115,10 +108,10 @@ export default function Resumen() {
 
   return (
     <Pantalla alRefrescar={refrescar} refrescando={refrescando} sinBorde>
-      {carga.estado === "cargando" && <Cargando texto="Cargando…" />}
+      {carga.estado === "cargando" && <Cargando texto={t("comun.cargando")} />}
       {(carga.estado === "error" || (carga.estado === "listo" && !m)) && (
         <Tarjeta tono="alerta">
-          <Texto>No se ha podido cargar. Tira hacia abajo para reintentar.</Texto>
+          <Texto>{t("comun.errorCarga")}</Texto>
         </Tarjeta>
       )}
       {m && (
@@ -128,84 +121,76 @@ export default function Resumen() {
 
           {m.mensajes > 0 && (
             <Boton variante="secundario" alPulsar={() => router.navigate("/bandeja")}>
-              {m.mensajes === 1 ? "1 mensaje en la bandeja" : `${m.mensajes} mensajes en la bandeja`}
+              {m.mensajes === 1 ? t("mascota.mensajes.uno") : t("mascota.mensajes.varios", { n: m.mensajes })}
             </Boton>
           )}
 
-          <Seccion titulo="Si le pasa algo">
+          <Seccion titulo={t("mascota.siLePasa")}>
             <Paso
               hecho={m.ficha}
-              titulo={m.ficha ? "Ficha de salud escrita" : "Ficha de salud"}
-              detalle={
-                m.ficha
-                  ? "Alergias, medicación y enfermedades. Tenla al día."
-                  : "Si tiene alguna alergia o toma medicación, un veterinario de urgencias no lo sabrá. Son cinco minutos."
-              }
+              titulo={m.ficha ? t("mascota.fichaHecha") : t("comun.pantalla.salud")}
+              detalle={m.ficha ? t("mascota.fichaHechaTexto") : t("mascota.fichaFaltaTexto")}
             />
             <Boton variante={m.ficha ? "secundario" : "primario"} alPulsar={() => ir(`${base}/salud`)}>
-              {m.ficha ? "Ver la ficha de salud" : "Escribir la ficha de salud"}
+              {m.ficha ? t("mascota.verFicha") : t("mascota.escribirFicha")}
             </Boton>
             <Paso
               hecho={m.placa}
               opcional
-              titulo={m.placa ? "Placa del collar activa" : "Placa del collar"}
-              detalle={
-                m.placa
-                  ? "Quien la escanee ve el resumen de urgencia, en su idioma."
-                  : "Un QR en el collar que abre el resumen de urgencia en cualquier móvil."
-              }
+              titulo={m.placa ? t("mascota.placaActiva") : t("comun.pantalla.placa")}
+              detalle={m.placa ? t("mascota.placaActivaTexto") : t("mascota.placaFaltaTexto")}
             />
             <View style={{ gap: espacio.sm }}>
               <Boton variante="secundario" alPulsar={() => ir(`${base}/placa`)}>
-                {m.placa ? "Ver la placa" : "Preparar la placa"}
+                {m.placa ? t("mascota.verPlaca") : t("mascota.prepararPlaca")}
               </Boton>
               <Boton variante="secundario" alPulsar={() => ir(`${base}/compartir`)}>
-                Enseñar el historial a un veterinario
+                {t("mascota.ensenarHistorial")}
               </Boton>
             </View>
           </Seccion>
 
-          <Seccion titulo="Si se pierde">
+          <Seccion titulo={t("mascota.siSePierde")}>
             <Paso
               hecho={m.estado === "activa"}
-              titulo="Chip activado en una clínica"
+              titulo={t("mascota.chipActivado")}
               detalle={
                 m.estado === "pendiente"
-                  ? "Una clínica tiene que leerlo con tu mascota delante. Genera el código cuando vayas a ir: el anterior, si lo había, deja de valer."
+                  ? t("mascota.chipPendiente")
                   : m.activada
-                    ? `Desde el ${deIso(m.activada)}`
+                    ? t("mascota.chipDesde", { fecha: deIso(m.activada) })
                     : undefined
               }
             />
             {m.estado === "pendiente" && !m.reclamacion && <Activar m={m} />}
             <Paso
               hecho={m.perfil.publicado}
-              titulo="Perfil público visible"
-              detalle={m.perfil.publicado ? undefined : "Quien la encuentre no verá su nombre ni tu teléfono."}
+              titulo={t("mascota.perfilVisible")}
+              detalle={m.perfil.publicado ? undefined : t("mascota.perfilOculto")}
             />
             <Paso
               hecho={m.perfil.telefonos.length > 0}
-              titulo="Un teléfono para llamarte"
-              detalle={m.perfil.telefonos.map((t) => t.etiqueta || t.numero).join(" · ") || undefined}
+              titulo={t("mascota.telefono")}
+              detalle={m.perfil.telefonos.map((x) => x.etiqueta || x.numero).join(" · ") || undefined}
             />
             <Boton variante="secundario" alPulsar={() => ir(`${base}/perfil`)}>
-              Editar el perfil público
+              {t("mascota.editarPerfil")}
             </Boton>
-            <Texto tono="suave">La foto se sube desde barkandmeow.app/mi-mascota.</Texto>
+            <Texto tono="suave">{t("mascota.fotoWeb")}</Texto>
           </Seccion>
 
-          <Seccion titulo="Para viajar">
-            <Texto>Qué pide cada destino, qué consta ya y un QR para enseñarlo en la frontera.</Texto>
+          <Seccion titulo={t("mascota.paraViajar")}>
+            <Texto>{t("mascota.viajarTexto")}</Texto>
             <Boton variante="secundario" alPulsar={() => ir(`${base}/pasaporte`)}>
-              Pasaporte de viaje
+              {t("comun.pantalla.pasaporte")}
             </Boton>
           </Seccion>
 
-          <Seccion titulo="Tu clínica de siempre">
+          <Seccion titulo={t("mascota.clinica")}>
             <Fila
-              titulo="Permisos"
-              detalle="Quién tiene acceso permanente a la ficha, y cómo retirarlo."
-              accion="Abrir"
+              titulo={t("comun.tab.permisos")}
+              detalle={t("mascota.permisosTexto")}
+              accion={t("mascota.abrir")}
               alPulsar={() => router.navigate("/permisos")}
             />
           </Seccion>

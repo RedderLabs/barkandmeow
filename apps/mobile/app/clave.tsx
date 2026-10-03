@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { Boton, Campo, Pantalla, Texto, Titulo } from "@/components/ui";
 import { yo } from "@/lib/api";
 import { guardarClave } from "@/lib/almacen";
+import { useT } from "@/lib/idioma";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { claveDeDueno, deBase64, iguales, leerCodigo } from "@/lib/cripto";
 import { espacio } from "@/lib/tema";
@@ -13,6 +14,7 @@ import { espacio } from "@/lib/tema";
    el llavero. El código no sale del móvil. */
 
 export default function Clave() {
+  const t = useT();
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [comprobando, setComprobando] = useState(false);
@@ -21,7 +23,7 @@ export default function Clave() {
     setError(null);
     const semilla = leerCodigo(codigo);
     if (!semilla) {
-      setError("El código no es válido: revisa cada bloque en el papel.");
+      setError(t("entrada.clave.invalido"));
       return;
     }
     setComprobando(true);
@@ -31,14 +33,14 @@ export default function Clave() {
       const clave = claveDeDueno(semilla);
       const y = await yo();
       if (!iguales(clave.publica, deBase64(y.pubKey))) {
-        setError("Ese código es válido, pero no es el de esta cuenta.");
+        setError(t("entrada.clave.otraCuenta"));
         return;
       }
       await guardarClave(clave.secreta);
       rellenarRecuperacion(y, clave.secreta);
       router.back();
     } catch {
-      setError("No se ha podido comprobar. Revisa la conexión y vuelve a intentarlo.");
+      setError(t("entrada.clave.error"));
     } finally {
       setComprobando(false);
     }
@@ -47,14 +49,11 @@ export default function Clave() {
   return (
     <Pantalla>
       <View style={{ gap: espacio.sm }}>
-        <Titulo>Tu código de recuperación</Titulo>
-        <Texto tono="suave">
-          Son 8 bloques de 4 caracteres que apuntaste en papel al darte de alta. Con él, este móvil puede abrir tu
-          bandeja y la ficha de salud de tus mascotas.
-        </Texto>
+        <Titulo>{t("entrada.clave.titulo")}</Titulo>
+        <Texto tono="suave">{t("entrada.clave.intro")}</Texto>
       </View>
       <Campo
-        etiqueta="Código de recuperación"
+        etiqueta={t("entrada.clave.campo")}
         datos
         multiline
         value={codigo}
@@ -67,10 +66,10 @@ export default function Clave() {
         error={error}
       />
       <Boton alPulsar={() => void alEnviar()} ocupado={comprobando} desactivado={!codigo.trim()}>
-        Guardar la clave en este móvil
+        {t("entrada.clave.guardar")}
       </Boton>
       <Boton variante="secundario" alPulsar={() => router.back()}>
-        Ahora no
+        {t("entrada.clave.ahoraNo")}
       </Boton>
     </Pantalla>
   );

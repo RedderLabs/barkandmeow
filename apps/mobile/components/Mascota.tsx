@@ -3,6 +3,7 @@ import { Image, View } from "react-native";
 import { Text } from "@/components/texto";
 import { Boton, Cargando, Datos, Insignia, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { API, type Mascota } from "@/lib/api";
+import { useT } from "@/lib/idioma";
 import { ir, type EstadoFicha } from "@/lib/salud";
 import { espacio, fuente, useColores } from "@/lib/tema";
 
@@ -16,14 +17,18 @@ export const faltanDe = (m: Mascota) =>
 export const enReclamacion = (m: Mascota) => m.estado === "congelada" || m.reclamacion?.rol === "reclamante";
 
 export function InsigniaMascota({ m }: { m: Mascota }) {
+  const t = useT();
   const faltan = faltanDe(m);
-  if (enReclamacion(m)) return <Insignia tono="aviso">En reclamación</Insignia>;
-  if (faltan === 0) return <Insignia tono="listo">Todo en orden</Insignia>;
-  return <Insignia tono="aviso">{faltan === 1 ? "Falta 1 paso" : `Faltan ${faltan} pasos`}</Insignia>;
+  if (enReclamacion(m)) return <Insignia tono="aviso">{t("piezas.enReclamacion")}</Insignia>;
+  if (faltan === 0) return <Insignia tono="listo">{t("piezas.todoEnOrden")}</Insignia>;
+  return (
+    <Insignia tono="aviso">{faltan === 1 ? t("piezas.falta.uno") : t("piezas.falta.varios", { n: faltan })}</Insignia>
+  );
 }
 
 export function Identidad({ m, token }: { m: Mascota; token: string | null }) {
   const c = useColores();
+  const t = useT();
   const nombre = m.perfil.nombre.trim();
   return (
     <View style={{ flexDirection: "row", gap: espacio.lg, alignItems: "center" }}>
@@ -50,8 +55,8 @@ export function Identidad({ m, token }: { m: Mascota; token: string | null }) {
         </View>
       )}
       <View style={{ flex: 1, gap: espacio.xs }}>
-        <Titulo nivel={2}>{nombre || "Sin nombre"}</Titulo>
-        <Datos>CHIP ···· {m.chipPista ?? "····"}</Datos>
+        <Titulo nivel={2}>{nombre || t("piezas.sinNombre")}</Titulo>
+        <Datos>{t("piezas.chip", { pista: m.chipPista ?? "····" })}</Datos>
         <InsigniaMascota m={m} />
       </View>
     </View>
@@ -75,27 +80,25 @@ export function ConFicha({
   alRefrescar: () => void;
   children: (lista: Extract<EstadoFicha, { tipo: "lista" }>) => ReactNode;
 }) {
+  const t = useT();
   return (
     <Pantalla alRefrescar={alRefrescar} sinBorde>
       <View style={{ gap: espacio.sm }}>
         <Titulo>{titulo}</Titulo>
         <Texto tono="suave">{intro}</Texto>
       </View>
-      {estado.tipo === "cargando" && <Cargando texto="Abriendo la ficha…" />}
+      {estado.tipo === "cargando" && <Cargando texto={t("piezas.abriendoFicha")} />}
       {estado.tipo === "error" && (
         <Tarjeta tono="alerta">
-          <Texto tono="fuerte">No se ha podido abrir la ficha.</Texto>
-          <Texto>Revisa la conexión y tira hacia abajo para reintentar.</Texto>
+          <Texto tono="fuerte">{t("piezas.errorFicha")}</Texto>
+          <Texto>{t("piezas.errorFichaTexto")}</Texto>
         </Tarjeta>
       )}
       {estado.tipo === "sin-clave" && (
         <Tarjeta tono="aviso">
-          <Texto tono="fuerte">Este móvil no tiene tu clave</Texto>
-          <Texto>
-            La ficha se guarda cerrada con tu clave, y solo se abre donde está guardada. Escribe el código de
-            recuperación que apuntaste en papel al darte de alta: la clave se rehace aquí y no sale del móvil.
-          </Texto>
-          <Boton alPulsar={() => ir("/clave")}>Escribir el código</Boton>
+          <Texto tono="fuerte">{t("piezas.sinClave")}</Texto>
+          <Texto>{t("piezas.sinClaveTexto")}</Texto>
+          <Boton alPulsar={() => ir("/clave")}>{t("piezas.escribirCodigo")}</Boton>
         </Tarjeta>
       )}
       {estado.tipo === "lista" && children(estado)}

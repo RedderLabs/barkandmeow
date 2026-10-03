@@ -10,6 +10,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ProveedorAjustes, useEscala } from "@/lib/ajustes";
+import { useT } from "@/lib/idioma";
 import { ProveedorSesion, useSesion } from "@/lib/sesion";
 import { fuente, useColores } from "@/lib/tema";
 import type { DatosPush } from "@/lib/push";
@@ -33,6 +34,7 @@ function useAbrirDesdeAviso() {
 function Navegacion() {
   const c = useColores();
   const k = useEscala();
+  const t = useT();
   const { estado } = useSesion();
   useAbrirDesdeAviso();
   useEffect(() => {
@@ -52,12 +54,12 @@ function Navegacion() {
         {/* Lo de una mascota va encima de las pestañas, con su flecha de volver. */}
         {(
           [
-            ["mascota/[id]/index", "Mi mascota"],
-            ["mascota/[id]/salud", "Ficha de salud"],
-            ["mascota/[id]/placa", "Placa del collar"],
-            ["mascota/[id]/compartir", "Compartir"],
-            ["mascota/[id]/perfil", "Perfil público"],
-            ["mascota/[id]/pasaporte", "Pasaporte de viaje"],
+            ["mascota/[id]/index", "comun.pantalla.mascota"],
+            ["mascota/[id]/salud", "comun.pantalla.salud"],
+            ["mascota/[id]/placa", "comun.pantalla.placa"],
+            ["mascota/[id]/compartir", "comun.pantalla.compartir"],
+            ["mascota/[id]/perfil", "comun.pantalla.perfil"],
+            ["mascota/[id]/pasaporte", "comun.pantalla.pasaporte"],
           ] as const
         ).map(([name, title]) => (
           <Stack.Screen
@@ -65,7 +67,7 @@ function Navegacion() {
             name={name}
             options={{
               headerShown: true,
-              title,
+              title: t(title),
               headerBackButtonDisplayMode: "minimal",
               headerStyle: { backgroundColor: c.surface },
               headerTintColor: c.accent,

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { aBase64, cargarCripto, firmarRegistro } from "@barkandmeow/crypto";
-import { abrirTodos } from "../lib/bandeja.ts";
+import { abrirTodos, resumenRegistro } from "../lib/bandeja.ts";
 
 const wasm = await cargarCripto(
   readFileSync(new URL("../../../packages/crypto/wasm/bm_crypto.wasm", import.meta.url)),
@@ -47,8 +47,8 @@ test("notas, avisos, informes y certificados firmados", () => {
   assert.deepEqual(nota.contenido, { tipo: "nota", clinica: "Sur", motivo: "Revisión", diagnostico: "Sano", tratamiento: "", observaciones: "" });
   assert.equal(aviso.contenido.tipo, "aviso");
   assert.equal(informe.contenido.tipo, "informe");
-  assert.deepEqual(cert.contenido, {
-    tipo: "certificado",
+  assert.equal(cert.contenido.tipo, "certificado");
+  assert.deepEqual(cert.contenido.tipo === "certificado" && resumenRegistro(cert.contenido.registro), {
     titulo: "Vacuna de la rabia",
     detalle: "14/03/2026 · Nobivac · lote A1 · válida hasta 14/03/2027",
   });

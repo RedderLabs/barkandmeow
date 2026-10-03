@@ -5,9 +5,12 @@
    gestión y registros firmados (vacunas, desparasitaciones, análisis). El
    contenido lo escribe quien sella, no el servidor: se valida campo a campo. */
 
+import { fmt } from "@barkandmeow/i18n";
 import { registroClinico, sobreFirmado, type RegistroClinico } from "@barkandmeow/schema";
 import { abrirSellado, deBase64, firmaValida } from "./cripto";
 import type { MensajeSellado, Origen } from "./api";
+import type { T } from "./idioma";
+import { TEXTOS } from "./textos";
 
 export type Contenido =
   | { tipo: "nota"; clinica: string; motivo: string; diagnostico: string; tratamiento: string; observaciones: string }
@@ -22,13 +25,17 @@ export type Contenido =
       observaciones: string;
       firmado?: boolean;
     }
-  | { tipo: "certificado"; titulo: string; detalle: string }
+  // El título se escribe al enseñarlo, en el idioma de la app: resumenRegistro.
+  | { tipo: "certificado"; registro: Exclude<RegistroClinico, { tipo: "informe" }> }
   | { tipo: "firma-mala" }
   | { tipo: "ilegible" };
 
 export type Mensaje = { id: string; petId: string; llegada: string; origen: Origen | null; contenido: Contenido };
 
 const texto = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+/** Para quien no tiene `t` a mano (y las pruebas): los textos en español. */
+const enEspanol: T = (clave, valores) => (valores ? fmt(TEXTOS.es[clave], valores) : TEXTOS.es[clave]);
 
 /**
  * Un registro firmado vale si la firma es de la clave de la conexión que lo
@@ -48,26 +55,43 @@ function comprobar(
   }
 }
 
-/** Título y una línea de detalle de un registro de viaje. */
-export function resumenRegistro(r: { tipo: string } & Record<string, unknown>): { titulo: string; detalle: string } {
+/** Título y una línea de detalle de un registro de viaje. Las fechas, dd/mm/aaaa en todos los idiomas. */
+export function resumenRegistro(
+  r: { tipo: string } & Record<string, unknown>,
+  t: T = enEspanol,
+): { titulo: string; detalle: string } {
   const f = (x: unknown) => (typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x.split("-").reverse().join("/") : "");
   const partes = (xs: unknown[]) => xs.filter((x) => typeof x === "string" && x).join(" · ");
   if (r.tipo === "vacuna")
     return {
-      titulo: r.enfermedad === "rabia" ? "Vacuna de la rabia" : `Vacuna${r.nombre ? `: ${r.nombre}` : ""}`,
-      detalle: partes([f(r.fecha), r.producto, r.lote && `lote ${r.lote}`, f(r.validaHasta) && `válida hasta ${f(r.validaHasta)}`]),
+      titulo:
+        r.enfermedad === "rabia"
+          ? t("bandeja.reg.vacunaRabia")
+          : r.nombre
+            ? t("bandeja.reg.vacunaDe", { nombre: String(r.nombre) })
+            : t("bandeja.reg.vacuna"),
+      detalle: partes([
+        f(r.fecha),
+        r.producto,
+        r.lote && t("bandeja.reg.lote", { lote: String(r.lote) }),
+        f(r.validaHasta) && t("bandeja.reg.validaHasta", { fecha: f(r.validaHasta) }),
+      ]),
     };
   if (r.tipo === "desparasitacion")
     return {
-      titulo: r.contra === "equinococo" ? "Tratamiento contra la tenia" : "Desparasitación",
+      titulo: r.contra === "equinococo" ? t("bandeja.reg.tenia") : t("bandeja.reg.desparasitacion"),
       detalle: partes([f(r.fecha) && `${f(r.fecha)} ${r.hora ?? ""}`.trim(), r.producto]),
     };
   if (r.tipo === "titulacion")
     return {
-      titulo: "Análisis de anticuerpos de la rabia",
-      detalle: partes([`${r.resultado} UI/ml`, f(r.fechaMuestra) && `muestra del ${f(r.fechaMuestra)}`, r.laboratorio]),
+      titulo: t("bandeja.reg.titulacion"),
+      detalle: partes([
+        `${r.resultado} UI/ml`,
+        f(r.fechaMuestra) && t("bandeja.reg.muestra", { fecha: f(r.fechaMuestra) }),
+        r.laboratorio,
+      ]),
     };
-  return { titulo: "Registro", detalle: "" };
+  return { titulo: t("bandeja.reg.registro"), detalle: "" };
 }
 
 export function interpretar(claro: Uint8Array, origen: Origen | null): Contenido {
@@ -94,7 +118,7 @@ export function interpretar(claro: Uint8Array, origen: Origen | null): Contenido
         observaciones: r.observaciones,
         firmado: true,
       };
-    return { tipo: "certificado", ...resumenRegistro(r) };
+    return { tipo: "certificado", registro: r };
   }
   if (j.tipo === "nota")
     return {

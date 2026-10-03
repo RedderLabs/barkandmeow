@@ -14,10 +14,13 @@ import {
   sobreFirmado,
   type PasaporteDueno,
   type RegistroEvaluable,
+  type Requisito,
 } from "@barkandmeow/schema";
 import { aBase64, aBase64Url, abrir, abrirSellado, cerrar, clavePasaporte, deBase64, firmaValida, ad } from "./cripto";
 import { resumenRegistro } from "./bandeja";
 import type { MensajeSellado } from "./api";
+import type { Clave, T } from "./idioma";
+import textos from "./textos/pasaporte";
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -67,7 +70,7 @@ export function firmadosDeBandeja(
 export type FilaPasaporte = { id: string; certificado: boolean; titulo: string; detalle: string; clinica: string };
 
 /** Lo que cuenta para un viaje y cómo enseñarlo: lo firmado se comprueba cada vez. */
-export function registrosDeViaje(datos: PasaporteDueno, deBandeja: Firmado[] = []) {
+export function registrosDeViaje(datos: PasaporteDueno, deBandeja: Firmado[] = [], t?: T) {
   const evaluables: RegistroEvaluable[] = [];
   const filas: FilaPasaporte[] = [];
   const firmados = [...datos.certificados.map((x) => ({ ...x, clinica: x.origen.clinica })), ...deBandeja];
@@ -81,13 +84,40 @@ export function registrosDeViaje(datos: PasaporteDueno, deBandeja: Firmado[] = [
     }
     if (!r.success || r.data.tipo === "informe") continue;
     evaluables.push({ origen: "certificado", registro: r.data } as RegistroEvaluable);
-    filas.push({ id: x.id, certificado: true, ...resumenRegistro(r.data), clinica: r.data.clinica || x.clinica });
+    filas.push({ id: x.id, certificado: true, ...resumenRegistro(r.data, t), clinica: r.data.clinica || x.clinica });
   }
   for (const d of datos.declarados) {
     evaluables.push({ origen: "declarado", registro: { ...d.registro, chip: d.registro.chip ?? datos.chip } } as RegistroEvaluable);
-    filas.push({ id: d.id, certificado: false, ...resumenRegistro(d.registro), clinica: d.registro.clinica });
+    filas.push({ id: d.id, certificado: false, ...resumenRegistro(d.registro, t), clinica: d.registro.clinica });
   }
   return { evaluables, filas };
+}
+
+/* evaluarViaje() escribe los requisitos en español. Cada texto se reconoce con
+   su plantilla «pasaporte.req.*», se sacan sus huecos (fechas, número) y se
+   vuelve a escribir en el idioma elegido. Lo que no encaje con ninguna se
+   enseña tal cual: mejor en español que nada. */
+const escapar = (s: string) => s.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+const PLANTILLAS = (Object.entries(textos.es) as [Clave, string][])
+  .filter(([k]) => k.startsWith("pasaporte.req."))
+  .map(([clave, es]) => {
+    const trozos = es.split(/\{(\w+)\}/);
+    const huecos = trozos.filter((_, i) => i % 2 === 1);
+    const patron = trozos.map((x, i) => (i % 2 ? "(.+?)" : escapar(x))).join("");
+    return { clave, huecos, re: new RegExp(`^${patron}$`) };
+  });
+
+function traducirTexto(texto: string, t: T): string {
+  for (const p of PLANTILLAS) {
+    const m = p.re.exec(texto);
+    if (m) return t(p.clave, Object.fromEntries(p.huecos.map((h, i) => [h, m[i + 1]])));
+  }
+  return texto;
+}
+
+/** El título y el detalle de un requisito de viaje en el idioma de `t`. */
+export function traducirRequisito(r: Pick<Requisito, "titulo" | "detalle">, t: T) {
+  return { titulo: traducirTexto(r.titulo, t), detalle: traducirTexto(r.detalle, t) };
 }
 
 /** El pasaporte cifrado con la clave del enlace, y el enlace: lo abre la web del veterinario en /p. */

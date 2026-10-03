@@ -6,8 +6,10 @@ import { fichaLista, terminoCronica, terminoReaccion, type FichaDueno } from "@b
 import { ConFicha } from "@/components/Mascota";
 import { Qr } from "@/components/Qr";
 import { Boton, Datos, Fila, Opciones, Seccion, Tarjeta, Texto } from "@/components/ui";
+import { useIdioma } from "@/lib/ajustes";
 import { ErrorApi, quitarPlaca, WEB, type Mascota } from "@/lib/api";
 import { enlacePlaca, nuevaPlaca } from "@/lib/ficha";
+import { useT } from "@/lib/idioma";
 import { deIso, hoyIso, ir, useFicha, type Cambiar } from "@/lib/salud";
 import { espacio, fuente, useColores } from "@/lib/tema";
 
@@ -19,63 +21,73 @@ import { espacio, fuente, useColores } from "@/lib/tema";
 
 /** Lo que enseñará la placa, dicho como en una ficha de papel. */
 function Resumen({ f, telefono }: { f: FichaDueno; telefono: string }) {
+  const t = useT();
+  const idioma = useIdioma();
   const c = useColores();
   return (
     <View>
       {f.alergias.length > 0 && (
         <Tarjeta tono="alerta">
           <Texto estilo={{ fontFamily: fuente.textoFuerte, fontSize: 13, letterSpacing: 0.8, color: c.alertInk }}>
-            ALERGIAS
+            {t("salud.alergias").toUpperCase()}
           </Texto>
           {f.alergias.map((a) => (
             <View key={a.id} style={{ gap: 2 }}>
               <Texto estilo={{ fontFamily: fuente.textoFuerte, fontSize: 17, color: c.alertInk }}>{a.sustancia}</Texto>
-              <Texto estilo={{ color: c.alertSoftInk }}>{terminoReaccion(a).es}</Texto>
+              <Texto estilo={{ color: c.alertSoftInk }}>{terminoReaccion(a)[idioma]}</Texto>
             </View>
           ))}
         </Tarjeta>
       )}
-      {f.alergias.length === 0 && <Fila titulo="Alergias" detalle="Ninguna registrada" />}
+      {f.alergias.length === 0 && <Fila titulo={t("salud.alergias")} detalle={t("placa.ningunaRegistrada")} />}
       <Fila
-        titulo="Medicación"
-        detalle={f.medicacion.length ? f.medicacion.map((m) => [m.principio, m.dosis].filter(Boolean).join(" ")).join(" · ") : "Ninguna"}
-      />
-      <Fila
-        titulo="Enfermedades crónicas"
-        detalle={f.cronicas.length ? f.cronicas.map((x) => terminoCronica(x).es).join(" · ") : "Ninguna registrada"}
-      />
-      <Fila
-        titulo="Rabia"
+        titulo={t("placa.medicacion")}
         detalle={
-          f.rabiaHasta ? `${f.rabiaHasta < hoyIso() ? "Caducó el" : "Válida hasta el"} ${deIso(f.rabiaHasta)}` : "No consta"
+          f.medicacion.length
+            ? f.medicacion.map((m) => [m.principio, m.dosis].filter(Boolean).join(" ")).join(" · ")
+            : t("placa.ninguna")
         }
       />
-      <Fila titulo="Teléfono" detalle={telefono || "No se enseña"} />
+      <Fila
+        titulo={t("salud.cronicas")}
+        detalle={
+          f.cronicas.length
+            ? f.cronicas.map((x) => terminoCronica(x)[idioma]).join(" · ")
+            : t("placa.ningunaRegistrada")
+        }
+      />
+      <Fila
+        titulo={t("placa.rabia")}
+        detalle={
+          f.rabiaHasta
+            ? t(f.rabiaHasta < hoyIso() ? "placa.caduco" : "placa.validaHasta", { fecha: deIso(f.rabiaHasta) })
+            : t("placa.noConsta")
+        }
+      />
+      <Fila titulo={t("placa.telefono")} detalle={telefono || t("placa.noSeEnsena")} />
     </View>
   );
 }
 
 function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaDueno; cambiar: Cambiar; alCambiar: () => void }) {
+  const t = useT();
   const nombre = m.perfil.nombre.trim();
-  const llamar = nombre || "tu mascota";
+  const llamar = nombre || t("mascota.tuMascota");
   const telefonos = m.perfil.telefonos;
   const [telefono, setTelefono] = useState(telefonos[0]?.numero ?? "");
   const [ocupado, setOcupado] = useState(false);
   const base = `/mascota/${m.petId}`;
 
   const opcionesTelefono = [
-    ...telefonos.map((t) => [t.numero, t.etiqueta ? `${t.numero} · ${t.etiqueta}` : t.numero] as const),
-    ["", "Ninguno"] as const,
+    ...telefonos.map((x) => [x.numero, x.etiqueta ? `${x.numero} · ${x.etiqueta}` : x.numero] as const),
+    ["", t("placa.ninguno")] as const,
   ];
 
   if (!fichaLista(datos))
     return (
-      <Seccion titulo="Antes, la ficha de salud">
-        <Texto>
-          La placa enseña el resumen de urgencia de {llamar}: sus alergias, lo que toma y sus enfermedades. Escribe
-          primero la ficha; después vuelve aquí y la placa se crea con un botón.
-        </Texto>
-        <Boton alPulsar={() => ir(`${base}/salud`)}>Escribir la ficha de salud</Boton>
+      <Seccion titulo={t("placa.antesFicha")}>
+        <Texto>{t("placa.antesFichaTexto", { nombre: llamar })}</Texto>
+        <Boton alPulsar={() => ir(`${base}/salud`)}>{t("mascota.escribirFicha")}</Boton>
       </Seccion>
     );
 
@@ -91,17 +103,17 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
   }
 
   function sustituir() {
-    Alert.alert("¿Sustituir la placa?", "El QR de ahora dejará de funcionar y tendrás que imprimir el nuevo. La ficha de salud no cambia.", [
-      { text: "No, volver", style: "cancel" },
-      { text: "Sí, crear un QR nuevo", onPress: () => void crear() },
+    Alert.alert(t("placa.sustituirPregunta"), t("placa.sustituirTexto"), [
+      { text: t("comun.volver"), style: "cancel" },
+      { text: t("placa.sustituirSi"), onPress: () => void crear() },
     ]);
   }
 
   function retirar() {
-    Alert.alert("¿Retirar la placa?", `El QR dejará de abrir nada y ${llamar} se quedará sin placa. Puedes crear otra cuando quieras.`, [
-      { text: "No, volver", style: "cancel" },
+    Alert.alert(t("placa.retirarPregunta"), t("placa.retirarTexto", { nombre: llamar }), [
+      { text: t("comun.volver"), style: "cancel" },
       {
-        text: "Sí, retirarla",
+        text: t("placa.retirarSi"),
         style: "destructive",
         onPress: async () => {
           setOcupado(true);
@@ -113,7 +125,7 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
             await cambiar((d) => ({ ...d, placa: null }));
             alCambiar();
           } catch {
-            Alert.alert("No se ha podido retirar", "Vuelve a intentarlo en un momento.");
+            Alert.alert(t("placa.retirarError"), t("comun.errorReintentar"));
           } finally {
             setOcupado(false);
           }
@@ -126,20 +138,20 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
   if (!placa)
     return (
       <>
-        <Seccion titulo="Crear la placa">
-          <Texto>
-            Quien la escanee con el móvil ve el resumen de urgencia de {llamar} en su idioma, sin instalar nada: un
-            veterinario de guardia en otro país, o quien la encuentre.
-          </Texto>
-          <Opciones etiqueta="Teléfono que enseña la placa" opciones={opcionesTelefono} valor={telefono} alElegir={setTelefono} />
-          {telefonos.length === 0 && (
-            <Texto tono="suave">No tienes teléfonos en el perfil público. Se añaden en barkandmeow.app/mi-mascota.</Texto>
-          )}
+        <Seccion titulo={t("placa.crear")}>
+          <Texto>{t("placa.crearTexto", { nombre: llamar })}</Texto>
+          <Opciones
+            etiqueta={t("placa.telefonoQueEnsena")}
+            opciones={opcionesTelefono}
+            valor={telefono}
+            alElegir={setTelefono}
+          />
+          {telefonos.length === 0 && <Texto tono="suave">{t("placa.sinTelefonos")}</Texto>}
           <Boton alPulsar={() => void crear()} ocupado={ocupado}>
-            Crear la placa
+            {t("placa.crear")}
           </Boton>
         </Seccion>
-        <Seccion titulo="Esto es lo que enseñará">
+        <Seccion titulo={t("placa.loQueEnsenara")}>
           <Resumen f={datos} telefono={telefono} />
         </Seccion>
       </>
@@ -148,22 +160,20 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
   const url = enlacePlaca(WEB, placa);
   return (
     <>
-      <Seccion titulo="Placa activa">
-        <Qr valor={url} etiqueta={`Código QR de la placa de ${llamar}`} />
-        <Texto>
-          Imprímelo o grábalo en una chapa y ponlo en su collar. También puedes escribir el enlace en una etiqueta NFC.
-        </Texto>
+      <Seccion titulo={t("placa.activa")}>
+        <Qr valor={url} etiqueta={t("placa.qr", { nombre: llamar })} />
+        <Texto>{t("placa.imprimir")}</Texto>
         <View style={{ gap: espacio.sm }}>
-          <Boton alPulsar={() => void Share.share({ message: url })}>Enviar o guardar el enlace</Boton>
+          <Boton alPulsar={() => void Share.share({ message: url })}>{t("placa.enviarEnlace")}</Boton>
         </View>
-        <Datos>Creada el {deIso(placa.creada)}</Datos>
-        <Texto tono="suave">No hay que cambiarla nunca: cuando actualizas la ficha, el mismo QR enseña lo nuevo.</Texto>
+        <Datos>{t("placa.creada", { fecha: deIso(placa.creada) })}</Datos>
+        <Texto tono="suave">{t("placa.noCambiar")}</Texto>
       </Seccion>
 
-      <Seccion titulo="Lo que ve quien la escanea">
+      <Seccion titulo={t("placa.loQueVe")}>
         <Resumen f={datos} telefono={placa.telefono} />
         <Opciones
-          etiqueta="Teléfono que enseña la placa"
+          etiqueta={t("placa.telefonoQueEnsena")}
           opciones={
             placa.telefono && !telefonos.some((t) => t.numero === placa.telefono)
               ? [[placa.telefono, placa.telefono] as const, ...opcionesTelefono]
@@ -172,23 +182,17 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
           valor={placa.telefono}
           alElegir={(v) => void cambiar((d) => (d.placa ? { ...d, placa: { ...d.placa, telefono: v } } : d))}
         />
-        <Texto tono="suave">
-          Además, el nombre, la especie, el sexo, la edad y el peso. Lo escribes tú: en la pantalla del veterinario
-          sale como información del dueño, no como un registro oficial.
-        </Texto>
+        <Texto tono="suave">{t("placa.ademas")}</Texto>
       </Seccion>
 
-      <Seccion titulo="Si pierdes la placa">
-        <Texto>
-          Quien tenga el QR puede ver el resumen de urgencia. Si la placa se pierde, sustitúyela: el QR anterior deja de
-          abrir nada al momento.
-        </Texto>
+      <Seccion titulo={t("placa.siPierdes")}>
+        <Texto>{t("placa.siPierdesTexto")}</Texto>
         <View style={{ gap: espacio.sm }}>
           <Boton variante="secundario" alPulsar={sustituir} ocupado={ocupado}>
-            Sustituir la placa
+            {t("placa.sustituir")}
           </Boton>
           <Boton variante="peligro" alPulsar={retirar} desactivado={ocupado}>
-            Retirar la placa
+            {t("placa.retirar")}
           </Boton>
         </View>
       </Seccion>
@@ -197,13 +201,14 @@ function Contenido({ m, datos, cambiar, alCambiar }: { m: Mascota; datos: FichaD
 }
 
 export default function Placa() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { estado, cambiar, recargar } = useFicha(id);
   return (
     <ConFicha
       estado={estado}
-      titulo="Placa del collar"
-      intro="Un QR que abre el resumen de urgencia en cualquier móvil, en el idioma de quien lo lee."
+      titulo={t("comun.pantalla.placa")}
+      intro={t("placa.intro")}
       alRefrescar={() => void recargar()}
     >
       {({ m, datos }) => <Contenido m={m} datos={datos} cambiar={cambiar} alCambiar={() => void recargar()} />}

@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import type { ComponentProps } from "react";
 import type { ColorValue } from "react-native";
 import { useEscala } from "@/lib/ajustes";
+import { useT } from "@/lib/idioma";
 import { fuente, useColores } from "@/lib/tema";
 
 type Icono = ComponentProps<typeof Ionicons>["name"];
@@ -17,6 +18,7 @@ const icono =
 export default function Dentro() {
   const c = useColores();
   const k = useEscala();
+  const t = useT();
   return (
     <Tabs
       screenOptions={{
@@ -28,10 +30,10 @@ export default function Dentro() {
         sceneStyle: { backgroundColor: c.ground },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Mis mascotas", tabBarIcon: icono("paw", "paw-outline") }} />
-      <Tabs.Screen name="bandeja" options={{ title: "Bandeja", tabBarIcon: icono("mail", "mail-outline") }} />
-      <Tabs.Screen name="permisos" options={{ title: "Permisos", tabBarIcon: icono("key", "key-outline") }} />
-      <Tabs.Screen name="cuenta" options={{ title: "Cuenta", tabBarIcon: icono("person-circle", "person-circle-outline") }} />
+      <Tabs.Screen name="index" options={{ title: t("comun.tab.mascotas"), tabBarIcon: icono("paw", "paw-outline") }} />
+      <Tabs.Screen name="bandeja" options={{ title: t("comun.tab.bandeja"), tabBarIcon: icono("mail", "mail-outline") }} />
+      <Tabs.Screen name="permisos" options={{ title: t("comun.tab.permisos"), tabBarIcon: icono("key", "key-outline") }} />
+      <Tabs.Screen name="cuenta" options={{ title: t("comun.tab.cuenta"), tabBarIcon: icono("person-circle", "person-circle-outline") }} />
     </Tabs>
   );
 }

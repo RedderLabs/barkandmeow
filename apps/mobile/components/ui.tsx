@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput } from "@/components/texto";
+import { useT } from "@/lib/idioma";
 import { espacio, fuente, radio, toque, useColores } from "@/lib/tema";
 
 export function Pantalla({
@@ -229,6 +230,7 @@ export function Boton({
             fontFamily: fuente.textoFuerte,
             fontSize: 16,
             color: primario ? c.accentOn : variante === "peligro" ? c.alertInk : c.ink,
+            textAlign: "center",
           }}
         >
           {children}
@@ -264,6 +266,7 @@ export function Paso({
   opcional?: boolean;
 }) {
   const c = useColores();
+  const t = useT();
   return (
     <View style={{ flexDirection: "row", gap: espacio.md, alignItems: "flex-start" }}>
       <View
@@ -285,8 +288,7 @@ export function Paso({
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Texto estilo={{ fontFamily: fuente.textoFuerte }}>
-          {hecho ? "" : opcional ? "Opcional: " : "Falta: "}
-          {titulo}
+          {hecho ? titulo : t(opcional ? "piezas.paso.opcional" : "piezas.paso.falta", { titulo })}
         </Texto>
         {detalle ? <Texto tono="suave">{detalle}</Texto> : null}
       </View>
@@ -415,6 +417,7 @@ export function Fila({
 /** El código de activación: se enseña en la clínica, de un vistazo. Solo se muestra una vez. */
 export function CodigoActivacion({ codigo, caduca, nombre }: { codigo: string; caduca: string; nombre: string }) {
   const c = useColores();
+  const t = useT();
   const d = new Date(caduca);
   const hasta = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
   return (
@@ -430,7 +433,7 @@ export function CodigoActivacion({ codigo, caduca, nombre }: { codigo: string; c
       }}
     >
       <Text style={{ fontFamily: fuente.textoFuerte, fontSize: 13, letterSpacing: 0.8, color: c.accentSoftInk }}>
-        CÓDIGO DE ACTIVACIÓN
+        {t("piezas.codigo.titulo")}
       </Text>
       <Text
         selectable
@@ -439,9 +442,7 @@ export function CodigoActivacion({ codigo, caduca, nombre }: { codigo: string; c
         {codigo}
       </Text>
       <Text style={{ fontFamily: fuente.texto, fontSize: 14, lineHeight: 20, color: c.accentSoftInk }}>
-        Llévalo a tu clínica veterinaria junto con {nombre || "tu mascota"}: leerán su chip y teclearán este código.
-        Vale hasta el {hasta}. Apúntalo o hazle una captura: no se puede volver a mostrar, aunque sí puedes generar
-        otro.
+        {t("piezas.codigo.texto", { nombre: nombre || t("piezas.codigo.tuMascota"), hasta })}
       </Text>
     </View>
   );

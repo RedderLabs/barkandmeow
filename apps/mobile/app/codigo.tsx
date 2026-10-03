@@ -3,6 +3,7 @@ import { Redirect, router } from "expo-router";
 import { View } from "react-native";
 import { Boton, Campo, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { ErrorApi } from "@/lib/api";
+import { useT } from "@/lib/idioma";
 import { useSesion } from "@/lib/sesion";
 import { espacio } from "@/lib/tema";
 
@@ -11,6 +12,7 @@ import { espacio } from "@/lib/tema";
 
 export default function Codigo() {
   const { paso, confirmar, reenviar } = useSesion();
+  const t = useT();
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [nota, setNota] = useState<string | null>(null);
@@ -28,10 +30,16 @@ export default function Codigo() {
     } catch (e) {
       if (e instanceof ErrorApi && e.estado === 400) {
         const quedan = e.datos.intentosRestantes;
-        setError(typeof quedan === "number" ? `Código incorrecto. Te quedan ${quedan} intentos.` : "Código incorrecto.");
+        setError(
+          typeof quedan !== "number"
+            ? t("entrada.codigo.incorrecto")
+            : quedan === 1
+              ? t("entrada.codigo.incorrecto.uno")
+              : t("entrada.codigo.incorrecto.varios", { n: quedan }),
+        );
       } else if (e instanceof ErrorApi && (e.estado === 410 || e.estado === 429)) {
-        setError("El código ha caducado o se han agotado los intentos. Vuelve a empezar.");
-      } else setError("No se ha podido comprobar el código. Vuelve a intentarlo.");
+        setError(t("entrada.codigo.caducado"));
+      } else setError(t("entrada.codigo.errorComprobar"));
     } finally {
       setEnviando(false);
     }
@@ -44,13 +52,12 @@ export default function Codigo() {
     try {
       await reenviar(canal);
       setCodigo("");
-      setNota("Te hemos enviado un código nuevo. El anterior ya no vale.");
+      setNota(t("entrada.codigo.nuevo"));
     } catch (e) {
       const segundos = e instanceof ErrorApi ? e.datos.segundos : undefined;
-      if (typeof segundos === "number") setNota(`Espera ${segundos} s antes de pedir otro código.`);
-      else if (e instanceof ErrorApi && e.datos.motivo === "sin-cupo-sms")
-        setNota("Has llegado al límite de SMS de hoy. Pide el código por correo.");
-      else setError("No se ha podido enviar otro código.");
+      if (typeof segundos === "number") setNota(t("entrada.codigo.espera", { n: segundos }));
+      else if (e instanceof ErrorApi && e.datos.motivo === "sin-cupo-sms") setNota(t("entrada.codigo.sinSms"));
+      else setError(t("entrada.codigo.errorEnvio"));
     } finally {
       setReenviando(false);
     }
@@ -59,15 +66,15 @@ export default function Codigo() {
   return (
     <Pantalla>
       <View style={{ gap: espacio.sm }}>
-        <Titulo>Escribe el código</Titulo>
+        <Titulo>{t("entrada.codigo.titulo")}</Titulo>
         <Texto tono="suave">
-          {porSms ? "Te lo hemos enviado por SMS al " : "Te lo hemos enviado a "}
-          <Texto tono="fuerte">{paso.destino}</Texto>. Caduca en 15 minutos.
+          {t(porSms ? "entrada.codigo.porSms" : "entrada.codigo.porCorreo")}{" "}
+          <Texto tono="fuerte">{paso.destino}</Texto>. {t("entrada.codigo.caduca")}
         </Texto>
       </View>
       <View style={{ gap: espacio.xl }}>
         <Campo
-          etiqueta="Código"
+          etiqueta={t("entrada.codigo.campo")}
           datos
           value={codigo}
           onChangeText={setCodigo}
@@ -86,18 +93,18 @@ export default function Codigo() {
           </Tarjeta>
         )}
         <Boton alPulsar={() => void alConfirmar()} ocupado={enviando} desactivado={codigo.trim().length < 8}>
-          Entrar
+          {t("entrada.codigo.entrar")}
         </Boton>
         <Boton variante="secundario" alPulsar={() => void alReenviar()} ocupado={reenviando}>
-          Enviar otro código
+          {t("entrada.codigo.otro")}
         </Boton>
         {paso.otroCanal && (
           <Boton variante="secundario" alPulsar={() => void alReenviar(paso.otroCanal!)}>
-            {paso.otroCanal === "sms" ? "Recibirlo por SMS" : "Recibirlo por correo"}
+            {t(paso.otroCanal === "sms" ? "entrada.codigo.recibirSms" : "entrada.codigo.recibirCorreo")}
           </Boton>
         )}
         <Boton variante="secundario" alPulsar={() => router.replace("/entrar")}>
-          Volver
+          {t("entrada.codigo.volver")}
         </Boton>
       </View>
     </Pantalla>

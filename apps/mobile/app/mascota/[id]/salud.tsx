@@ -5,7 +5,6 @@ import { View } from "react-native";
 import {
   CRONICAS,
   REACCIONES,
-  edadTexto,
   terminoCronica,
   terminoReaccion,
   type AlergiaFicha,
@@ -15,7 +14,9 @@ import {
 } from "@barkandmeow/schema";
 import { ConFicha } from "@/components/Mascota";
 import { Boton, Campo, Fila, Opciones, Seccion, Tarjeta, Texto } from "@/components/ui";
-import { aIso, deIso, hoyIso, useFicha, type Cambiar } from "@/lib/salud";
+import { useIdioma } from "@/lib/ajustes";
+import { useT, type Clave, type T } from "@/lib/idioma";
+import { aIso, deIso, edadEn, hoyIso, useFicha, type Cambiar } from "@/lib/salud";
 import { espacio, fuente, useColores } from "@/lib/tema";
 
 /* La ficha de salud en el teléfono: la misma que en el portal. Lo que un
@@ -24,48 +25,50 @@ import { espacio, fuente, useColores } from "@/lib/tema";
    van por principio activo, nunca por marca: la marca cambia de país a país. */
 
 const ESPECIES = [
-  ["dog", "Perro"],
-  ["cat", "Gato"],
-  ["ferret", "Hurón"],
-  ["rabbit", "Conejo"],
-  ["bird", "Ave"],
-  ["rodent", "Roedor"],
-  ["reptile", "Reptil"],
-] as const;
+  ["dog", "salud.especie.dog"],
+  ["cat", "salud.especie.cat"],
+  ["ferret", "salud.especie.ferret"],
+  ["rabbit", "salud.especie.rabbit"],
+  ["bird", "salud.especie.bird"],
+  ["rodent", "salud.especie.rodent"],
+  ["reptile", "salud.especie.reptile"],
+] as const satisfies readonly (readonly [string, Clave])[];
 
 const SEXOS = [
-  ["hembra", "Hembra"],
-  ["macho", "Macho"],
-] as const;
+  ["hembra", "salud.sexo.hembra"],
+  ["macho", "salud.sexo.macho"],
+] as const satisfies readonly (readonly [string, Clave])[];
 
 const SI_NO = [
-  ["si", "Sí"],
-  ["no", "No"],
-] as const;
+  ["si", "salud.si"],
+  ["no", "salud.no"],
+] as const satisfies readonly (readonly [string, Clave])[];
 
-const GRAVEDADES: readonly (readonly [Gravedad, string])[] = [
-  ["alta", "Grave"],
-  ["media", "Moderada"],
-  ["baja", "Leve"],
-];
-const nombreGravedad: Record<Gravedad, string> = { alta: "Grave", media: "Moderada", baja: "Leve" };
+const GRAVEDADES = [
+  ["alta", "salud.gravedad.alta"],
+  ["media", "salud.gravedad.media"],
+  ["baja", "salud.gravedad.baja"],
+] as const satisfies readonly (readonly [Gravedad, Clave])[];
+const nombreGravedad = Object.fromEntries(GRAVEDADES) as Record<Gravedad, Clave>;
 
 const CADA = [
-  [8, "Cada 8 h"],
-  [12, "Cada 12 h"],
-  [24, "Una vez al día"],
-  [48, "Cada 2 días"],
-  [168, "Cada semana"],
-  [720, "Cada mes"],
-] as const;
-const cadaTexto = (h: number) => CADA.find(([x]) => x === h)?.[1].toLowerCase() ?? `cada ${h} horas`;
+  [8, "salud.cada.8"],
+  [12, "salud.cada.12"],
+  [24, "salud.cada.24"],
+  [48, "salud.cada.48"],
+  [168, "salud.cada.168"],
+  [720, "salud.cada.720"],
+] as const satisfies readonly (readonly [number, Clave])[];
+const cadaTexto = (t: T, h: number) => {
+  const k = CADA.find(([x]) => x === h)?.[1];
+  return k ? t(k).toLowerCase() : t("salud.cada.horas", { n: h });
+};
 
-const REACCIONES_OPC = [...Object.entries(REACCIONES).map(([c, t]) => [c, t.es] as const), ["otra", "Otra cosa"] as const] as readonly (readonly [
-  AlergiaFicha["reaccion"],
-  string,
-])[];
+/** Pasa una lista [valor, clave] a [valor, texto] para <Opciones>. */
+const traducir = <V,>(t: T, lista: readonly (readonly [V, Clave])[]) => lista.map(([v, k]) => [v, t(k)] as const);
 
 function Basico({ f, cambiar, chipPista }: { f: FichaDueno; cambiar: Cambiar; chipPista: string | null }) {
+  const t = useT();
   const [especie, setEspecie] = useState(f.especie);
   const [sexo, setSexo] = useState(f.sexo);
   const [esterilizado, setEsterilizado] = useState(f.esterilizado);
@@ -77,17 +80,17 @@ function Basico({ f, cambiar, chipPista }: { f: FichaDueno; cambiar: Cambiar; ch
   const [guardando, setGuardando] = useState(false);
 
   const nacimientoIso = aIso(nacimiento);
-  const edad = nacimientoIso ? edadTexto(nacimientoIso, new Date()) : "";
+  const edad = nacimientoIso ? edadEn(t, nacimientoIso, new Date()) : "";
 
   async function guardar() {
     const limpio = chip.replace(/[\s.-]/g, "");
-    if (!sexo) return setError("Marca si es hembra o macho: sin eso la ficha no se puede enseñar.");
-    if (nacimientoIso === null) return setError("La fecha de nacimiento, así: 14/05/2021.");
-    if (nacimientoIso > hoyIso()) return setError("La fecha de nacimiento no puede ser futura.");
-    if (peso.trim() && !/^\d{1,3}([.,]\d{1,2})?$/.test(peso.trim())) return setError("El peso, en kilos: por ejemplo 12,4.");
-    if (limpio && !/^[0-9A-Za-z]{6,23}$/.test(limpio)) return setError("El número de chip no tiene ese formato.");
+    if (!sexo) return setError(t("salud.error.sexo"));
+    if (nacimientoIso === null) return setError(t("salud.error.nacimiento"));
+    if (nacimientoIso > hoyIso()) return setError(t("salud.error.futura"));
+    if (peso.trim() && !/^\d{1,3}([.,]\d{1,2})?$/.test(peso.trim())) return setError(t("salud.error.peso"));
+    if (limpio && !/^[0-9A-Za-z]{6,23}$/.test(limpio)) return setError(t("salud.error.chip"));
     if (limpio && chipPista && !limpio.endsWith(chipPista))
-      return setError(`Ese número no acaba en ${chipPista}, como el chip de esta mascota. Revísalo.`);
+      return setError(t("salud.error.chipPista", { pista: chipPista }));
     setError(null);
     setGuardando(true);
     await cambiar((d) => ({
@@ -105,18 +108,31 @@ function Basico({ f, cambiar, chipPista }: { f: FichaDueno; cambiar: Cambiar; ch
   }
 
   return (
-    <Seccion titulo="Lo básico">
-      <Opciones etiqueta="Especie" opciones={ESPECIES} valor={especie as (typeof ESPECIES)[number][0]} alElegir={setEspecie} />
-      <Opciones etiqueta="Sexo" opciones={SEXOS} valor={sexo} alElegir={setSexo} />
+    <Seccion titulo={t("salud.basico")}>
       <Opciones
-        etiqueta={sexo === "macho" ? "Esterilizado" : sexo === "hembra" ? "Esterilizada" : "Esterilización"}
-        opciones={SI_NO}
+        etiqueta={t("salud.especie")}
+        opciones={traducir(t, ESPECIES)}
+        valor={especie as (typeof ESPECIES)[number][0]}
+        alElegir={setEspecie}
+      />
+      <Opciones etiqueta={t("salud.sexo")} opciones={traducir(t, SEXOS)} valor={sexo} alElegir={setSexo} />
+      <Opciones
+        etiqueta={t(
+          sexo === "macho" ? "salud.esterilizado" : sexo === "hembra" ? "salud.esterilizada" : "salud.esterilizacion",
+        )}
+        opciones={traducir(t, SI_NO)}
         valor={esterilizado ? "si" : "no"}
         alElegir={(v) => setEsterilizado(v === "si")}
       />
-      <Campo etiqueta="Raza" placeholder="Mestiza, labrador…" maxLength={80} value={raza} onChangeText={setRaza} />
       <Campo
-        etiqueta={edad ? `Fecha de nacimiento · ${edad.toLowerCase()}` : "Fecha de nacimiento"}
+        etiqueta={t("salud.raza")}
+        placeholder={t("salud.razaEjemplo")}
+        maxLength={80}
+        value={raza}
+        onChangeText={setRaza}
+      />
+      <Campo
+        etiqueta={edad ? t("salud.nacimientoEdad", { edad }) : t("salud.nacimiento")}
         datos
         placeholder="14/05/2021"
         keyboardType="numbers-and-punctuation"
@@ -125,16 +141,16 @@ function Basico({ f, cambiar, chipPista }: { f: FichaDueno; cambiar: Cambiar; ch
         onChangeText={setNacimiento}
       />
       <Campo
-        etiqueta="Peso, en kilos"
+        etiqueta={t("salud.peso")}
         datos
-        placeholder="12,4"
+        placeholder={t("salud.pesoEjemplo")}
         keyboardType="decimal-pad"
         maxLength={6}
         value={peso}
         onChangeText={setPeso}
       />
       <Campo
-        etiqueta={`Número completo del chip (opcional, acaba en ${chipPista ?? "····"})`}
+        etiqueta={t("salud.chip", { pista: chipPista ?? "····" })}
         datos
         keyboardType="number-pad"
         maxLength={32}
@@ -143,13 +159,15 @@ function Basico({ f, cambiar, chipPista }: { f: FichaDueno; cambiar: Cambiar; ch
         error={error}
       />
       <Boton alPulsar={() => void guardar()} ocupado={guardando}>
-        Guardar
+        {t("comun.guardar")}
       </Boton>
     </Seccion>
   );
 }
 
 function Alergias({ f, cambiar, nombre }: { f: FichaDueno; cambiar: Cambiar; nombre: string }) {
+  const t = useT();
+  const idioma = useIdioma();
   const c = useColores();
   const [sustancia, setSustancia] = useState("");
   const [reaccion, setReaccion] = useState<AlergiaFicha["reaccion"]>("urticaria");
@@ -159,9 +177,9 @@ function Alergias({ f, cambiar, nombre }: { f: FichaDueno; cambiar: Cambiar; nom
   const [ocupado, setOcupado] = useState(false);
 
   async function anadir() {
-    if (!sustancia.trim()) return setError("Escribe a qué tiene alergia: un medicamento o un alimento.");
-    if (reaccion === "otra" && !texto.trim()) return setError("Describe la reacción en pocas palabras.");
-    if (f.alergias.length >= 20) return setError("Hay demasiadas alergias apuntadas. Quita alguna.");
+    if (!sustancia.trim()) return setError(t("salud.error.sustancia"));
+    if (reaccion === "otra" && !texto.trim()) return setError(t("salud.error.reaccion"));
+    if (f.alergias.length >= 20) return setError(t("salud.error.muchasAlergias"));
     setError(null);
     setOcupado(true);
     const nueva: AlergiaFicha = {
@@ -181,55 +199,66 @@ function Alergias({ f, cambiar, nombre }: { f: FichaDueno; cambiar: Cambiar; nom
     }
   }
 
+  const reacciones = [
+    ...Object.entries(REACCIONES).map(([k, x]) => [k as AlergiaFicha["reaccion"], x[idioma]] as const),
+    ["otra", t("salud.reaccionOtra")] as const,
+  ];
+
   return (
-    <Seccion titulo="Alergias">
+    <Seccion titulo={t("salud.alergias")}>
       {f.alergias.length === 0 ? (
         // Sin alergias no hay bloque rojo: un rojo que dice «ninguna» enseña a ignorar el rojo.
-        <Texto tono="suave">Ninguna registrada.</Texto>
+        <Texto tono="suave">{t("salud.ningunaRegistrada")}</Texto>
       ) : (
         <Tarjeta tono="alerta">
           <Texto estilo={{ fontFamily: fuente.textoFuerte, fontSize: 13, letterSpacing: 0.8, color: c.alertInk }}>
-            ALERGIAS DE {(nombre || "tu mascota").toUpperCase()}
+            {t("salud.alergiasDe", { nombre: (nombre || t("mascota.tuMascota")).toUpperCase() })}
           </Texto>
           {f.alergias.map((a) => (
             <View key={a.id} style={{ flexDirection: "row", alignItems: "center", gap: espacio.md }}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Texto estilo={{ fontFamily: fuente.textoFuerte, fontSize: 17, color: c.alertInk }}>{a.sustancia}</Texto>
                 <Texto estilo={{ color: c.alertSoftInk }}>
-                  {terminoReaccion(a).es} · {nombreGravedad[a.gravedad]}
+                  {terminoReaccion(a)[idioma]} · {t(nombreGravedad[a.gravedad])}
                 </Texto>
               </View>
               <Boton
                 variante="peligro"
                 alPulsar={() => void cambiar((d) => ({ ...d, alergias: d.alergias.filter((x) => x.id !== a.id) }))}
               >
-                Quitar
+                {t("salud.quitar")}
               </Boton>
             </View>
           ))}
         </Tarjeta>
       )}
       <Campo
-        etiqueta="Alergia a (principio activo o alimento, no la marca)"
-        placeholder="Amoxicilina, pollo…"
+        etiqueta={t("salud.alergiaA")}
+        placeholder={t("salud.alergiaEjemplo")}
         maxLength={80}
         value={sustancia}
         onChangeText={setSustancia}
       />
-      <Opciones etiqueta="Qué le pasa" opciones={REACCIONES_OPC} valor={reaccion} alElegir={setReaccion} />
+      <Opciones etiqueta={t("salud.reaccion")} opciones={reacciones} valor={reaccion} alElegir={setReaccion} />
       {reaccion === "otra" && (
-        <Campo etiqueta="Descríbelo (se enseña sin traducir)" maxLength={80} value={texto} onChangeText={setTexto} />
+        <Campo etiqueta={t("salud.reaccionTexto")} maxLength={80} value={texto} onChangeText={setTexto} />
       )}
-      <Opciones etiqueta="Gravedad" opciones={GRAVEDADES} valor={gravedad} alElegir={setGravedad} />
+      <Opciones
+        etiqueta={t("salud.gravedad")}
+        opciones={traducir(t, GRAVEDADES)}
+        valor={gravedad}
+        alElegir={setGravedad}
+      />
       {error ? <Texto estilo={{ color: c.alertInk }}>{error}</Texto> : null}
       <Boton variante="secundario" alPulsar={() => void anadir()} ocupado={ocupado}>
-        Añadir alergia
+        {t("salud.anadirAlergia")}
       </Boton>
     </Seccion>
   );
 }
 
 function Medicacion({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
+  const t = useT();
   const c = useColores();
   const [principio, setPrincipio] = useState("");
   const [dosis, setDosis] = useState("");
@@ -238,8 +267,8 @@ function Medicacion({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
   const [ocupado, setOcupado] = useState(false);
 
   async function anadir() {
-    if (!principio.trim()) return setError("Escribe qué toma.");
-    if (f.medicacion.length >= 20) return setError("Hay demasiados medicamentos apuntados. Quita alguno.");
+    if (!principio.trim()) return setError(t("salud.error.principio"));
+    if (f.medicacion.length >= 20) return setError(t("salud.error.muchosMedicamentos"));
     setError(null);
     setOcupado(true);
     const nuevo = { id: Crypto.randomUUID(), principio: principio.trim(), dosis: dosis.trim(), cadaHoras: cada };
@@ -252,40 +281,49 @@ function Medicacion({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
   }
 
   return (
-    <Seccion titulo="Medicación habitual">
+    <Seccion titulo={t("salud.medicacion")}>
       {f.medicacion.length === 0 ? (
-        <Texto tono="suave">No toma nada de forma habitual.</Texto>
+        <Texto tono="suave">{t("salud.sinMedicacion")}</Texto>
       ) : (
         <View>
           {f.medicacion.map((m) => (
             <Fila
               key={m.id}
               titulo={m.principio}
-              detalle={[m.dosis, cadaTexto(m.cadaHoras)].filter(Boolean).join(" · ")}
-              accion="Quitar"
+              detalle={[m.dosis, cadaTexto(t, m.cadaHoras)].filter(Boolean).join(" · ")}
+              accion={t("salud.quitar")}
               alPulsar={() => void cambiar((d) => ({ ...d, medicacion: d.medicacion.filter((x) => x.id !== m.id) }))}
             />
           ))}
         </View>
       )}
       <Campo
-        etiqueta="Qué toma (el principio activo, no la marca)"
-        placeholder="Omeprazol"
+        etiqueta={t("salud.principio")}
+        placeholder={t("salud.principioEjemplo")}
         maxLength={80}
         value={principio}
         onChangeText={setPrincipio}
       />
-      <Campo etiqueta="Dosis" datos placeholder="10 mg" maxLength={40} value={dosis} onChangeText={setDosis} />
-      <Opciones etiqueta="Cada cuánto" opciones={CADA} valor={cada} alElegir={setCada} />
+      <Campo
+        etiqueta={t("salud.dosis")}
+        datos
+        placeholder="10 mg"
+        maxLength={40}
+        value={dosis}
+        onChangeText={setDosis}
+      />
+      <Opciones etiqueta={t("salud.cada")} opciones={traducir(t, CADA)} valor={cada} alElegir={setCada} />
       {error ? <Texto estilo={{ color: c.alertInk }}>{error}</Texto> : null}
       <Boton variante="secundario" alPulsar={() => void anadir()} ocupado={ocupado}>
-        Añadir medicamento
+        {t("salud.anadirMedicamento")}
       </Boton>
     </Seccion>
   );
 }
 
 function Cronicas({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
+  const t = useT();
+  const idioma = useIdioma();
   const c = useColores();
   const [codigo, setCodigo] = useState<CronicaFicha["codigo"] | null>(null);
   const [texto, setTexto] = useState("");
@@ -295,14 +333,14 @@ function Cronicas({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
   const opciones = [
     ...Object.entries(CRONICAS)
       .filter(([k]) => !ya.has(k as CronicaFicha["codigo"]))
-      .map(([k, t]) => [k as CronicaFicha["codigo"], t.es] as const),
-    ["otra", "Otra"] as const,
+      .map(([k, x]) => [k as CronicaFicha["codigo"], x[idioma]] as const),
+    ["otra", t("salud.cronicaOtra")] as const,
   ];
 
   async function anadir() {
-    if (!codigo) return setError("Elige una de la lista.");
-    if (codigo === "otra" && !texto.trim()) return setError("Escribe cuál.");
-    if (f.cronicas.length >= 20) return setError("Hay demasiadas apuntadas. Quita alguna.");
+    if (!codigo) return setError(t("salud.error.elegir"));
+    if (codigo === "otra" && !texto.trim()) return setError(t("salud.error.cual"));
+    if (f.cronicas.length >= 20) return setError(t("salud.error.muchasCronicas"));
     setError(null);
     setOcupado(true);
     const nueva: CronicaFicha = { id: Crypto.randomUUID(), codigo, texto: codigo === "otra" ? texto.trim() : "" };
@@ -315,27 +353,29 @@ function Cronicas({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
   }
 
   return (
-    <Seccion titulo="Enfermedades crónicas">
+    <Seccion titulo={t("salud.cronicas")}>
       {f.cronicas.length === 0 ? (
-        <Texto tono="suave">Ninguna registrada.</Texto>
+        <Texto tono="suave">{t("salud.ningunaRegistrada")}</Texto>
       ) : (
         <View>
           {f.cronicas.map((x) => (
             <Fila
               key={x.id}
-              titulo={terminoCronica(x).es}
-              accion="Quitar"
+              titulo={terminoCronica(x)[idioma]}
+              accion={t("salud.quitar")}
               alPulsar={() => void cambiar((d) => ({ ...d, cronicas: d.cronicas.filter((y) => y.id !== x.id) }))}
             />
           ))}
         </View>
       )}
-      <Opciones etiqueta="Añadir una (solo las que haya diagnosticado un veterinario)" opciones={opciones} valor={codigo} alElegir={setCodigo} />
-      {codigo === "otra" && <Campo etiqueta="Cuál (se enseña sin traducir)" maxLength={80} value={texto} onChangeText={setTexto} />}
+      <Opciones etiqueta={t("salud.cronicaAnadir")} opciones={opciones} valor={codigo} alElegir={setCodigo} />
+      {codigo === "otra" && (
+        <Campo etiqueta={t("salud.cronicaTexto")} maxLength={80} value={texto} onChangeText={setTexto} />
+      )}
       {error ? <Texto estilo={{ color: c.alertInk }}>{error}</Texto> : null}
       {codigo && (
         <Boton variante="secundario" alPulsar={() => void anadir()} ocupado={ocupado}>
-          Añadir enfermedad
+          {t("salud.anadirEnfermedad")}
         </Boton>
       )}
     </Seccion>
@@ -343,6 +383,7 @@ function Cronicas({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
 }
 
 function Rabia({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
+  const t = useT();
   const [hasta, setHasta] = useState(deIso(f.rabiaHasta));
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -350,7 +391,7 @@ function Rabia({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
 
   async function guardar() {
     const iso = aIso(hasta);
-    if (iso === null) return setError("La fecha, así: 14/03/2027. Déjala vacía si no consta.");
+    if (iso === null) return setError(t("salud.error.rabia"));
     setError(null);
     setOcupado(true);
     await cambiar((d) => ({ ...d, rabiaHasta: iso }));
@@ -358,9 +399,9 @@ function Rabia({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
   }
 
   return (
-    <Seccion titulo="Vacuna de la rabia">
+    <Seccion titulo={t("salud.rabia")}>
       <Campo
-        etiqueta="Válida hasta (la fecha de su cartilla)"
+        etiqueta={t("salud.rabiaHasta")}
         datos
         placeholder="14/03/2027"
         keyboardType="numbers-and-punctuation"
@@ -371,25 +412,26 @@ function Rabia({ f, cambiar }: { f: FichaDueno; cambiar: Cambiar }) {
       />
       {caducada && (
         <Tarjeta tono="aviso">
-          <Texto>Según esta fecha, la vacuna caducó el {deIso(f.rabiaHasta)}. Si ya se la han puesto, actualízala.</Texto>
+          <Texto>{t("salud.rabiaCaducada", { fecha: deIso(f.rabiaHasta) })}</Texto>
         </Tarjeta>
       )}
       <Boton variante="secundario" alPulsar={() => void guardar()} ocupado={ocupado}>
-        Guardar la fecha
+        {t("salud.guardarFecha")}
       </Boton>
     </Seccion>
   );
 }
 
 export default function Salud() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { estado, cambiar, recargar } = useFicha(id);
 
   return (
     <ConFicha
       estado={estado}
-      titulo="Ficha de salud"
-      intro="Lo que un veterinario que no conoce a tu mascota necesita saber antes de darle nada. Se guarda cifrada con tu clave: nadie la ve hasta que tú la enseñes."
+      titulo={t("comun.pantalla.salud")}
+      intro={t("salud.intro")}
       alRefrescar={() => void recargar()}
     >
       {({ datos, m }) => {
@@ -408,9 +450,8 @@ export default function Salud() {
             <Cronicas f={datos} cambiar={cambiar} />
             <Rabia key={datos.rabiaHasta} f={datos} cambiar={cambiar} />
             <Texto tono="suave">
-              {datos.actualizado ? `Guardada por última vez el ${deIso(datos.actualizado)}. ` : ""}
-              Lo que escribes aquí sale marcado como «declarado por el dueño»: no pesa lo mismo que un informe firmado
-              por una clínica.
+              {datos.actualizado ? `${t("salud.guardada", { fecha: deIso(datos.actualizado) })} ` : ""}
+              {t("salud.declarado")}
             </Texto>
           </>
         );

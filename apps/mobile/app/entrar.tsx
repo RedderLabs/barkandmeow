@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Image, useColorScheme, View } from "react-native";
 import { Boton, Campo, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { API, ErrorApi, identificar } from "@/lib/api";
+import { useT } from "@/lib/idioma";
 import { useSesion } from "@/lib/sesion";
 import { espacio } from "@/lib/tema";
 
@@ -16,6 +17,7 @@ const URL_RECUPERAR = `${API.replace(/\/api$/, "")}/mi-mascota/recuperar`;
 
 export default function Entrar() {
   const { entrar } = useSesion();
+  const t = useT();
   const oscuro = useColorScheme() === "dark";
   const [chip, setChip] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +29,7 @@ export default function Entrar() {
     setError(null);
     const id = identificar(chip);
     if (!id) {
-      setErrorChip("Escribe los 15 dígitos del chip (o los 9–10 caracteres de un chip antiguo).");
+      setErrorChip(t("entrada.entrar.errorChip"));
       return;
     }
     setErrorChip(null);
@@ -36,11 +38,10 @@ export default function Entrar() {
       await entrar(id, password);
       router.push("/codigo");
     } catch (e) {
-      if (e instanceof ErrorApi && e.estado === 401) setError("El chip o la contraseña no son correctos.");
-      else if (e instanceof ErrorApi && e.estado === 429)
-        setError("Demasiados intentos seguidos. Espera un minuto y vuelve a probar.");
-      else if (e instanceof ErrorApi && e.estado === 0) setError("Sin conexión. Comprueba la red y vuelve a intentarlo.");
-      else setError("No se ha podido enviar el código. Vuelve a intentarlo en un momento.");
+      if (e instanceof ErrorApi && e.estado === 401) setError(t("entrada.entrar.error401"));
+      else if (e instanceof ErrorApi && e.estado === 429) setError(t("entrada.entrar.error429"));
+      else if (e instanceof ErrorApi && e.estado === 0) setError(t("entrada.entrar.errorRed"));
+      else setError(t("entrada.entrar.errorEnvio"));
     } finally {
       setEnviando(false);
     }
@@ -57,12 +58,12 @@ export default function Entrar() {
           style={{ width: 200, height: oscuro ? 75 : 65 }}
           resizeMode="contain"
         />
-        <Titulo>Entrar</Titulo>
-        <Texto tono="suave">Con el chip de tu mascota y tu contraseña.</Texto>
+        <Titulo>{t("entrada.entrar.titulo")}</Titulo>
+        <Texto tono="suave">{t("entrada.entrar.intro")}</Texto>
       </View>
       <View style={{ gap: espacio.xl }}>
         <Campo
-          etiqueta="Número de chip"
+          etiqueta={t("entrada.entrar.chip")}
           datos
           value={chip}
           onChangeText={setChip}
@@ -73,7 +74,7 @@ export default function Entrar() {
           error={errorChip}
         />
         <Campo
-          etiqueta="Contraseña"
+          etiqueta={t("entrada.entrar.clave")}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -87,17 +88,14 @@ export default function Entrar() {
           </Tarjeta>
         )}
         <Boton alPulsar={() => void alEnviar()} ocupado={enviando} desactivado={!chip.trim() || !password}>
-          Continuar
+          {t("entrada.entrar.continuar")}
         </Boton>
         {/* La recuperación pide el código en papel: se hace en el portal web. */}
         <Boton variante="secundario" alPulsar={() => void Linking.openURL(URL_RECUPERAR)}>
-          ¿Has olvidado la contraseña?
+          {t("entrada.entrar.olvidada")}
         </Boton>
       </View>
-      <Texto tono="suave">
-        ¿Aún no tienes cuenta? Date de alta en barkandmeow.app/mi-mascota: allí se genera el código de
-        recuperación en papel que abre tu bandeja.
-      </Texto>
+      <Texto tono="suave">{t("entrada.entrar.alta")}</Texto>
     </Pantalla>
   );
 }

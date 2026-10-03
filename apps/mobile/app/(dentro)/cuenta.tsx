@@ -2,12 +2,14 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Alert, View } from "react-native";
 import { Boton, Cargando, Opciones, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
-import { useAjustes, type Letra, type Tema } from "@/lib/ajustes";
+import { IDIOMAS } from "@barkandmeow/i18n";
+import { useAjustes, type Letra, type PreferenciaIdioma, type Tema } from "@/lib/ajustes";
 import { yo } from "@/lib/api";
 import { leerClave, leerPush } from "@/lib/almacen";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { deBase64, iguales, publica } from "@/lib/cripto";
 import { useCarga } from "@/lib/datos";
+import { useT, type Clave } from "@/lib/idioma";
 import { activarPush } from "@/lib/push";
 import { useSesion } from "@/lib/sesion";
 import { espacio } from "@/lib/tema";
@@ -23,40 +25,58 @@ async function cargar() {
 }
 
 const motivos = {
-  simulador: "Los avisos solo funcionan en un móvil de verdad, no en el simulador.",
-  permiso: "Sin permiso para notificaciones. Actívalo en los ajustes del sistema.",
-  "sin-proyecto": "Esta compilación no tiene configurados los avisos (falta EAS_PROJECT_ID).",
-  error: "No se ha podido registrar este móvil. Vuelve a intentarlo.",
-} as const;
+  simulador: "cuenta.motivo.simulador",
+  permiso: "cuenta.motivo.permiso",
+  "sin-proyecto": "cuenta.motivo.sinProyecto",
+  error: "cuenta.motivo.error",
+} as const satisfies Record<string, Clave>;
 
 const TEMAS = [
-  ["sistema", "El del sistema"],
-  ["claro", "Claro"],
-  ["oscuro", "Oscuro"],
-] as const satisfies readonly (readonly [Tema, string])[];
+  ["sistema", "cuenta.tema.sistema"],
+  ["claro", "cuenta.tema.claro"],
+  ["oscuro", "cuenta.tema.oscuro"],
+] as const satisfies readonly (readonly [Tema, Clave])[];
 
 const LETRAS = [
-  ["normal", "Normal"],
-  ["grande", "Grande"],
-  ["muy-grande", "Muy grande"],
-] as const satisfies readonly (readonly [Letra, string])[];
+  ["normal", "cuenta.letra.normal"],
+  ["grande", "cuenta.letra.grande"],
+  ["muy-grande", "cuenta.letra.muyGrande"],
+] as const satisfies readonly (readonly [Letra, Clave])[];
+
+/** Cada idioma se nombra en sí mismo: quien no entiende el actual reconoce el suyo. */
+const NOMBRES = { es: "Español", pt: "Português", en: "English", fr: "Français" } as const;
 
 /** Cómo se ve la app en este móvil. Se guarda aquí, no en la cuenta. */
 function Apariencia() {
-  const { tema, letra, elegirTema, elegirLetra } = useAjustes();
+  const t = useT();
+  const { tema, letra, idioma, elegirTema, elegirLetra, elegirIdioma } = useAjustes();
+  const idiomas: (readonly [PreferenciaIdioma, string])[] = [
+    ["sistema", t("cuenta.idioma.sistema")],
+    ...IDIOMAS.map((i) => [i, NOMBRES[i]] as const),
+  ];
   return (
     <Tarjeta>
-      <Texto tono="fuerte">Pantalla</Texto>
-      <Opciones etiqueta="Tema" opciones={TEMAS} valor={tema} alElegir={elegirTema} />
-      <Opciones etiqueta="Tamaño de letra" opciones={LETRAS} valor={letra} alElegir={elegirLetra} />
-      <Texto tono="suave">
-        Se aplica solo en este móvil. El tamaño se suma al que tengas puesto en los ajustes del sistema.
-      </Texto>
+      <Texto tono="fuerte">{t("cuenta.pantalla")}</Texto>
+      <Opciones etiqueta={t("cuenta.idioma")} opciones={idiomas} valor={idioma} alElegir={elegirIdioma} />
+      <Opciones
+        etiqueta={t("cuenta.tema")}
+        opciones={TEMAS.map(([v, k]) => [v, t(k)] as const)}
+        valor={tema}
+        alElegir={elegirTema}
+      />
+      <Opciones
+        etiqueta={t("cuenta.letra")}
+        opciones={LETRAS.map(([v, k]) => [v, t(k)] as const)}
+        valor={letra}
+        alElegir={elegirLetra}
+      />
+      <Texto tono="suave">{t("cuenta.pantallaNota")}</Texto>
     </Tarjeta>
   );
 }
 
 export default function Cuenta() {
+  const t = useT();
   const { salir } = useSesion();
   const { carga, refrescar } = useCarga(cargar);
   const [activando, setActivando] = useState(false);
@@ -66,15 +86,15 @@ export default function Cuenta() {
     setActivando(true);
     const fallo = await activarPush();
     setActivando(false);
-    if (fallo) Alert.alert("Avisos sin activar", motivos[fallo]);
+    if (fallo) Alert.alert(t("cuenta.avisosNo"), t(motivos[fallo]));
     await refrescar();
   }
 
   function alSalir() {
-    Alert.alert("¿Salir de la cuenta?", "Este móvil dejará de recibir avisos y olvidará tu clave. El papel la rehace.", [
-      { text: "No, volver", style: "cancel" },
+    Alert.alert(t("cuenta.salirPregunta"), t("cuenta.salirTexto"), [
+      { text: t("comun.volver"), style: "cancel" },
       {
-        text: "Sí, salir",
+        text: t("cuenta.salirSi"),
         style: "destructive",
         onPress: async () => {
           setSaliendo(true);
@@ -86,32 +106,25 @@ export default function Cuenta() {
 
   return (
     <Pantalla>
-      <Titulo>Cuenta</Titulo>
-      {carga.estado === "cargando" && <Cargando texto="Cargando…" />}
+      <Titulo>{t("cuenta.titulo")}</Titulo>
+      {carga.estado === "cargando" && <Cargando texto={t("comun.cargando")} />}
       {carga.estado === "listo" && (
         <View style={{ gap: espacio.lg }}>
           <Tarjeta>
-            <Texto tono="suave">Correo</Texto>
+            <Texto tono="suave">{t("cuenta.correo")}</Texto>
             <Texto tono="fuerte">{carga.datos.correo}</Texto>
           </Tarjeta>
           <Tarjeta tono={carga.datos.clave ? "normal" : "aviso"}>
-            <Texto tono="fuerte">{carga.datos.clave ? "Clave guardada en este móvil" : "Este móvil no tiene tu clave"}</Texto>
-            <Texto tono="suave">
-              {carga.datos.clave
-                ? "Tu bandeja se abre aquí. La clave vive en el llavero del sistema y no sale del móvil."
-                : "Sin ella no se pueden abrir los mensajes de la bandeja."}
-            </Texto>
-            {!carga.datos.clave && <Boton alPulsar={() => router.push("/clave")}>Escribir el código</Boton>}
+            <Texto tono="fuerte">{t(carga.datos.clave ? "cuenta.claveSi" : "cuenta.claveNo")}</Texto>
+            <Texto tono="suave">{t(carga.datos.clave ? "cuenta.claveSiTexto" : "cuenta.claveNoTexto")}</Texto>
+            {!carga.datos.clave && <Boton alPulsar={() => router.push("/clave")}>{t("cuenta.escribirCodigo")}</Boton>}
           </Tarjeta>
           <Tarjeta tono={carga.datos.push ? "normal" : "aviso"}>
-            <Texto tono="fuerte">{carga.datos.push ? "Avisos activados" : "Avisos sin activar"}</Texto>
-            <Texto tono="suave">
-              Te avisamos cuando llega un mensaje o reclaman el chip. El aviso no dice nada del contenido: lo lees al
-              abrir la app.
-            </Texto>
+            <Texto tono="fuerte">{t(carga.datos.push ? "cuenta.avisosSi" : "cuenta.avisosNo")}</Texto>
+            <Texto tono="suave">{t("cuenta.avisosTexto")}</Texto>
             {!carga.datos.push && (
               <Boton variante="secundario" alPulsar={() => void alActivar()} ocupado={activando}>
-                Activar avisos
+                {t("cuenta.activarAvisos")}
               </Boton>
             )}
           </Tarjeta>
@@ -119,7 +132,7 @@ export default function Cuenta() {
       )}
       <Apariencia />
       <Boton variante="peligro" alPulsar={alSalir} ocupado={saliendo}>
-        Salir
+        {t("cuenta.salir")}
       </Boton>
     </Pantalla>
   );

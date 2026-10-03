@@ -8,6 +8,7 @@ import { Qr } from "@/components/Qr";
 import { Boton, Fila, Opciones, Seccion, Texto } from "@/components/ui";
 import { crearEnlace, leerBandeja, leerPasaporte, listarEnlaces, retirarEnlace, WEB, type Enlace, type Mascota } from "@/lib/api";
 import { notasDeBandeja, registrosDePasaporte, sobreHistorial } from "@/lib/ficha";
+import { useT, type Clave } from "@/lib/idioma";
 import { deIso, ir, useFicha } from "@/lib/salud";
 import { espacio } from "@/lib/tema";
 
@@ -19,10 +20,10 @@ import { espacio } from "@/lib/tema";
    se puede retirar antes. */
 
 const DURACIONES = [
-  [24, "24 horas"],
-  [72, "3 días"],
-  [168, "7 días"],
-] as const;
+  [24, "compartir.duracion.24"],
+  [72, "compartir.duracion.72"],
+  [168, "compartir.duracion.168"],
+] as const satisfies readonly (readonly [number, Clave])[];
 
 const hora = (iso: string) => {
   const d = new Date(iso);
@@ -34,8 +35,8 @@ const dia = (iso: string) => {
 };
 
 function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secreta: Uint8Array }) {
+  const t = useT();
   const nombre = m.perfil.nombre.trim();
-  const llamar = nombre || "tu mascota";
   const [horas, setHoras] = useState<24 | 72 | 168>(24);
   const [creando, setCreando] = useState(false);
   const [hecho, setHecho] = useState<{ id: string; url: string; caduca: string; registros: number } | null>(null);
@@ -56,12 +57,9 @@ function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secre
 
   if (!fichaLista(datos))
     return (
-      <Seccion titulo="Antes, la ficha de salud">
-        <Texto>
-          Lo que se enseña es la ficha de {llamar}: sus alergias, lo que toma y sus enfermedades. Escríbela primero y
-          vuelve aquí.
-        </Texto>
-        <Boton alPulsar={() => ir(`/mascota/${m.petId}/salud`)}>Escribir la ficha de salud</Boton>
+      <Seccion titulo={t("compartir.antesFicha")}>
+        <Texto>{nombre ? t("compartir.antesFichaTexto", { nombre }) : t("compartir.antesFichaTextoSin")}</Texto>
+        <Boton alPulsar={() => ir(`/mascota/${m.petId}/salud`)}>{t("compartir.escribirFicha")}</Boton>
       </Seccion>
     );
 
@@ -89,17 +87,17 @@ function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secre
       setHecho({ id: h.id, url: h.url, caduca: r.caduca, registros: h.registros });
       await recargar();
     } catch {
-      Alert.alert("No se ha podido crear el enlace", "Vuelve a intentarlo en un momento.");
+      Alert.alert(t("compartir.errorCrear"), t("comun.errorReintentar"));
     } finally {
       setCreando(false);
     }
   }
 
   function retirar(id: string) {
-    Alert.alert("¿Retirar este enlace?", "Dejará de abrirse al momento. Lo que alguien vio no se puede borrar.", [
-      { text: "No, volver", style: "cancel" },
+    Alert.alert(t("compartir.retirarPregunta"), t("compartir.retirarTexto"), [
+      { text: t("comun.volver"), style: "cancel" },
       {
-        text: "Sí, retirarlo",
+        text: t("compartir.retirarSi"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -107,7 +105,7 @@ function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secre
             if (hecho?.id === id) setHecho(null);
             await recargar();
           } catch {
-            Alert.alert("No se ha podido retirar", "Vuelve a intentarlo en un momento.");
+            Alert.alert(t("compartir.errorRetirar"), t("comun.errorReintentar"));
           }
         },
       },
@@ -117,48 +115,49 @@ function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secre
   return (
     <>
       {hecho ? (
-        <Seccion titulo="Enséñale este QR">
-          <Qr valor={hecho.url} etiqueta="Código QR del enlace al historial" />
-          <Texto>
-            El veterinario lo escanea con su móvil. Vale hasta el {dia(hecho.caduca)} a las {hora(hecho.caduca)}.
-          </Texto>
+        <Seccion titulo={t("compartir.qrTitulo")}>
+          <Qr valor={hecho.url} etiqueta={t("compartir.qrEtiqueta")} />
+          <Texto>{t("compartir.qrTexto", { dia: dia(hecho.caduca), hora: hora(hecho.caduca) })}</Texto>
           <Texto tono="suave">
-            Lleva la ficha de salud
-            {hecho.registros > 0
-              ? ` y ${hecho.registros === 1 ? "un registro" : `${hecho.registros} registros`} de vacunas, tratamientos y notas.`
-              : "."}{" "}
-            Guárdalo ahora: la clave va en el propio enlace y no se puede volver a mostrar.
+            {hecho.registros === 0
+              ? t("compartir.lleva")
+              : hecho.registros === 1
+                ? t("compartir.llevaUno")
+                : t("compartir.llevaVarios", { n: hecho.registros })}{" "}
+            {t("compartir.guardalo")}
           </Texto>
           <View style={{ gap: espacio.sm }}>
-            <Boton alPulsar={() => void Share.share({ message: hecho.url })}>Enviar el enlace</Boton>
+            <Boton alPulsar={() => void Share.share({ message: hecho.url })}>{t("compartir.enviar")}</Boton>
             <Boton variante="secundario" alPulsar={() => setHecho(null)}>
-              Hecho
+              {t("comun.hecho")}
             </Boton>
           </View>
         </Seccion>
       ) : (
-        <Seccion titulo="Crear un enlace">
-          <Opciones etiqueta="Cuánto tiempo vale" opciones={DURACIONES} valor={horas} alElegir={setHoras} />
+        <Seccion titulo={t("compartir.crearTitulo")}>
+          <Opciones
+            etiqueta={t("compartir.duracion")}
+            opciones={DURACIONES.map(([v, k]) => [v, t(k)] as const)}
+            valor={horas}
+            alElegir={setHoras}
+          />
           <Boton alPulsar={() => void crear()} ocupado={creando}>
-            Crear el enlace
+            {t("compartir.crear")}
           </Boton>
-          <Texto tono="suave">
-            Verá la ficha de salud, las vacunas y tratamientos que constan y las notas de consultas anteriores, en su
-            idioma y sin crear una cuenta. Puede dejarte la nota de la visita: te llega cifrada a la bandeja.
-          </Texto>
+          <Texto tono="suave">{t("compartir.crearTexto")}</Texto>
         </Seccion>
       )}
 
       {enlaces.length > 0 && (
-        <Seccion titulo="Enlaces que siguen abiertos">
-          <Texto tono="suave">Los de esta pantalla y los del pasaporte de viaje.</Texto>
+        <Seccion titulo={t("compartir.abiertos")}>
+          <Texto tono="suave">{t("compartir.abiertosTexto")}</Texto>
           <View>
             {enlaces.map((e) => (
               <Fila
                 key={e.id}
-                titulo={`Creado el ${deIso(e.creado)}`}
-                detalle={`Vale hasta el ${dia(e.caduca)} a las ${hora(e.caduca)}`}
-                accion="Retirar"
+                titulo={t("compartir.creado", { fecha: deIso(e.creado) })}
+                detalle={t("compartir.valeHasta", { dia: dia(e.caduca), hora: hora(e.caduca) })}
+                accion={t("compartir.retirar")}
                 alPulsar={() => retirar(e.id)}
               />
             ))}
@@ -170,13 +169,14 @@ function Contenido({ m, datos, secreta }: { m: Mascota; datos: FichaDueno; secre
 }
 
 export default function Compartir() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { estado, recargar } = useFicha(id);
   return (
     <ConFicha
       estado={estado}
-      titulo="Compartir con un veterinario"
-      intro="Para una consulta fuera de casa: un enlace que enseña el historial y caduca solo."
+      titulo={t("compartir.titulo")}
+      intro={t("compartir.intro")}
       alRefrescar={() => void recargar()}
     >
       {({ m, datos, secreta }) => <Contenido m={m} datos={datos} secreta={secreta} />}

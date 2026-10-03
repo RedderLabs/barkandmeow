@@ -7,9 +7,10 @@ import { Boton, Cargando, Datos, Pantalla, Tarjeta, Texto, Titulo } from "@/comp
 import { borrarMensaje, borrarMensajes, leerBandeja, yo } from "@/lib/api";
 import { leerClave } from "@/lib/almacen";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
-import { abrirTodos, type Mensaje } from "@/lib/bandeja";
+import { abrirTodos, resumenRegistro, type Mensaje } from "@/lib/bandeja";
 import { deBase64, iguales, publica } from "@/lib/cripto";
 import { useCarga } from "@/lib/datos";
+import { useT } from "@/lib/idioma";
 import { espacio, fuente, useColores } from "@/lib/tema";
 
 /* La bandeja en el teléfono. Los mensajes llegan sellados a la clave pública
@@ -66,37 +67,39 @@ function Tarjetita({
   alMarcar?: () => void;
 }) {
   const c = useColores();
+  const t = useT();
   const x = m.contenido;
+  const registro = x.tipo === "certificado" ? resumenRegistro(x.registro, t) : null;
   const titulo =
     x.tipo === "aviso"
-      ? `Una clínica tiene a ${nombre}`
+      ? t("bandeja.titulo.aviso", { nombre })
       : x.tipo === "nota"
-        ? x.motivo || "Nota de la consulta"
+        ? x.motivo || t("bandeja.titulo.nota")
         : x.tipo === "informe"
-          ? x.motivo || "Informe de la clínica"
-          : x.tipo === "certificado"
-            ? x.titulo
+          ? x.motivo || t("bandeja.titulo.informe")
+          : registro
+            ? registro.titulo
             : x.tipo === "firma-mala"
-              ? "Registro con una firma que no cuadra"
-              : "Mensaje que no se puede abrir";
-  const etiqueta = {
-    aviso: "Aviso",
-    nota: "Nota de consulta",
-    informe: "Informe",
-    certificado: "Pasaporte",
-    "firma-mala": "Sin validar",
-    ilegible: "Sin abrir",
-  }[x.tipo];
+              ? t("bandeja.titulo.firmaMala")
+              : t("bandeja.titulo.ilegible");
+  const etiqueta = t(
+    (
+      {
+        aviso: "bandeja.tipo.aviso",
+        nota: "bandeja.tipo.nota",
+        informe: "bandeja.tipo.informe",
+        certificado: "bandeja.tipo.certificado",
+        "firma-mala": "bandeja.tipo.firmaMala",
+        ilegible: "bandeja.tipo.ilegible",
+      } as const
+    )[x.tipo],
+  );
 
   function confirmarBorrado() {
-    Alert.alert(
-      "¿Borrar este mensaje?",
-      "Se borra del servidor y no se puede recuperar. Si es una nota o un informe y lo quieres conservar, guárdalo antes por tu cuenta.",
-      [
-        { text: "No, volver", style: "cancel" },
-        { text: "Sí, borrar", style: "destructive", onPress: alBorrar },
-      ],
-    );
+    Alert.alert(t("bandeja.borrarUno"), t("bandeja.borrarUnoTexto"), [
+      { text: t("comun.volver"), style: "cancel" },
+      { text: t("comun.siBorrar"), style: "destructive", onPress: alBorrar },
+    ]);
   }
 
   return (
@@ -105,7 +108,7 @@ function Tarjetita({
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: !!marcada }}
-          accessibilityLabel={`Seleccionar: ${titulo}`}
+          accessibilityLabel={t("bandeja.seleccionarMensaje", { titulo })}
           onPress={alMarcar}
           style={{
             flexDirection: "row",
@@ -115,7 +118,7 @@ function Tarjetita({
           }}
         >
           <Ionicons name={marcada ? "checkbox" : "square-outline"} size={24} color={marcada ? c.accent : c.muted} />
-          <Texto tono="fuerte">{marcada ? "Seleccionado" : "Seleccionar"}</Texto>
+          <Texto tono="fuerte">{marcada ? t("bandeja.seleccionado") : t("bandeja.seleccionar")}</Texto>
         </Pressable>
       )}
       <View
@@ -136,21 +139,24 @@ function Tarjetita({
       {/* El remitente lo pone el servidor por la clave con que llegó; lo de dentro, la clínica. */}
       {m.origen && (
         <Texto tono="suave">
-          Enviado por {m.origen.clinica}
-          {m.origen.dominio ? ` · ${m.origen.dominio}, dominio verificado` : ` · ${m.origen.pais}`} · desde su software de
-          gestión
+          {m.origen.dominio
+            ? t("bandeja.enviadoDominio", { clinica: m.origen.clinica, dominio: m.origen.dominio })
+            : t("bandeja.enviadoPais", { clinica: m.origen.clinica, pais: m.origen.pais })}
         </Texto>
       )}
 
       {x.tipo === "aviso" && (
         <>
           <Texto>
-            {x.clinica || "Una clínica veterinaria"} ha leído el chip de {nombre} y quiere hablar contigo
-            {x.motivo ? `: «${x.motivo}»` : "."}
+            {t(x.motivo ? "bandeja.aviso.textoMotivo" : "bandeja.aviso.texto", {
+              clinica: x.clinica || t("bandeja.aviso.unaClinica"),
+              nombre,
+              motivo: x.motivo,
+            })}
           </Texto>
           {x.telefono ? (
             <Boton alPulsar={() => void Linking.openURL(`tel:${x.telefono.replace(/[^\d+]/g, "")}`)}>
-              {`Llamar a la clínica · ${x.telefono}`}
+              {t("bandeja.aviso.llamar", { telefono: x.telefono })}
             </Boton>
           ) : null}
         </>
@@ -158,10 +164,10 @@ function Tarjetita({
       {x.tipo === "nota" && (
         <Filas
           filas={[
-            ["Clínica", x.clinica],
-            ["Diagnóstico", x.diagnostico],
-            ["Tratamiento", x.tratamiento],
-            ["Observaciones", x.observaciones],
+            [t("bandeja.campo.clinica"), x.clinica],
+            [t("bandeja.campo.diagnostico"), x.diagnostico],
+            [t("bandeja.campo.tratamiento"), x.tratamiento],
+            [t("bandeja.campo.observaciones"), x.observaciones],
           ]}
         />
       )}
@@ -169,32 +175,27 @@ function Tarjetita({
         <>
           <Filas
             filas={[
-              ["Fecha", x.fecha && x.fecha.split("-").reverse().join("/")],
-              ["Veterinario", x.veterinario],
-              ["Diagnóstico", x.diagnostico],
-              ["Tratamiento", x.tratamiento],
-              ["Observaciones", x.observaciones],
+              [t("bandeja.campo.fecha"), x.fecha && x.fecha.split("-").reverse().join("/")],
+              [t("bandeja.campo.veterinario"), x.veterinario],
+              [t("bandeja.campo.diagnostico"), x.diagnostico],
+              [t("bandeja.campo.tratamiento"), x.tratamiento],
+              [t("bandeja.campo.observaciones"), x.observaciones],
             ]}
           />
-          {x.firmado && <Texto tono="suave">Firma de la clínica comprobada en este móvil.</Texto>}
+          {x.firmado && <Texto tono="suave">{t("bandeja.informeFirmado")}</Texto>}
         </>
       )}
-      {x.tipo === "certificado" && (
+      {registro && (
         <>
-          <Texto>{x.detalle}</Texto>
-          <Texto tono="suave">
-            Firma de la clínica comprobada. Se guarda en el pasaporte de viaje al abrirlo en el portal web.
-          </Texto>
+          <Texto>{registro.detalle}</Texto>
+          <Texto tono="suave">{t("bandeja.certificadoNota")}</Texto>
         </>
       )}
       {x.tipo === "firma-mala" && (
-        <Texto>
-          Dice venir de tu clínica, pero la firma no es la de su conexión con Bark &amp; Meow. Si esperabas un registro,
-          pregunta a tu clínica.
-        </Texto>
+        <Texto>{t("bandeja.firmaMalaTexto")}</Texto>
       )}
       {x.tipo === "ilegible" && (
-        <Texto>No se ha podido abrir con tu clave. Puede estar dañado o sellado para otra clave.</Texto>
+        <Texto>{t("bandeja.ilegibleTexto")}</Texto>
       )}
 
       {!alMarcar && (
@@ -209,7 +210,7 @@ function Tarjetita({
             paddingHorizontal: 8,
           }}
         >
-          <Texto estilo={{ color: c.alertInk, fontFamily: fuente.textoFuerte }}>Borrar</Texto>
+          <Texto estilo={{ color: c.alertInk, fontFamily: fuente.textoFuerte }}>{t("comun.borrar")}</Texto>
         </Pressable>
       )}
     </Tarjeta>
@@ -217,6 +218,7 @@ function Tarjetita({
 }
 
 export default function Bandeja() {
+  const t = useT();
   const { carga, refrescar, refrescando, setCarga } = useCarga(cargar);
   // null: no se está seleccionando. Si no, los ids marcados para borrar de golpe.
   const [seleccion, setSeleccion] = useState<Set<string> | null>(null);
@@ -251,12 +253,12 @@ export default function Bandeja() {
     if (!seleccion?.size) return;
     const n = seleccion.size;
     Alert.alert(
-      n === 1 ? "¿Borrar 1 mensaje?" : `¿Borrar ${n} mensajes?`,
-      "Se borran del servidor y no se pueden recuperar. Si hay notas o informes que quieras conservar, guárdalos antes por tu cuenta.",
+      n === 1 ? t("bandeja.borrarVarios.uno") : t("bandeja.borrarVarios.varios", { n }),
+      t("bandeja.borrarVariosTexto"),
       [
-        { text: "No, volver", style: "cancel" },
+        { text: t("comun.volver"), style: "cancel" },
         {
-          text: "Sí, borrar",
+          text: t("comun.siBorrar"),
           style: "destructive",
           onPress: () => void borrarSeleccion(),
         },
@@ -273,7 +275,7 @@ export default function Bandeja() {
       quitarDeLaLista(ids);
       setSeleccion(null);
     } catch {
-      Alert.alert("No se ha podido borrar", "Vuelve a intentarlo en un momento.");
+      Alert.alert(t("bandeja.errorBorrar"), t("comun.errorReintentar"));
     } finally {
       setBorrando(false);
     }
@@ -284,36 +286,30 @@ export default function Bandeja() {
       await borrarMensaje(id);
       quitarDeLaLista(new Set([id]));
     } catch {
-      Alert.alert("No se ha podido borrar", "Vuelve a intentarlo en un momento.");
+      Alert.alert(t("bandeja.errorBorrar"), t("comun.errorReintentar"));
     }
   }
 
   return (
     <Pantalla alRefrescar={refrescar} refrescando={refrescando}>
-      <Titulo>Bandeja</Titulo>
-      {carga.estado === "cargando" && <Cargando texto="Abriendo tu bandeja…" />}
+      <Titulo>{t("comun.tab.bandeja")}</Titulo>
+      {carga.estado === "cargando" && <Cargando texto={t("bandeja.abriendo")} />}
       {carga.estado === "error" && (
         <Tarjeta tono="alerta">
-          <Texto>No se ha podido cargar la bandeja. Tira hacia abajo para reintentar.</Texto>
+          <Texto>{t("bandeja.errorCarga")}</Texto>
         </Tarjeta>
       )}
       {carga.estado === "listo" && carga.datos.falta && (
         <Tarjeta tono="aviso">
-          <Texto tono="fuerte">Este móvil no tiene tu clave</Texto>
-          <Texto>
-            Las notas, los informes y los avisos llegan cerrados con tu clave, y solo se abren donde está guardada.
-            Escribe el código de recuperación que apuntaste en el alta: la clave se reconstruye aquí y no sale del móvil.
-          </Texto>
-          <Boton alPulsar={() => router.push("/clave")}>Escribir el código</Boton>
+          <Texto tono="fuerte">{t("cuenta.claveNo")}</Texto>
+          <Texto>{t("bandeja.faltaClave")}</Texto>
+          <Boton alPulsar={() => router.push("/clave")}>{t("cuenta.escribirCodigo")}</Boton>
         </Tarjeta>
       )}
       {carga.estado === "listo" &&
         !carga.datos.falta &&
         (carga.datos.mensajes.length === 0 ? (
-          <Texto tono="suave">
-            No tienes mensajes. Aquí llegan las notas que te deja el veterinario después de una consulta, los informes
-            de tu clínica habitual y los avisos de una clínica si alguien lleva a tu mascota perdida.
-          </Texto>
+          <Texto tono="suave">{t("bandeja.vacia")}</Texto>
         ) : (
           <>
             {seleccion ? (
@@ -322,7 +318,7 @@ export default function Bandeja() {
                   variante="secundario"
                   alPulsar={() => setSeleccion(todosMarcados ? new Set() : new Set(mensajes.map((m) => m.id)))}
                 >
-                  {todosMarcados ? "Quitar todos" : "Seleccionar todos"}
+                  {todosMarcados ? t("bandeja.quitarTodos") : t("bandeja.seleccionarTodos")}
                 </Boton>
                 <Boton
                   variante="peligro"
@@ -330,24 +326,26 @@ export default function Bandeja() {
                   ocupado={borrando}
                   alPulsar={confirmarBorradoEnBloque}
                 >
-                  {seleccion.size
-                    ? `Borrar ${seleccion.size} seleccionado${seleccion.size === 1 ? "" : "s"}`
-                    : "Borrar"}
+                  {seleccion.size === 0
+                    ? t("comun.borrar")
+                    : seleccion.size === 1
+                      ? t("bandeja.borrarSeleccion.uno")
+                      : t("bandeja.borrarSeleccion.varios", { n: seleccion.size })}
                 </Boton>
                 <Boton variante="secundario" desactivado={borrando} alPulsar={() => setSeleccion(null)}>
-                  Cancelar
+                  {t("comun.cancelar")}
                 </Boton>
               </View>
             ) : (
               <Boton variante="secundario" alPulsar={() => setSeleccion(new Set())}>
-                Seleccionar mensajes
+                {t("bandeja.seleccionarMensajes")}
               </Boton>
             )}
             {carga.datos.mensajes.map((m) => (
               <Tarjetita
                 key={m.id}
                 m={m}
-                nombre={(!carga.datos.falta && carga.datos.nombres[m.petId]) || "Tu mascota"}
+                nombre={(!carga.datos.falta && carga.datos.nombres[m.petId]) || t("comun.tuMascota")}
                 alBorrar={() => void alBorrar(m.id)}
                 marcada={seleccion?.has(m.id)}
                 alMarcar={seleccion ? () => marcar(m.id) : undefined}

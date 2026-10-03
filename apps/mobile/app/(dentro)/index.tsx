@@ -5,6 +5,7 @@ import { Boton, Campo, Cargando, CodigoActivacion, Pantalla, Tarjeta, Texto, Tit
 import { identificar, nuevaMascota, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
+import { useT, type T } from "@/lib/idioma";
 import { ir } from "@/lib/salud";
 import { espacio, fuente, radio, useColores } from "@/lib/tema";
 
@@ -13,24 +14,25 @@ import { espacio, fuente, radio, useColores } from "@/lib/tema";
    compartir con un veterinario. */
 
 /** Lo siguiente que toca, en una línea. */
-function siguiente(m: Mascota): string | null {
-  if (enReclamacion(m)) return "Hay una reclamación abierta sobre su chip.";
-  if (m.estado !== "activa") return "Llévala a tu clínica para activar su chip.";
-  if (!m.perfil.publicado) return "Publica su perfil para que quien la encuentre vea cómo llamarte.";
-  if (m.perfil.telefonos.length === 0) return "Añade un teléfono de contacto.";
-  if (!m.ficha) return "Escribe su ficha de salud: alergias, medicación y enfermedades.";
-  if (!m.placa) return "Prepara la placa de su collar.";
+function siguiente(m: Mascota, t: T): string | null {
+  if (enReclamacion(m)) return t("mascotas.toca.reclamacion");
+  if (m.estado !== "activa") return t("mascotas.toca.activar");
+  if (!m.perfil.publicado) return t("mascotas.toca.publicar");
+  if (m.perfil.telefonos.length === 0) return t("mascotas.toca.telefono");
+  if (!m.ficha) return t("mascotas.toca.ficha");
+  if (!m.placa) return t("mascotas.toca.placa");
   return null;
 }
 
 function Tarjetita({ m, token }: { m: Mascota; token: string | null }) {
   const c = useColores();
-  const nombre = m.perfil.nombre.trim() || "tu mascota";
-  const toca = siguiente(m);
+  const t = useT();
+  const nombre = m.perfil.nombre.trim() || t("comun.tuMascota").toLowerCase();
+  const toca = siguiente(m, t);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Abrir ${nombre}`}
+      accessibilityLabel={t("mascotas.abrir", { nombre })}
       onPress={() => ir(`/mascota/${m.petId}`)}
       style={({ pressed }) => ({
         backgroundColor: pressed ? c.ground : c.surface,
@@ -45,7 +47,7 @@ function Tarjetita({ m, token }: { m: Mascota; token: string | null }) {
       {toca ? <Texto tono="suave">{toca}</Texto> : null}
       {m.mensajes > 0 ? (
         <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>
-          {m.mensajes === 1 ? "1 mensaje en la bandeja" : `${m.mensajes} mensajes en la bandeja`}
+          {m.mensajes === 1 ? t("mascotas.mensajes.uno") : t("mascotas.mensajes.varios", { n: m.mensajes })}
         </Texto>
       ) : null}
     </Pressable>
@@ -66,6 +68,7 @@ function Nueva({
   alCerrar: () => void;
 }) {
   const c = useColores();
+  const t = useT();
   const [chip, setChip] = useState("");
   const [nombre, setNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +81,7 @@ function Nueva({
 
   async function anadir() {
     const id = identificar(chip);
-    if (!id) return setError("Un microchip ISO tiene 15 dígitos.");
+    if (!id) return setError(t("mascotas.nueva.errorChip"));
     setError(null);
     setOcupado(true);
     try {
@@ -88,7 +91,7 @@ function Nueva({
       setNombre("");
       alAnadir();
     } catch {
-      setError("No se ha podido añadir. Revisa el número y vuelve a intentarlo.");
+      setError(t("mascotas.nueva.error"));
     } finally {
       setOcupado(false);
     }
@@ -115,11 +118,11 @@ function Nueva({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Titulo>{vacia ? "Añadir tu mascota" : "Añadir otra mascota"}</Titulo>
+            <Titulo>{vacia ? t("mascotas.anadirPrimera") : t("mascotas.anadirOtra")}</Titulo>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cerrar"
+            accessibilityLabel={t("comun.cerrar")}
             onPress={cerrar}
             style={{
               minHeight: 44,
@@ -128,22 +131,22 @@ function Nueva({
               alignItems: "flex-end",
             }}
           >
-            <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>Cerrar</Texto>
+            <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>{t("comun.cerrar")}</Texto>
           </Pressable>
         </View>
         {hecho ? (
           <>
             <CodigoActivacion codigo={hecho.codigoActivacion} caduca={hecho.caduca} nombre={hecho.nombre} />
-            <Boton alPulsar={cerrar}>Hecho</Boton>
+            <Boton alPulsar={cerrar}>{t("comun.hecho")}</Boton>
             <Boton variante="secundario" alPulsar={() => setHecho(null)}>
-              Añadir otra
+              {t("mascotas.nueva.otraMas")}
             </Boton>
           </>
         ) : (
           <>
-            <Texto tono="suave">Con el número de su microchip: son 15 cifras y vienen en su pasaporte.</Texto>
+            <Texto tono="suave">{t("mascotas.nueva.intro")}</Texto>
             <Campo
-              etiqueta="Número del microchip"
+              etiqueta={t("mascotas.nueva.chip")}
               datos
               keyboardType="number-pad"
               maxLength={32}
@@ -151,9 +154,9 @@ function Nueva({
               onChangeText={setChip}
               error={error}
             />
-            <Campo etiqueta="Cómo se llama" maxLength={60} value={nombre} onChangeText={setNombre} />
+            <Campo etiqueta={t("mascotas.nueva.nombre")} maxLength={60} value={nombre} onChangeText={setNombre} />
             <Boton alPulsar={() => void anadir()} ocupado={ocupado}>
-              Añadir mascota
+              {t("mascotas.nueva.boton")}
             </Boton>
           </>
         )}
@@ -163,6 +166,7 @@ function Nueva({
 }
 
 export default function Mascotas() {
+  const t = useT();
   const { carga, refrescar, refrescando } = useCarga(yo);
   const [token, setToken] = useState<string | null>(null);
   const [anadiendo, setAnadiendo] = useState(false);
@@ -173,18 +177,18 @@ export default function Mascotas() {
   return (
     <Pantalla alRefrescar={refrescar} refrescando={refrescando}>
       <View style={{ gap: espacio.sm }}>
-        <Titulo>Mis mascotas</Titulo>
-        <Texto tono="suave">Entra en cada una para ver su ficha de salud, su placa y lo que le falta.</Texto>
+        <Titulo>{t("comun.tab.mascotas")}</Titulo>
+        <Texto tono="suave">{t("mascotas.intro")}</Texto>
       </View>
-      {carga.estado === "cargando" && <Cargando texto="Cargando tus mascotas…" />}
+      {carga.estado === "cargando" && <Cargando texto={t("mascotas.cargando")} />}
       {carga.estado === "error" && (
         <Tarjeta tono="alerta">
-          <Texto>No se han podido cargar. Tira hacia abajo para reintentar.</Texto>
+          <Texto>{t("comun.errorCarga")}</Texto>
         </Tarjeta>
       )}
       {carga.estado === "listo" &&
         (carga.datos.mascotas.length === 0 ? (
-          <Texto tono="suave">Tu cuenta aún no tiene ninguna mascota.</Texto>
+          <Texto tono="suave">{t("mascotas.vacia")}</Texto>
         ) : (
           carga.datos.mascotas.map((m) => <Tarjetita key={m.petId} m={m} token={token} />)
         ))}
@@ -194,7 +198,7 @@ export default function Mascotas() {
             variante={carga.datos.mascotas.length === 0 ? "primario" : "secundario"}
             alPulsar={() => setAnadiendo(true)}
           >
-            {carga.datos.mascotas.length === 0 ? "Añadir tu mascota" : "Añadir otra mascota"}
+            {carga.datos.mascotas.length === 0 ? t("mascotas.anadirPrimera") : t("mascotas.anadirOtra")}
           </Boton>
           <Nueva
             abierta={anadiendo}

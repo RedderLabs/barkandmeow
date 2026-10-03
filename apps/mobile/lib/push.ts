@@ -8,9 +8,13 @@
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { IDIOMAS } from "@barkandmeow/i18n";
 import { registrarDispositivo, retirarDispositivo } from "./api";
+import { IDIOMA, idiomaDelSistema } from "./ajustes";
 import { borrarPush, guardarPush, leerPush } from "./almacen";
+import { TEXTOS } from "./textos";
 
 export type DatosPush = { tipo?: "bandeja" | "reclamacion" | "permiso"; petId?: string };
 
@@ -22,6 +26,13 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+/** El nombre del canal de Android en el idioma de la app. Se lee del almacén porque esto no es un componente. */
+async function nombreCanal() {
+  const elegido = await SecureStore.getItemAsync(IDIOMA).catch(() => null);
+  const idioma = IDIOMAS.find((i) => i === elegido) ?? idiomaDelSistema();
+  return TEXTOS[idioma]["entrada.canalAvisos"];
+}
 
 const idProyecto = () =>
   (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ??
@@ -39,7 +50,7 @@ export async function activarPush(): Promise<null | "simulador" | "permiso" | "s
   try {
     if (Platform.OS === "android")
       await Notifications.setNotificationChannelAsync("avisos", {
-        name: "Avisos de Bark & Meow",
+        name: await nombreCanal(),
         importance: Notifications.AndroidImportance.HIGH,
       });
     let { status } = await Notifications.getPermissionsAsync();
