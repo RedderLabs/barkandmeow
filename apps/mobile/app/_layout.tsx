@@ -9,6 +9,7 @@ import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ProveedorAjustes, useEscala } from "@/lib/ajustes";
 import { ProveedorSesion, useSesion } from "@/lib/sesion";
 import { fuente, useColores } from "@/lib/tema";
 import type { DatosPush } from "@/lib/push";
@@ -31,6 +32,7 @@ function useAbrirDesdeAviso() {
 
 function Navegacion() {
   const c = useColores();
+  const k = useEscala();
   const { estado } = useSesion();
   useAbrirDesdeAviso();
   useEffect(() => {
@@ -67,7 +69,11 @@ function Navegacion() {
               headerBackButtonDisplayMode: "minimal",
               headerStyle: { backgroundColor: c.surface },
               headerTintColor: c.accent,
-              headerTitleStyle: { fontFamily: fuente.textoFuerte, fontSize: 17, color: c.ink },
+              headerTitleStyle: {
+                fontFamily: fuente.textoFuerte,
+                fontSize: 17 * k,
+                color: c.ink,
+              },
               headerShadowVisible: false,
             }}
           />
@@ -91,10 +97,12 @@ export default function Raiz() {
   if (!fuentes) return null;
   return (
     <SafeAreaProvider>
-      <ProveedorSesion>
-        <StatusBar style="auto" />
-        <Navegacion />
-      </ProveedorSesion>
+      <ProveedorAjustes>
+        <ProveedorSesion>
+          <StatusBar style="auto" />
+          <Navegacion />
+        </ProveedorSesion>
+      </ProveedorAjustes>
     </SafeAreaProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Image, Text, View } from "react-native";
+import { Image, View } from "react-native";
+import { Text } from "@/components/texto";
 import { Boton, Cargando, Datos, Insignia, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { API, type Mascota } from "@/lib/api";
 import { ir, type EstadoFicha } from "@/lib/salud";

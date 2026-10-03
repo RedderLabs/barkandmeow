@@ -10,13 +10,12 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   type TextInputProps,
   type TextStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Text, TextInput } from "@/components/texto";
 import { espacio, fuente, radio, toque, useColores } from "@/lib/tema";
 
 export function Pantalla({

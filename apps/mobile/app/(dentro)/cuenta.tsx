@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { router } from "expo-router";
 import { Alert, View } from "react-native";
-import { Boton, Cargando, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
+import { Boton, Cargando, Opciones, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
+import { useAjustes, type Letra, type Tema } from "@/lib/ajustes";
 import { yo } from "@/lib/api";
 import { leerClave, leerPush } from "@/lib/almacen";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
@@ -14,7 +15,11 @@ import { espacio } from "@/lib/tema";
 async function cargar() {
   const [y, clave, push] = await Promise.all([yo(), leerClave(), leerPush()]);
   rellenarRecuperacion(y, clave);
-  return { correo: y.correo, clave: !!clave && iguales(publica(clave), deBase64(y.pubKey)), push: !!push };
+  return {
+    correo: y.correo,
+    clave: !!clave && iguales(publica(clave), deBase64(y.pubKey)),
+    push: !!push,
+  };
 }
 
 const motivos = {
@@ -23,6 +28,33 @@ const motivos = {
   "sin-proyecto": "Esta compilación no tiene configurados los avisos (falta EAS_PROJECT_ID).",
   error: "No se ha podido registrar este móvil. Vuelve a intentarlo.",
 } as const;
+
+const TEMAS = [
+  ["sistema", "El del sistema"],
+  ["claro", "Claro"],
+  ["oscuro", "Oscuro"],
+] as const satisfies readonly (readonly [Tema, string])[];
+
+const LETRAS = [
+  ["normal", "Normal"],
+  ["grande", "Grande"],
+  ["muy-grande", "Muy grande"],
+] as const satisfies readonly (readonly [Letra, string])[];
+
+/** Cómo se ve la app en este móvil. Se guarda aquí, no en la cuenta. */
+function Apariencia() {
+  const { tema, letra, elegirTema, elegirLetra } = useAjustes();
+  return (
+    <Tarjeta>
+      <Texto tono="fuerte">Pantalla</Texto>
+      <Opciones etiqueta="Tema" opciones={TEMAS} valor={tema} alElegir={elegirTema} />
+      <Opciones etiqueta="Tamaño de letra" opciones={LETRAS} valor={letra} alElegir={elegirLetra} />
+      <Texto tono="suave">
+        Se aplica solo en este móvil. El tamaño se suma al que tengas puesto en los ajustes del sistema.
+      </Texto>
+    </Tarjeta>
+  );
+}
 
 export default function Cuenta() {
   const { salir } = useSesion();
@@ -85,6 +117,7 @@ export default function Cuenta() {
           </Tarjeta>
         </View>
       )}
+      <Apariencia />
       <Boton variante="peligro" alPulsar={alSalir} ocupado={saliendo}>
         Salir
       </Boton>
