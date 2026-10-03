@@ -4,6 +4,8 @@ import {
   base64,
   claveRecuperacionBody,
   codigoCorreoBody,
+  contrasenaCambioBody,
+  cuentaBorrarBody,
   dispositivoBody,
   dispositivoRetirarBody,
   ownerLoginBody,
@@ -329,6 +331,29 @@ export const rutasDuenos = {
     cuerpo: dispositivoRetirarBody,
     respuesta: ok,
     errores: [400, 401],
+  }),
+
+  /* ── Cuenta ───────────────────────────────────────────────── */
+
+  cambiarContrasena: ruta({
+    metodo: "POST",
+    ruta: "/owners/v1/password",
+    acceso: "dueno",
+    resumen: "Cambiar la contraseña. Cierra las demás sesiones y avisa por correo.",
+    cuerpo: contrasenaCambioBody,
+    respuesta: ok,
+    errores: [400, 401, 403, 429],
+  }),
+
+  borrarCuenta: ruta({
+    metodo: "DELETE",
+    ruta: "/owners/v1/me",
+    acceso: "dueno",
+    resumen:
+      "Borrar la cuenta para siempre: mascotas, fichas, placas, pasaportes, bandeja, permisos y fotos. Los chips quedan libres.",
+    cuerpo: cuentaBorrarBody,
+    respuesta: ok,
+    errores: [400, 401, 403, 429],
   }),
 
   /* ── Reclamaciones de chip ────────────────────────────────── */

@@ -30,6 +30,18 @@ export async function guardarClave(secreta: Uint8Array, publica: Uint8Array): Pr
   await navigator.storage?.persist?.().catch(() => false);
 }
 
+/** Olvida la clave de este navegador (al borrar la cuenta). */
+export async function borrarClave(): Promise<void> {
+  const bd = await abrir();
+  await new Promise<void>((ok, mal) => {
+    const tx = bd.transaction(ALMACEN, "readwrite");
+    tx.objectStore(ALMACEN).delete("dueno");
+    tx.oncomplete = () => ok();
+    tx.onerror = () => mal(tx.error);
+  });
+  bd.close();
+}
+
 /** La clave guardada en este navegador, o null si no hay (o si IndexedDB falla). */
 export async function leerClave(): Promise<ClaveLocal | null> {
   try {

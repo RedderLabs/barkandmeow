@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -49,6 +50,42 @@ export function Pantalla({
         {children}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** Una hoja que sube encima de la pantalla, con su título y «Cerrar» arriba. */
+export function Ventana({
+  abierta,
+  titulo,
+  alCerrar,
+  children,
+}: {
+  abierta: boolean;
+  titulo: string;
+  alCerrar: () => void;
+  children: ReactNode;
+}) {
+  const c = useColores();
+  const t = useT();
+  return (
+    <Modal visible={abierta} animationType="slide" presentationStyle="pageSheet" onRequestClose={alCerrar}>
+      <Pantalla>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: espacio.md }}>
+          <View style={{ flex: 1 }}>
+            <Titulo>{titulo}</Titulo>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("comun.cerrar")}
+            onPress={alCerrar}
+            style={{ minHeight: toque, minWidth: toque, justifyContent: "center", alignItems: "flex-end" }}
+          >
+            <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>{t("comun.cerrar")}</Texto>
+          </Pressable>
+        </View>
+        {children}
+      </Pantalla>
+    </Modal>
   );
 }
 

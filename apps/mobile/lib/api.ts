@@ -87,6 +87,11 @@ export const salir = () => conSesion.llamar(d.salir);
 
 export const yo = () => conSesion.llamar(d.yo);
 
+export const cambiarContrasena = (actual: string, nueva: string) =>
+  conSesion.llamar(d.cambiarContrasena, { cuerpo: { actual, nueva } });
+
+export const borrarCuenta = (password: string) => conSesion.llamar(d.borrarCuenta, { cuerpo: { password } });
+
 export const leerBandeja = () => conSesion.llamar(d.leerBandeja);
 
 export const borrarMensaje = (id: string) => conSesion.llamar(d.borrarMensaje, { params: { id } });

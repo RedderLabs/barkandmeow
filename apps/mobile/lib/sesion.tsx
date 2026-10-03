@@ -15,7 +15,7 @@ import {
   type Identificador,
   type Pendiente,
 } from "./api";
-import { borrarClave, borrarToken, guardarToken, leerToken } from "./almacen";
+import { borrarClave, borrarPush, borrarToken, guardarToken, leerToken } from "./almacen";
 import { activarPush, desactivarPush } from "./push";
 
 type Paso = { token: string; destino: string; canal: Canal; otroCanal: Canal | null };
@@ -27,6 +27,8 @@ type Sesion = {
   confirmar(codigo: string): Promise<void>;
   reenviar(canal?: Canal): Promise<void>;
   salir(): Promise<void>;
+  /** Tras borrar la cuenta: el servidor ya no tiene nada; aquí se olvida lo del móvil. */
+  olvidar(): Promise<void>;
 };
 
 const Contexto = createContext<Sesion | null>(null);
@@ -82,9 +84,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     setEstado("fuera");
   }, []);
 
+  const olvidar = useCallback(async () => {
+    await Promise.all([borrarPush(), borrarToken(), borrarClave()]);
+    setEstado("fuera");
+  }, []);
+
   const valor = useMemo(
-    () => ({ estado, paso, entrar, confirmar, reenviar, salir }),
-    [estado, paso, entrar, confirmar, reenviar, salir],
+    () => ({ estado, paso, entrar, confirmar, reenviar, salir, olvidar }),
+    [estado, paso, entrar, confirmar, reenviar, salir, olvidar],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

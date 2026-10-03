@@ -2551,3 +2551,110 @@ describe("recuperar la contraseña", () => {
     assert.equal(f.json().motivo, "incorrecto");
   });
 });
+
+describe("cuenta del dueño: cambiar la contraseña y borrarla", () => {
+  const CHIP = "724098100006666";
+  const id = { tipo: "iso", valor: CHIP };
+  const correo = "se-va@correo.example";
+  const galleta = (r: { cookies: { name: string; value: string }[] }) =>
+    r.cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  let petId = "";
+
+  async function entrar(password: string) {
+    const r = await app.inject({ method: "POST", url: "/owners/v1/login", payload: { identificador: id, password } });
+    if (r.statusCode !== 200) return { estado: r.statusCode, cookie: "" };
+    const v = await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: galleta(r) },
+      payload: { codigo: ultimoCodigo(correo) },
+    });
+    return { estado: v.statusCode, cookie: galleta(v) };
+  }
+  const yo = (cookie: string) => app.inject({ method: "GET", url: "/owners/v1/me", headers: { cookie } });
+
+  before(async () => {
+    const r = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email: correo, password: "clave-de-antes-larga", pubKey: b64(), mascota: { identificador: id, nombre: "Coco" } },
+    });
+    petId = r.json().mascota.petId;
+    await app.inject({
+      method: "POST",
+      url: "/owners/v1/login/verify",
+      headers: { cookie: galleta(r) },
+      payload: { codigo: ultimoCodigo(correo) },
+    });
+  });
+
+  it("cambiar la contraseña exige la actual y cierra las demás sesiones", async () => {
+    const aqui = await entrar("clave-de-antes-larga");
+    const alli = await entrar("clave-de-antes-larga");
+    const cambiar = (cookie: string, actual: string) =>
+      app.inject({
+        method: "POST",
+        url: "/owners/v1/password",
+        headers: { cookie },
+        payload: { actual, nueva: "clave-de-ahora-larga" },
+      });
+
+    assert.equal((await cambiar("", "clave-de-antes-larga")).statusCode, 401);
+    assert.equal((await cambiar(aqui.cookie, "no-es-la-clave")).statusCode, 403);
+    const corta = await app.inject({
+      method: "POST",
+      url: "/owners/v1/password",
+      headers: { cookie: aqui.cookie },
+      payload: { actual: "clave-de-antes-larga", nueva: "corta" },
+    });
+    assert.equal(corta.statusCode, 400);
+
+    const cartas = buzon.length;
+    assert.equal((await cambiar(aqui.cookie, "clave-de-antes-larga")).statusCode, 200);
+    // Esta sesión sigue; la del otro móvil, no.
+    assert.equal((await yo(aqui.cookie)).statusCode, 200);
+    assert.equal((await yo(alli.cookie)).statusCode, 401);
+    await new Promise((ok) => setImmediate(ok));
+    assert.ok(buzon.slice(cartas).some((c) => c.para === correo && /contraseña/.test(c.asunto)));
+    assert.equal((await entrar("clave-de-antes-larga")).estado, 401);
+    assert.equal((await entrar("clave-de-ahora-larga")).estado, 200);
+  });
+
+  it("borrar la cuenta se lleva sus mascotas y deja el chip libre", async () => {
+    const { cookie } = await entrar("clave-de-ahora-larga");
+    // Algo de todo lo que cuelga de la mascota: perfil con foto, ficha, bandeja con adjunto.
+    almacen.objetos.set("fotos/coco", Buffer.from("foto"));
+    almacen.objetos.set("adjuntos/coco", Buffer.from("pdf"));
+    await sql`UPDATE pet_profiles SET foto_key = 'fotos/coco' WHERE pet_id = ${petId}`;
+    await sql`INSERT INTO blobs (pet_id, kind, sealed) VALUES (${petId}, 'record', ${randomBytes(40)})`;
+    const [m] = await sql`INSERT INTO inbox (pet_id, sealed) VALUES (${petId}, ${randomBytes(40)}) RETURNING id`;
+    await sql`INSERT INTO inbox_adjuntos (inbox_id, orden, bytes, s3_key) VALUES (${m.id}, 0, 3, 'adjuntos/coco')`;
+
+    const borrar = (password: string, c = cookie) =>
+      app.inject({ method: "DELETE", url: "/owners/v1/me", headers: { cookie: c }, payload: { password } });
+    assert.equal((await borrar("no-es-la-clave")).statusCode, 403);
+    assert.equal((await yo(cookie)).statusCode, 200);
+
+    const r = await borrar("clave-de-ahora-larga");
+    assert.equal(r.statusCode, 200);
+    assert.equal((await yo(cookie)).statusCode, 401);
+    assert.equal((await sql`SELECT count(*)::int AS n FROM owners WHERE email = ${correo}`)[0].n, 0);
+    for (const tabla of ["pets", "pet_profiles", "blobs", "inbox", "pet_identifiers"])
+      assert.equal(
+        (await sql.unsafe(`SELECT count(*)::int AS n FROM ${tabla} WHERE ${tabla === "pets" ? "id" : "pet_id"} = $1`, [petId]))[0].n,
+        0,
+        tabla,
+      );
+    assert.equal(almacen.objetos.has("fotos/coco"), false);
+    assert.equal(almacen.objetos.has("adjuntos/coco"), false);
+    assert.equal((await entrar("clave-de-ahora-larga")).estado, 401);
+
+    // El chip queda libre: otra persona puede darlo de alta.
+    const otra = await app.inject({
+      method: "POST",
+      url: "/owners/v1/register",
+      payload: { email: "nueva@correo.example", password: "clave-de-la-nueva-larga", pubKey: b64(), mascota: { identificador: id, nombre: "" } },
+    });
+    assert.equal(otra.statusCode, 201);
+  });
+});

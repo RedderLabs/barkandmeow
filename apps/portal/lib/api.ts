@@ -47,6 +47,11 @@ export const darDeAlta = (datos: {
 export const entrar = (identificador: Identificador, password: string) =>
   cliente.llamar(d.entrar, { cuerpo: { identificador, password } });
 
+export const cambiarContrasena = (actual: string, nueva: string) =>
+  cliente.llamar(d.cambiarContrasena, { cuerpo: { actual, nueva } });
+
+export const borrarCuenta = (password: string) => cliente.llamar(d.borrarCuenta, { cuerpo: { password } });
+
 export const confirmarCodigo = (codigo: string) => cliente.llamar(d.confirmarCodigo, { cuerpo: { codigo } });
 
 export const reenviarCodigo = (canal?: Canal) =>

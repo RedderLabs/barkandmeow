@@ -5,6 +5,7 @@ import {
   blobs,
   clinicApiKeys,
   clinics,
+  drafts,
   inbox,
   inboxAdjuntos,
   ownerDevices,
@@ -14,10 +15,13 @@ import {
   petProfiles,
   pets,
   reclamaciones,
+  recuperaciones,
 } from "@barkandmeow/db";
 import {
   bandejaBorrarBody,
   codigoCorreoBody,
+  contrasenaCambioBody,
+  cuentaBorrarBody,
   dispositivoBody,
   dispositivoRetirarBody,
   normalizarChip,
@@ -456,6 +460,87 @@ export default async function rutasDuenos(app: FastifyInstance) {
   app.post("/owners/v1/logout", async (req, reply) => {
     const token = tokenDe(req);
     if (token) await db.delete(ownerSessions).where(eq(ownerSessions.tokenHash, hashToken(token)));
+    reply.clearCookie(COOKIE, { path: "/" });
+    return { ok: true };
+  });
+
+  /* Las dos piden la contraseña actual aunque la sesión esté abierta: con
+     un móvil desbloqueado en mano no basta para cambiarla ni para borrarlo
+     todo. Pocos intentos, para que no sirvan de oráculo de contraseñas. */
+  const comprobarContrasena = { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } };
+
+  /** Cambiar la contraseña. Las demás sesiones se cierran; esta sigue. */
+  app.post("/owners/v1/password", comprobarContrasena, async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = contrasenaCambioBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const [o] = await db.select().from(owners).where(eq(owners.id, d.ownerId));
+    if (!o || !(await verificarPassword(cuerpo.data.actual, o.passwordHash)))
+      return reply.code(403).send({ error: "contraseña incorrecta" });
+
+    await db.update(owners).set({ passwordHash: await hashPassword(cuerpo.data.nueva) }).where(eq(owners.id, o.id));
+    await db.delete(ownerSessions).where(and(eq(ownerSessions.ownerId, o.id), ne(ownerSessions.id, d.sessionId)));
+    await enviarCorreo({
+      para: o.email,
+      asunto: "Has cambiado tu contraseña de Bark & Meow",
+      texto: [
+        "La contraseña de tu cuenta de Bark & Meow acaba de cambiar, y se han cerrado las",
+        "sesiones abiertas en otros navegadores y móviles.",
+        "",
+        "Si no has sido tú, recupera la cuenta con tu código en papel:",
+        "",
+        `    ${env.portalWebUrl}/recuperar`,
+      ].join("\n"),
+    }).catch((e) => req.log.warn({ err: (e as Error).message }, "no se pudo avisar del cambio de contraseña"));
+    return { ok: true };
+  });
+
+  /**
+   * Borrar la cuenta para siempre. Se van sus mascotas y todo lo que cuelga
+   * de ellas (identificadores, perfil, ficha, placa, pasaporte, bandeja,
+   * permisos, etiquetas de las clínicas), sus sesiones y sus móviles. Los
+   * chips quedan libres para registrarse de nuevo. No hay papelera.
+   */
+  app.delete("/owners/v1/me", comprobarContrasena, async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = cuentaBorrarBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+    const [o] = await db.select().from(owners).where(eq(owners.id, d.ownerId));
+    if (!o || !(await verificarPassword(cuerpo.data.password, o.passwordHash)))
+      return reply.code(403).send({ error: "contraseña incorrecta" });
+
+    const ids = (await db.select({ id: pets.id }).from(pets).where(eq(pets.ownerId, o.id))).map((p) => p.id);
+    // Lo que vive en el almacén de objetos se apunta antes: las filas que lo señalan se van en cascada.
+    const objetos = ids.length
+      ? [
+          ...(await db.select({ k: petProfiles.fotoKey }).from(petProfiles).where(inArray(petProfiles.petId, ids))),
+          ...(await db.select({ k: blobs.s3Key }).from(blobs).where(inArray(blobs.petId, ids))),
+          ...(await db
+            .select({ k: inboxAdjuntos.s3Key })
+            .from(inboxAdjuntos)
+            .innerJoin(inbox, eq(inbox.id, inboxAdjuntos.inboxId))
+            .where(inArray(inbox.petId, ids))),
+        ]
+          .map((x) => x.k)
+          .filter((k): k is string => !!k)
+      : [];
+
+    await db.transaction(async (tx) => {
+      if (ids.length) {
+        // Los borradores de las clínicas no se borran con la mascota: solo dejan de apuntarla.
+        await tx.update(drafts).set({ claimedByPetId: null }).where(inArray(drafts.claimedByPetId, ids));
+        await tx.delete(pets).where(inArray(pets.id, ids));
+      }
+      await tx.delete(recuperaciones).where(and(eq(recuperaciones.tipo, "dueno"), eq(recuperaciones.sujetoId, o.id)));
+      await tx.delete(owners).where(eq(owners.id, o.id));
+    });
+    // Si el almacén falla, lo que queda es huérfano y sellado: nadie más lo abre.
+    for (const k of objetos)
+      await almacenActual()
+        .borrar(k)
+        .catch((e) => req.log.warn({ err: (e as Error).message }, "no se pudo borrar un objeto del almacén"));
     reply.clearCookie(COOKIE, { path: "/" });
     return { ok: true };
   });

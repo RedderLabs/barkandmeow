@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { enReclamacion, Identidad } from "@/components/Mascota";
-import { Boton, Campo, Cargando, CodigoActivacion, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
+import { Boton, Campo, Cargando, CodigoActivacion, Pantalla, Tarjeta, Texto, Titulo, Ventana } from "@/components/ui";
 import { identificar, nuevaMascota, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
@@ -67,7 +67,6 @@ function Nueva({
   alAnadir: () => void;
   alCerrar: () => void;
 }) {
-  const c = useColores();
   const t = useT();
   const [chip, setChip] = useState("");
   const [nombre, setNombre] = useState("");
@@ -107,61 +106,38 @@ function Nueva({
   }
 
   return (
-    <Modal visible={abierta} animationType="slide" presentationStyle="pageSheet" onRequestClose={cerrar}>
-      <Pantalla>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: espacio.md,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Titulo>{vacia ? t("mascotas.anadirPrimera") : t("mascotas.anadirOtra")}</Titulo>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("comun.cerrar")}
-            onPress={cerrar}
-            style={{
-              minHeight: 44,
-              minWidth: 44,
-              justifyContent: "center",
-              alignItems: "flex-end",
-            }}
-          >
-            <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>{t("comun.cerrar")}</Texto>
-          </Pressable>
-        </View>
-        {hecho ? (
-          <>
-            <CodigoActivacion codigo={hecho.codigoActivacion} caduca={hecho.caduca} nombre={hecho.nombre} />
-            <Boton alPulsar={cerrar}>{t("comun.hecho")}</Boton>
-            <Boton variante="secundario" alPulsar={() => setHecho(null)}>
-              {t("mascotas.nueva.otraMas")}
-            </Boton>
-          </>
-        ) : (
-          <>
-            <Texto tono="suave">{t("mascotas.nueva.intro")}</Texto>
-            <Campo
-              etiqueta={t("mascotas.nueva.chip")}
-              datos
-              keyboardType="number-pad"
-              maxLength={32}
-              value={chip}
-              onChangeText={setChip}
-              error={error}
-            />
-            <Campo etiqueta={t("mascotas.nueva.nombre")} maxLength={60} value={nombre} onChangeText={setNombre} />
-            <Boton alPulsar={() => void anadir()} ocupado={ocupado}>
-              {t("mascotas.nueva.boton")}
-            </Boton>
-          </>
-        )}
-      </Pantalla>
-    </Modal>
+    <Ventana
+      abierta={abierta}
+      titulo={vacia ? t("mascotas.anadirPrimera") : t("mascotas.anadirOtra")}
+      alCerrar={cerrar}
+    >
+      {hecho ? (
+        <>
+          <CodigoActivacion codigo={hecho.codigoActivacion} caduca={hecho.caduca} nombre={hecho.nombre} />
+          <Boton alPulsar={cerrar}>{t("comun.hecho")}</Boton>
+          <Boton variante="secundario" alPulsar={() => setHecho(null)}>
+            {t("mascotas.nueva.otraMas")}
+          </Boton>
+        </>
+      ) : (
+        <>
+          <Texto tono="suave">{t("mascotas.nueva.intro")}</Texto>
+          <Campo
+            etiqueta={t("mascotas.nueva.chip")}
+            datos
+            keyboardType="number-pad"
+            maxLength={32}
+            value={chip}
+            onChangeText={setChip}
+            error={error}
+          />
+          <Campo etiqueta={t("mascotas.nueva.nombre")} maxLength={60} value={nombre} onChangeText={setNombre} />
+          <Boton alPulsar={() => void anadir()} ocupado={ocupado}>
+            {t("mascotas.nueva.boton")}
+          </Boton>
+        </>
+      )}
+    </Ventana>
   );
 }
 

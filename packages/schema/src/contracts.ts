@@ -253,6 +253,15 @@ export const dispositivoRetirarBody = dispositivoBody.pick({ token: true });
 /** Varios mensajes de la bandeja a la vez («seleccionar todo» y borrar). */
 export const bandejaBorrarBody = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
 
+/** Cambiar la contraseña con la sesión abierta: hay que saber la actual. */
+export const contrasenaCambioBody = z.object({
+  actual: z.string().min(1).max(200),
+  nueva: z.string().min(12).max(200),
+});
+
+/** Borrar la cuenta: se vuelve a pedir la contraseña, aunque la sesión esté abierta. */
+export const cuentaBorrarBody = z.object({ password: z.string().min(1).max(200) });
+
 export const ownerPetBody = z.object({ identificador, nombre: z.string().max(60).default("") });
 
 export const perfilBody = z.object({

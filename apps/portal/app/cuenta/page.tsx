@@ -3,6 +3,7 @@ import ui from "@barkandmeow/ui-web/ui.module.css";
 import { Button } from "@barkandmeow/ui-web/components/button";
 import { Cabecera } from "@/components/Cabecera";
 import { SegundoFactor } from "@/components/Cuenta";
+import { BorrarCuenta, CambiarContrasena } from "@/components/Seguridad";
 import s from "@/components/portal.module.css";
 import { exigirSesion } from "@/lib/servidor";
 
@@ -27,6 +28,12 @@ export default async function Page() {
             </h2>
             <SegundoFactor canal={yo.segundoFactor} telefono={yo.telefono} />
           </section>
+          <section className={ui.panel} aria-labelledby="contrasena">
+            <h2 id="contrasena" className={ui.panelTitle}>
+              Cambiar la contraseña
+            </h2>
+            <CambiarContrasena />
+          </section>
           <section className={ui.panel} aria-labelledby="salir">
             <h2 id="salir" className={ui.panelTitle}>
               Cerrar la sesión
@@ -39,6 +46,12 @@ export default async function Page() {
               {/* Un enlace normal: la salida la resuelve el servidor. */}
               <a href="/mi-mascota/salir">Salir</a>
             </Button>
+          </section>
+          <section className={ui.panel} id="borrar-cuenta" aria-labelledby="borrar">
+            <h2 id="borrar" className={ui.panelTitle}>
+              Borrar la cuenta
+            </h2>
+            <BorrarCuenta />
           </section>
         </div>
       </main>
