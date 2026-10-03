@@ -16,7 +16,8 @@ import {
   claveDeRecuperacion as claveDeRecuperacionWasm,
   claveFicha as claveFichaWasm,
   firmarRegistro,
-  nuevoCodigo,
+  leerCodigo as leerCodigoWasm,
+  nuevoCodigo as nuevoCodigoWasm,
 } from "@barkandmeow/crypto";
 import {
   aBase64,
@@ -29,11 +30,14 @@ import {
   claveDeDueno,
   claveDeRecuperacion,
   claveFicha,
+  codificar,
   deBase64,
   derivar,
   ErrorCripto,
+  firmar,
   firmaValida,
   leerCodigo,
+  nuevoCodigo,
   publica,
   sellar,
   verificar,
@@ -45,10 +49,12 @@ const wasm = await cargarCripto(
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const azar = (n: number) => crypto.getRandomValues(new Uint8Array(n));
+/** 19 bytes al azar; los primeros, con los bordes (todo a 0 y todo a 1) para probar la máscara. */
+const azar19 = (i: number) => (i === 0 ? new Uint8Array(19) : i === 1 ? new Uint8Array(19).fill(0xff) : azar(19));
 
 test("el código en papel da la misma clave que en la web", async () => {
   for (let i = 0; i < 25; i++) {
-    const { bloques, semilla } = await nuevoCodigo();
+    const { bloques, semilla } = await nuevoCodigoWasm();
     const leida = leerCodigo(bloques.join(" ").toLowerCase());
     assert.deepEqual(leida, semilla);
     const web = claveDeDuenoWasm(wasm, semilla);
@@ -58,8 +64,33 @@ test("el código en papel da la misma clave que en la web", async () => {
   }
 });
 
+test("el código que genera el móvil es el mismo que daría la web, y se lee de vuelta", async () => {
+  // Los códigos de la web, codificados en el móvil: los mismos bloques.
+  for (let i = 0; i < 25; i++) {
+    const web = await nuevoCodigoWasm();
+    assert.deepEqual(codificar(web.semilla), web.bloques);
+    assert.deepEqual(nuevoCodigo(web.semilla), web);
+  }
+  // Los del móvil, leídos en la web y en el móvil: la misma semilla y la misma clave.
+  for (let i = 0; i < 200; i++) {
+    const azar = azar19(i);
+    const copia = azar.slice();
+    const { bloques, semilla } = nuevoCodigo(azar);
+    assert.deepEqual(azar, copia, "no toca el azar de quien llama");
+    assert.equal(semilla[0] & 0b1100_0000, 0);
+    assert.deepEqual(semilla.subarray(1), azar.subarray(1));
+    assert.equal(bloques.length, 8);
+    for (const b of bloques) assert.match(b, /^[0-9A-HJKMNP-TV-Z]{4}$/);
+    assert.deepEqual(leerCodigo(bloques.join(" ")), semilla);
+    assert.deepEqual(await leerCodigoWasm(bloques.join("-").toLowerCase()), semilla);
+    assert.deepEqual(claveDeDueno(semilla).publica, claveDeDuenoWasm(wasm, semilla).publica);
+  }
+  assert.throws(() => nuevoCodigo(azar(18)), TypeError);
+  assert.throws(() => codificar(new Uint8Array(19).fill(0xff)), TypeError);
+});
+
 test("una errata en el código se detecta", async () => {
-  const { bloques } = await nuevoCodigo();
+  const { bloques } = await nuevoCodigoWasm();
   const c = bloques.join("").split("");
   c[5] = c[5] === "7" ? "8" : "7";
   const r = leerCodigo(c.join(""));
@@ -140,7 +171,7 @@ test("base64 propio igual que el de la web, y acepta base64url", () => {
   assert.equal(deBase64("no es base64!"), null);
 });
 
-test("la clave de recuperación del móvil es la misma que la de la web", () => {
+test("la clave de recuperación del móvil es la misma que la de la web, y firma lo mismo", () => {
   for (let i = 0; i < 25; i++) {
     const secreta = azar(32);
     const web = claveDeRecuperacionWasm(wasm, secreta);
@@ -150,6 +181,8 @@ test("la clave de recuperación del móvil es la misma que la de la web", () => 
     // Y lo que firma el móvil lo verifica el núcleo de la web.
     const m = enc.encode("bm:dueno:recuperacion:v1\nid\nreto");
     assert.ok(verificar(movil.publica, m, wasm.firmar(web.semilla, m)));
+    // Y lo que firma el móvil, byte a byte lo mismo que la web (Ed25519 es determinista).
+    assert.deepEqual(firmar(movil.semilla, m), wasm.firmar(web.semilla, m));
   }
 });
 

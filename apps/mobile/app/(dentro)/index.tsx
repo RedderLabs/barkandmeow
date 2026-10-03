@@ -7,6 +7,7 @@ import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
 import { useT, type T } from "@/lib/idioma";
 import { ir } from "@/lib/salud";
+import { useSesion } from "@/lib/sesion";
 import { espacio, fuente, radio, useColores } from "@/lib/tema";
 
 /* «Mis mascotas»: quién es cada una, si le falta algo y qué toca ahora. Toda
@@ -143,6 +144,7 @@ function Nueva({
 
 export default function Mascotas() {
   const t = useT();
+  const { bienvenida, olvidarBienvenida } = useSesion();
   const { carga, refrescar, refrescando } = useCarga(yo);
   const [token, setToken] = useState<string | null>(null);
   const [anadiendo, setAnadiendo] = useState(false);
@@ -156,6 +158,19 @@ export default function Mascotas() {
         <Titulo>{t("comun.tab.mascotas")}</Titulo>
         <Texto tono="suave">{t("mascotas.intro")}</Texto>
       </View>
+      {/* Recién dada de alta: el código de activación de su mascota, como en la web tras confirmar el correo.
+          Va en la pantalla y no en una ventana: abrir un Modal mientras se cambia de pantalla deja en
+          Android una capa invisible que bloquea los toques. */}
+      {bienvenida && (
+        <View style={{ gap: espacio.md }}>
+          <Titulo nivel={2}>{t("entrada.bienvenida.titulo")}</Titulo>
+          <Texto tono="suave">
+            {t("entrada.bienvenida.texto", { nombre: bienvenida.nombre || t("piezas.codigo.tuMascota") })}
+          </Texto>
+          <CodigoActivacion codigo={bienvenida.codigoActivacion} caduca={bienvenida.caduca} nombre={bienvenida.nombre} />
+          <Boton alPulsar={olvidarBienvenida}>{t("comun.hecho")}</Boton>
+        </View>
+      )}
       {carga.estado === "cargando" && <Cargando texto={t("mascotas.cargando")} />}
       {carga.estado === "error" && (
         <Tarjeta tono="alerta">

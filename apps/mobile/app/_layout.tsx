@@ -84,6 +84,8 @@ function Navegacion() {
       <Stack.Protected guard={estado !== "dentro"}>
         <Stack.Screen name="entrar" />
         <Stack.Screen name="codigo" />
+        <Stack.Screen name="alta" />
+        <Stack.Screen name="recuperar" />
       </Stack.Protected>
     </Stack>
   );

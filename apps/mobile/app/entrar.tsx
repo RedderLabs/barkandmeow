@@ -1,25 +1,23 @@
 import { useState } from "react";
-import * as Linking from "expo-linking";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Image, useColorScheme, View } from "react-native";
 import { Boton, Campo, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
-import { API, ErrorApi, identificar } from "@/lib/api";
+import { ErrorApi, identificar } from "@/lib/api";
 import { useT } from "@/lib/idioma";
 import { useSesion } from "@/lib/sesion";
 import { espacio } from "@/lib/tema";
 
 /* Entrar, primer paso: el número de chip (identifica, no autoriza) y la
-   contraseña. Después llega un código por correo o por SMS. El alta se hace
-   en el portal web: ahí se genera y se imprime el código de recuperación. */
-
-/** El portal vive en el mismo origen que la API, sin el /api. */
-const URL_RECUPERAR = `${API.replace(/\/api$/, "")}/mi-mascota/recuperar`;
+   contraseña. Después llega un código por correo o por SMS. Desde aquí se va
+   también al alta y a recuperar la contraseña con el código en papel; al
+   volver de recuperarla, llega con el chip y el aviso de que ya puede entrar. */
 
 export default function Entrar() {
   const { entrar } = useSesion();
   const t = useT();
   const oscuro = useColorScheme() === "dark";
-  const [chip, setChip] = useState("");
+  const params = useLocalSearchParams<{ chip?: string; aviso?: string }>();
+  const [chip, setChip] = useState(params.chip ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [errorChip, setErrorChip] = useState<string | null>(null);
@@ -62,6 +60,12 @@ export default function Entrar() {
         <Texto tono="suave">{t("entrada.entrar.intro")}</Texto>
       </View>
       <View style={{ gap: espacio.xl }}>
+        {params.aviso === "recuperada" && (
+          <Tarjeta>
+            <Texto tono="fuerte">{t("entrada.recuperar.hecho.titulo")}</Texto>
+            <Texto>{t("entrada.recuperar.hecho.texto")}</Texto>
+          </Tarjeta>
+        )}
         <Campo
           etiqueta={t("entrada.entrar.chip")}
           datos
@@ -90,12 +94,18 @@ export default function Entrar() {
         <Boton alPulsar={() => void alEnviar()} ocupado={enviando} desactivado={!chip.trim() || !password}>
           {t("entrada.entrar.continuar")}
         </Boton>
-        {/* La recuperación pide el código en papel: se hace en el portal web. */}
-        <Boton variante="secundario" alPulsar={() => void Linking.openURL(URL_RECUPERAR)}>
+        {/* Quien acaba de descargar la app aún no tiene cuenta: el alta, a la vista, justo debajo. */}
+        <Tarjeta>
+          <Texto tono="fuerte">{t("entrada.entrar.sinCuenta")}</Texto>
+          <Boton variante="secundario" alPulsar={() => router.push("/alta")}>
+            {t("entrada.entrar.crear")}
+          </Boton>
+        </Tarjeta>
+        {/* La recuperación pide el código en papel: se teclea aquí y no sale del móvil. */}
+        <Boton variante="secundario" alPulsar={() => router.push("/recuperar")}>
           {t("entrada.entrar.olvidada")}
         </Boton>
       </View>
-      <Texto tono="suave">{t("entrada.entrar.alta")}</Texto>
     </Pantalla>
   );
 }

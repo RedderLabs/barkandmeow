@@ -5,6 +5,8 @@
 
    - derivar la clave X25519 del código de recuperación en papel,
    - abrir lo sellado (crypto_box_seal de libsodium),
+   - generar el código de recuperación del alta y firmar con su clave la
+     prueba de que se tiene el papel,
    - comprobar firmas Ed25519 de los registros de la clínica,
    - abrir y cerrar sobres (XChaCha20-Poly1305): la ficha de salud, el resumen
      de la placa y el historial que se comparte.
@@ -70,6 +72,31 @@ const comprobacion = (semilla: Uint8Array) => {
   const h = sha256(semilla);
   return ((BigInt(h[0]) << N8) | BigInt(h[1])) >> N6;
 };
+
+const N31 = BigInt(31);
+
+/** Los 8 bloques de una semilla de 19 bytes: igual que `codificar` en packages/crypto/js/index.ts. */
+export function codificar(semilla: Uint8Array): string[] {
+  if (semilla.length !== 19 || semilla[0] & 0b1100_0000)
+    throw new TypeError("semilla: 19 bytes con los 2 bits altos a 0");
+  let n = semilla.reduce((n, x) => (n << N8) | BigInt(x), N0);
+  n = (n << N10) | comprobacion(semilla);
+  const caracteres: string[] = [];
+  for (let i = 0; i < 32; i++) {
+    caracteres.unshift(ALFABETO[Number(n & N31)]);
+    n >>= N5;
+  }
+  return Array.from({ length: 8 }, (_, i) => caracteres.slice(i * 4, i * 4 + 4).join(""));
+}
+
+/** Un código nuevo. Hermes no trae azar: los 19 bytes los da quien llama, con
+    expo-crypto. Se copian y se dejan en 150 bits, como `nuevoCodigo` de la web. */
+export function nuevoCodigo(azar: Uint8Array): { bloques: string[]; semilla: Uint8Array } {
+  if (azar.length !== 19) throw new TypeError("azar: se esperaban 19 bytes");
+  const semilla = Uint8Array.from(azar);
+  semilla[0] &= 0b0011_1111; // 152 → 150 bits
+  return { bloques: codificar(semilla), semilla };
+}
 
 /** La semilla de un código tecleado, o null si no es válido o tiene una errata. */
 export function leerCodigo(texto: string): Uint8Array | null {
@@ -195,6 +222,13 @@ export function verificar(clavePub: Uint8Array, mensaje: Uint8Array, firma: Uint
   } catch {
     return false;
   }
+}
+
+/** Firma Ed25519 con una semilla de 32 bytes: la prueba del papel al recuperar la contraseña.
+    Determinista, como `firmar` de packages/crypto: mismos bytes que la web. */
+export function firmar(semilla: Uint8Array, mensaje: Uint8Array): Uint8Array {
+  if (semilla.length !== 32) throw new TypeError("semilla: se esperaban 32 bytes");
+  return ed25519.sign(mensaje, semilla);
 }
 
 /** Un registro firmado por la clínica: la firma cubre los bytes exactos de `registro`. */

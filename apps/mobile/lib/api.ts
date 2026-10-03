@@ -70,6 +70,15 @@ export type Canal = "correo" | "sms";
 
 /* ── Rutas ─────────────────────────────────────────────────── */
 
+/** El alta: con la app, el token pendiente del código del correo llega en la respuesta. */
+export const darDeAlta = (cuerpo: {
+  email: string;
+  password: string;
+  pubKey: string;
+  recuperacionPub: string;
+  mascota: { identificador: Identificador; nombre: string };
+}) => sinSesion.llamar(d.darDeAlta, { cuerpo });
+
 export const entrar = (identificador: Identificador, password: string) =>
   sinSesion.llamar(d.entrar, { cuerpo: { identificador, password } });
 
@@ -112,6 +121,18 @@ export const retirarAlta = (grantId: string) => conSesion.llamar(api.publicas.re
 
 export const impugnar = (reclamacionId: string) =>
   conSesion.llamar(d.impugnar, { params: { id: reclamacionId } });
+
+/* Recuperar la contraseña: el chip, el reto firmado con la clave del papel y,
+   al final, el código recibido con la contraseña nueva. */
+
+export const empezarRecuperacion = (identificador: Identificador) =>
+  sinSesion.llamar(d.empezarRecuperacion, { cuerpo: { identificador } });
+
+export const probarPapel = (recuperacionId: string, clave: string, firma: string) =>
+  sinSesion.llamar(d.probarPapel, { cuerpo: { recuperacionId, clave, firma } });
+
+export const terminarRecuperacion = (recuperacionId: string, codigo: string, password: string) =>
+  sinSesion.llamar(d.terminarRecuperacion, { cuerpo: { recuperacionId, codigo, password } });
 
 /** Sube una vez la clave pública de recuperación (cuentas de antes). */
 export const guardarClaveRecuperacion = (clave: string) =>
