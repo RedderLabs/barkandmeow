@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { and, count, desc, eq, inArray, lt, ne, or, sql } from "drizzle-orm";
 import {
   blobs,
@@ -16,6 +16,7 @@ import {
   reclamaciones,
 } from "@barkandmeow/db";
 import {
+  bandejaBorrarBody,
   codigoCorreoBody,
   dispositivoBody,
   dispositivoRetirarBody,
@@ -281,6 +282,18 @@ function tipoDeImagen(b: Buffer): "image/jpeg" | "image/png" | "image/webp" | nu
   if (b.length > 12 && b.subarray(0, 4).toString() === "RIFF" && b.subarray(8, 12).toString() === "WEBP")
     return "image/webp";
   return null;
+}
+
+/** Borra mensajes de la bandeja (ya comprobados) y sus adjuntos. No hay papelera. */
+async function borrarDeLaBandeja(ids: string[], log: FastifyBaseLogger) {
+  if (!ids.length) return;
+  const guardados = await db.select({ s3Key: inboxAdjuntos.s3Key }).from(inboxAdjuntos).where(inArray(inboxAdjuntos.inboxId, ids));
+  await db.delete(inbox).where(inArray(inbox.id, ids));
+  // Si el almacén falla, el objeto queda huérfano pero sellado: nadie más lo abre.
+  for (const a of guardados)
+    await almacenActual()
+      .borrar(a.s3Key)
+      .catch((e) => log.warn({ err: (e as Error).message }, "no se pudo borrar un adjunto del almacén"));
 }
 
 export default async function rutasDuenos(app: FastifyInstance) {
@@ -899,14 +912,27 @@ export default async function rutasDuenos(app: FastifyInstance) {
       .limit(1);
     if (!m) return reply.code(404).send({ error: "no encontrado" });
 
-    const guardados = await db.select({ s3Key: inboxAdjuntos.s3Key }).from(inboxAdjuntos).where(eq(inboxAdjuntos.inboxId, m.id));
-    await db.delete(inbox).where(eq(inbox.id, m.id));
-    // Si el almacén falla, el objeto queda huérfano pero sellado: nadie más lo abre.
-    for (const a of guardados)
-      await almacenActual()
-        .borrar(a.s3Key)
-        .catch((e) => req.log.warn({ err: (e as Error).message }, "no se pudo borrar un adjunto del almacén"));
+    await borrarDeLaBandeja([m.id], req.log);
     return { ok: true };
+  });
+
+  /** Borrar varios mensajes de golpe. Los ids que no son de este dueño se ignoran. */
+  app.delete("/owners/v1/inbox", async (req, reply) => {
+    const d = await duenoDe(req, reply);
+    if (!d) return;
+    const cuerpo = bandejaBorrarBody.safeParse(req.body);
+    if (!cuerpo.success) return reply.code(400).send({ error: "cuerpo inválido" });
+
+    const suyos = await db
+      .select({ id: inbox.id })
+      .from(inbox)
+      .innerJoin(pets, eq(pets.id, inbox.petId))
+      .where(and(inArray(inbox.id, cuerpo.data.ids), eq(pets.ownerId, d.ownerId), ne(pets.estado, "retirada")));
+    await borrarDeLaBandeja(
+      suyos.map((m) => m.id),
+      req.log,
+    );
+    return { borrados: suyos.length };
   });
 
   /** Un PDF adjunto, sellado. Se abre en el navegador o el móvil del dueño. */

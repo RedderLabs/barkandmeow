@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  bandejaBorrarBody,
   base64,
   claveRecuperacionBody,
   codigoCorreoBody,
@@ -359,6 +360,16 @@ export const rutasDuenos = {
     resumen: "Borrar un mensaje y sus adjuntos. No hay papelera.",
     respuesta: ok,
     errores: [401, 404],
+  }),
+
+  borrarMensajes: ruta({
+    metodo: "DELETE",
+    ruta: "/owners/v1/inbox",
+    acceso: "dueno",
+    resumen: "Borrar varios mensajes de golpe, con sus adjuntos. Los que no son del dueño se ignoran.",
+    cuerpo: bandejaBorrarBody,
+    respuesta: z.object({ borrados: z.number().int() }),
+    errores: [400, 401],
   }),
 
   descargarAdjunto: ruta({

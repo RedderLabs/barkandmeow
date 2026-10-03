@@ -1503,6 +1503,29 @@ describe("portal del dueño", () => {
     assert.equal(borrar.statusCode, 200);
     const queda = await app.inject({ method: "GET", url: "/owners/v1/inbox", headers: { cookie: cookieDueno } });
     assert.equal(queda.json().mensajes.length, 1);
+
+    // Borrado en bloque: lo ajeno no se toca, lo suyo se va entero.
+    const enBloqueAjeno = await app.inject({
+      method: "DELETE",
+      url: "/owners/v1/inbox",
+      headers: { cookie: ajena },
+      payload: { ids: [mensajes[1].id] },
+    });
+    assert.equal(enBloqueAjeno.json().borrados, 0);
+    const vacio = await app.inject({ method: "DELETE", url: "/owners/v1/inbox", headers: { cookie: cookieDueno }, payload: { ids: [] } });
+    assert.equal(vacio.statusCode, 400);
+    await sql`INSERT INTO inbox (pet_id, sealed) VALUES (${petLuna}, ${randomBytes(50)})`;
+    const todos = (await app.inject({ method: "GET", url: "/owners/v1/inbox", headers: { cookie: cookieDueno } })).json().mensajes;
+    assert.equal(todos.length, 2);
+    const enBloque = await app.inject({
+      method: "DELETE",
+      url: "/owners/v1/inbox",
+      headers: { cookie: cookieDueno },
+      payload: { ids: todos.map((m: { id: string }) => m.id) },
+    });
+    assert.equal(enBloque.json().borrados, 2);
+    const nada = await app.inject({ method: "GET", url: "/owners/v1/inbox", headers: { cookie: cookieDueno } });
+    assert.equal(nada.json().mensajes.length, 0);
   });
 
   it("si reclaman su chip, a la dueña le llega un correo y puede impugnar", async () => {

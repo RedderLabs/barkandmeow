@@ -91,6 +91,8 @@ export const leerBandeja = () => conSesion.llamar(d.leerBandeja);
 
 export const borrarMensaje = (id: string) => conSesion.llamar(d.borrarMensaje, { params: { id } });
 
+export const borrarMensajes = (ids: string[]) => conSesion.llamar(d.borrarMensajes, { cuerpo: { ids } });
+
 /* Permisos de nivel 3: lo que piden las clínicas y lo que el dueño ha dado. */
 
 export const leerPermisos = () => conSesion.llamar(api.publicas.permisosDueno);

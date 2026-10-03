@@ -250,6 +250,9 @@ export const dispositivoBody = z.object({
 /** Al salir de la app basta el token: la plataforma ya la sabe el servidor. */
 export const dispositivoRetirarBody = dispositivoBody.pick({ token: true });
 
+/** Varios mensajes de la bandeja a la vez («seleccionar todo» y borrar). */
+export const bandejaBorrarBody = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
+
 export const ownerPetBody = z.object({ identificador, nombre: z.string().max(60).default("") });
 
 export const perfilBody = z.object({

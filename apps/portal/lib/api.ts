@@ -119,6 +119,8 @@ export const leerBandeja = () => cliente.llamar(d.leerBandeja, { cache: "no-stor
 
 export const borrarMensaje = (id: string) => cliente.llamar(d.borrarMensaje, { params: { id } });
 
+export const borrarMensajes = (ids: string[]) => cliente.llamar(d.borrarMensajes, { cuerpo: { ids } });
+
 /* ── Ficha de salud y placa del collar ─────────────────────── */
 
 export const leerFicha = (petId: string) => cliente.llamar(d.leerFicha, { params: { id: petId }, cache: "no-store" });

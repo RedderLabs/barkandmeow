@@ -17,12 +17,14 @@ import {
   AlertDialogTrigger,
 } from "@barkandmeow/ui-web/components/alert-dialog";
 import { Button } from "@barkandmeow/ui-web/components/button";
+import { Checkbox } from "@barkandmeow/ui-web/components/checkbox";
 import { Input } from "@barkandmeow/ui-web/components/input";
 import { Label } from "@barkandmeow/ui-web/components/label";
 import { toast } from "@barkandmeow/ui-web/components/sonner";
 import { sobreFirmado, type AdjuntoFirmado } from "@barkandmeow/schema";
 import {
   borrarMensaje,
+  borrarMensajes,
   descargarAdjunto,
   leerBandeja,
   type AdjuntoSellado,
@@ -193,6 +195,9 @@ export function Bandeja({
 }) {
   const [estado, setEstado] = useState<Estado>({ tipo: "mirando" });
   const [secreta, setSecreta] = useState<Uint8Array | null>(null);
+  // Mensajes marcados para borrar de golpe.
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [borrando, setBorrando] = useState(false);
   const publica = deBase64(pubKey);
 
   async function cargar(clave: Uint8Array) {
@@ -229,10 +234,39 @@ export function Bandeja({
   async function alBorrar(id: string) {
     try {
       await borrarMensaje(id);
-      setEstado((e) => (e.tipo === "lista" ? { ...e, mensajes: e.mensajes.filter((m) => m.id !== id) } : e));
+      quitar(new Set([id]));
       toast("Mensaje borrado");
     } catch {
       toast("No se ha podido borrar", { description: "Vuelve a intentarlo en un momento." });
+    }
+  }
+
+  function quitar(ids: Set<string>) {
+    setEstado((e) => (e.tipo === "lista" ? { ...e, mensajes: e.mensajes.filter((m) => !ids.has(m.id)) } : e));
+    setSeleccion((sel) => new Set([...sel].filter((id) => !ids.has(id))));
+  }
+
+  function marcar(id: string, si: boolean) {
+    setSeleccion((sel) => {
+      const n = new Set(sel);
+      if (si) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+  }
+
+  async function alBorrarSeleccion() {
+    const ids = new Set(seleccion);
+    if (!ids.size) return;
+    setBorrando(true);
+    try {
+      await borrarMensajes([...ids]);
+      quitar(ids);
+      toast(ids.size === 1 ? "Mensaje borrado" : `${ids.size} mensajes borrados`);
+    } catch {
+      toast("No se ha podido borrar", { description: "Vuelve a intentarlo en un momento." });
+    } finally {
+      setBorrando(false);
     }
   }
 
@@ -272,14 +306,57 @@ export function Bandeja({
       </p>
     );
 
+  const n = seleccion.size;
+  const todos = n === estado.mensajes.length;
+  const mensajes = estado.mensajes;
+
   return (
-    <ol className={s.bandeja}>
-      {estado.mensajes.map((m) => (
-        <li key={m.id}>
-          <Tarjeta m={m} nombre={nombres[m.petId] || "Tu mascota"} secreta={secreta} alBorrar={() => alBorrar(m.id)} />
-        </li>
-      ))}
-    </ol>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2">
+          <Checkbox
+            className="mt-0"
+            checked={todos ? true : n ? "indeterminate" : false}
+            onCheckedChange={() => setSeleccion(todos ? new Set() : new Set(mensajes.map((m) => m.id)))}
+          />
+          {todos ? "Quitar todos" : "Seleccionar todos"}
+        </label>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="outline" size="sm" disabled={!n || borrando}>
+              {n ? `Borrar ${n} seleccionado${n === 1 ? "" : "s"}` : "Borrar seleccionados"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{n === 1 ? "¿Borrar 1 mensaje?" : `¿Borrar ${n} mensajes?`}</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se borran del servidor y no se pueden recuperar. Si hay notas o informes que quieras
+                conservar, guárdalos antes por tu cuenta.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>No, volver</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void alBorrarSeleccion()}>Sí, borrar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+      <ol className={s.bandeja}>
+        {mensajes.map((m) => (
+          <li key={m.id}>
+            <Tarjeta
+              m={m}
+              nombre={nombres[m.petId] || "Tu mascota"}
+              secreta={secreta}
+              alBorrar={() => alBorrar(m.id)}
+              marcada={seleccion.has(m.id)}
+              alMarcar={(si) => marcar(m.id, si)}
+            />
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -288,11 +365,15 @@ function Tarjeta({
   nombre,
   secreta,
   alBorrar,
+  marcada,
+  alMarcar,
 }: {
   m: Mensaje;
   nombre: string;
   secreta: Uint8Array | null;
   alBorrar: () => Promise<void>;
+  marcada: boolean;
+  alMarcar: (si: boolean) => void;
 }) {
   const ids = useId();
   const c = m.contenido;
@@ -322,6 +403,12 @@ function Tarjeta({
     >
       <header className={s.mensajeCabecera}>
         <span className={s.mensajeTipo}>
+          <Checkbox
+            className="mt-0"
+            checked={marcada}
+            onCheckedChange={(v) => alMarcar(v === true)}
+            aria-label={`Seleccionar: ${titulo}`}
+          />
           {aviso && <IconAlert size={14} />}
           {etiqueta} · {nombre}
         </span>
