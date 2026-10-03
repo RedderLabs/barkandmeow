@@ -87,6 +87,8 @@ pnpm --filter @barkandmeow/db db:migrate
 pnpm dev
 ```
 
+En Windows, `pnpm docker` hace el paso de Docker de una vez: instala Docker Desktop con winget si no está, lo abre si el motor no responde y levanta postgres, dragonfly y pepper ([`scripts/docker.ps1`](scripts/docker.ps1)).
+
 Las variables de entorno están en [`.env.example`](.env.example), en un bloque por app: copia cada bloque a su archivo (`apps/api/.env`, etc.).
 
 Se entra por **http://localhost:4510**:

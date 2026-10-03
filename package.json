@@ -12,7 +12,8 @@
     "test": "turbo run test",
     "tokens": "pnpm --filter @barkandmeow/tokens build",
     "docs:build": "node scripts/docs.mjs",
-    "spec": "pnpm --filter @barkandmeow/spec build"
+    "spec": "pnpm --filter @barkandmeow/spec build",
+    "docker": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/docker.ps1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
