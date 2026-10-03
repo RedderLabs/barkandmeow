@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 import { enReclamacion, Identidad } from "@/components/Mascota";
-import {
-  Boton,
-  Campo,
-  Cargando,
-  CodigoActivacion,
-  Pantalla,
-  Tarjeta,
-  Texto,
-  Titulo,
-} from "@/components/ui";
+import { Boton, Campo, Cargando, CodigoActivacion, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { identificar, nuevaMascota, yo, type Mascota } from "@/lib/api";
 import { leerToken } from "@/lib/almacen";
 import { useCarga } from "@/lib/datos";
@@ -24,13 +15,10 @@ import { espacio, fuente, radio, useColores } from "@/lib/tema";
 /** Lo siguiente que toca, en una línea. */
 function siguiente(m: Mascota): string | null {
   if (enReclamacion(m)) return "Hay una reclamación abierta sobre su chip.";
-  if (m.estado !== "activa")
-    return "Llévala a tu clínica para activar su chip.";
-  if (!m.perfil.publicado)
-    return "Publica su perfil para que quien la encuentre vea cómo llamarte.";
+  if (m.estado !== "activa") return "Llévala a tu clínica para activar su chip.";
+  if (!m.perfil.publicado) return "Publica su perfil para que quien la encuentre vea cómo llamarte.";
   if (m.perfil.telefonos.length === 0) return "Añade un teléfono de contacto.";
-  if (!m.ficha)
-    return "Escribe su ficha de salud: alergias, medicación y enfermedades.";
+  if (!m.ficha) return "Escribe su ficha de salud: alergias, medicación y enfermedades.";
   if (!m.placa) return "Prepara la placa de su collar.";
   return null;
 }
@@ -57,9 +45,7 @@ function Tarjetita({ m, token }: { m: Mascota; token: string | null }) {
       {toca ? <Texto tono="suave">{toca}</Texto> : null}
       {m.mensajes > 0 ? (
         <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>
-          {m.mensajes === 1
-            ? "1 mensaje en la bandeja"
-            : `${m.mensajes} mensajes en la bandeja`}
+          {m.mensajes === 1 ? "1 mensaje en la bandeja" : `${m.mensajes} mensajes en la bandeja`}
         </Texto>
       ) : null}
     </Pressable>
@@ -102,9 +88,7 @@ function Nueva({
       setNombre("");
       alAnadir();
     } catch {
-      setError(
-        "No se ha podido añadir. Revisa el número y vuelve a intentarlo.",
-      );
+      setError("No se ha podido añadir. Revisa el número y vuelve a intentarlo.");
     } finally {
       setOcupado(false);
     }
@@ -120,12 +104,7 @@ function Nueva({
   }
 
   return (
-    <Modal
-      visible={abierta}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={cerrar}
-    >
+    <Modal visible={abierta} animationType="slide" presentationStyle="pageSheet" onRequestClose={cerrar}>
       <Pantalla>
         <View
           style={{
@@ -136,9 +115,7 @@ function Nueva({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Titulo>
-              {vacia ? "Añadir tu mascota" : "Añadir otra mascota"}
-            </Titulo>
+            <Titulo>{vacia ? "Añadir tu mascota" : "Añadir otra mascota"}</Titulo>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -151,20 +128,12 @@ function Nueva({
               alignItems: "flex-end",
             }}
           >
-            <Texto
-              estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}
-            >
-              Cerrar
-            </Texto>
+            <Texto estilo={{ color: c.accentInk, fontFamily: fuente.textoFuerte }}>Cerrar</Texto>
           </Pressable>
         </View>
         {hecho ? (
           <>
-            <CodigoActivacion
-              codigo={hecho.codigoActivacion}
-              caduca={hecho.caduca}
-              nombre={hecho.nombre}
-            />
+            <CodigoActivacion codigo={hecho.codigoActivacion} caduca={hecho.caduca} nombre={hecho.nombre} />
             <Boton alPulsar={cerrar}>Hecho</Boton>
             <Boton variante="secundario" alPulsar={() => setHecho(null)}>
               Añadir otra
@@ -172,10 +141,7 @@ function Nueva({
           </>
         ) : (
           <>
-            <Texto tono="suave">
-              Con el número de su microchip: son 15 cifras y vienen en su
-              pasaporte.
-            </Texto>
+            <Texto tono="suave">Con el número de su microchip: son 15 cifras y vienen en su pasaporte.</Texto>
             <Campo
               etiqueta="Número del microchip"
               datos
@@ -185,12 +151,7 @@ function Nueva({
               onChangeText={setChip}
               error={error}
             />
-            <Campo
-              etiqueta="Cómo se llama"
-              maxLength={60}
-              value={nombre}
-              onChangeText={setNombre}
-            />
+            <Campo etiqueta="Cómo se llama" maxLength={60} value={nombre} onChangeText={setNombre} />
             <Boton alPulsar={() => void anadir()} ocupado={ocupado}>
               Añadir mascota
             </Boton>
@@ -213,40 +174,27 @@ export default function Mascotas() {
     <Pantalla alRefrescar={refrescar} refrescando={refrescando}>
       <View style={{ gap: espacio.sm }}>
         <Titulo>Mis mascotas</Titulo>
-        <Texto tono="suave">
-          Entra en cada una para ver su ficha de salud, su placa y lo que le
-          falta.
-        </Texto>
+        <Texto tono="suave">Entra en cada una para ver su ficha de salud, su placa y lo que le falta.</Texto>
       </View>
-      {carga.estado === "cargando" && (
-        <Cargando texto="Cargando tus mascotas…" />
-      )}
+      {carga.estado === "cargando" && <Cargando texto="Cargando tus mascotas…" />}
       {carga.estado === "error" && (
         <Tarjeta tono="alerta">
-          <Texto>
-            No se han podido cargar. Tira hacia abajo para reintentar.
-          </Texto>
+          <Texto>No se han podido cargar. Tira hacia abajo para reintentar.</Texto>
         </Tarjeta>
       )}
       {carga.estado === "listo" &&
         (carga.datos.mascotas.length === 0 ? (
           <Texto tono="suave">Tu cuenta aún no tiene ninguna mascota.</Texto>
         ) : (
-          carga.datos.mascotas.map((m) => (
-            <Tarjetita key={m.petId} m={m} token={token} />
-          ))
+          carga.datos.mascotas.map((m) => <Tarjetita key={m.petId} m={m} token={token} />)
         ))}
       {carga.estado === "listo" && (
         <>
           <Boton
-            variante={
-              carga.datos.mascotas.length === 0 ? "primario" : "secundario"
-            }
+            variante={carga.datos.mascotas.length === 0 ? "primario" : "secundario"}
             alPulsar={() => setAnadiendo(true)}
           >
-            {carga.datos.mascotas.length === 0
-              ? "Añadir tu mascota"
-              : "Añadir otra mascota"}
+            {carga.datos.mascotas.length === 0 ? "Añadir tu mascota" : "Añadir otra mascota"}
           </Boton>
           <Nueva
             abierta={anadiendo}

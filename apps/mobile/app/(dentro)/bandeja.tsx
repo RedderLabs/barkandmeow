@@ -3,15 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import * as Linking from "expo-linking";
 import { Alert, Pressable, View } from "react-native";
-import {
-  Boton,
-  Cargando,
-  Datos,
-  Pantalla,
-  Tarjeta,
-  Texto,
-  Titulo,
-} from "@/components/ui";
+import { Boton, Cargando, Datos, Pantalla, Tarjeta, Texto, Titulo } from "@/components/ui";
 import { borrarMensaje, borrarMensajes, leerBandeja, yo } from "@/lib/api";
 import { leerClave } from "@/lib/almacen";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
@@ -24,22 +16,17 @@ import { espacio, fuente, useColores } from "@/lib/tema";
    del dueño y se abren aquí, con la secreta del llavero. Si no está (móvil
    nuevo, sesión cerrada), el código en papel la reconstruye. */
 
-type Vista =
-  | { falta: true }
-  | { falta: false; mensajes: Mensaje[]; nombres: Record<string, string> };
+type Vista = { falta: true } | { falta: false; mensajes: Mensaje[]; nombres: Record<string, string> };
 
 async function cargar(): Promise<Vista> {
   const [yoMismo, clave] = await Promise.all([yo(), leerClave()]);
   rellenarRecuperacion(yoMismo, clave);
-  if (!clave || !iguales(publica(clave), deBase64(yoMismo.pubKey)))
-    return { falta: true };
+  if (!clave || !iguales(publica(clave), deBase64(yoMismo.pubKey))) return { falta: true };
   const { mensajes } = await leerBandeja();
   return {
     falta: false,
     mensajes: abrirTodos(clave, mensajes),
-    nombres: Object.fromEntries(
-      yoMismo.mascotas.map((m) => [m.petId, m.perfil.nombre]),
-    ),
+    nombres: Object.fromEntries(yoMismo.mascotas.map((m) => [m.petId, m.perfil.nombre])),
   };
 }
 
@@ -127,14 +114,8 @@ function Tarjetita({
             minHeight: 44,
           }}
         >
-          <Ionicons
-            name={marcada ? "checkbox" : "square-outline"}
-            size={24}
-            color={marcada ? c.accent : c.muted}
-          />
-          <Texto tono="fuerte">
-            {marcada ? "Seleccionado" : "Seleccionar"}
-          </Texto>
+          <Ionicons name={marcada ? "checkbox" : "square-outline"} size={24} color={marcada ? c.accent : c.muted} />
+          <Texto tono="fuerte">{marcada ? "Seleccionado" : "Seleccionar"}</Texto>
         </Pressable>
       )}
       <View
@@ -156,26 +137,19 @@ function Tarjetita({
       {m.origen && (
         <Texto tono="suave">
           Enviado por {m.origen.clinica}
-          {m.origen.dominio
-            ? ` · ${m.origen.dominio}, dominio verificado`
-            : ` · ${m.origen.pais}`}{" "}
-          · desde su software de gestión
+          {m.origen.dominio ? ` · ${m.origen.dominio}, dominio verificado` : ` · ${m.origen.pais}`} · desde su software de
+          gestión
         </Texto>
       )}
 
       {x.tipo === "aviso" && (
         <>
           <Texto>
-            {x.clinica || "Una clínica veterinaria"} ha leído el chip de{" "}
-            {nombre} y quiere hablar contigo
+            {x.clinica || "Una clínica veterinaria"} ha leído el chip de {nombre} y quiere hablar contigo
             {x.motivo ? `: «${x.motivo}»` : "."}
           </Texto>
           {x.telefono ? (
-            <Boton
-              alPulsar={() =>
-                void Linking.openURL(`tel:${x.telefono.replace(/[^\d+]/g, "")}`)
-              }
-            >
+            <Boton alPulsar={() => void Linking.openURL(`tel:${x.telefono.replace(/[^\d+]/g, "")}`)}>
               {`Llamar a la clínica · ${x.telefono}`}
             </Boton>
           ) : null}
@@ -202,33 +176,25 @@ function Tarjetita({
               ["Observaciones", x.observaciones],
             ]}
           />
-          {x.firmado && (
-            <Texto tono="suave">
-              Firma de la clínica comprobada en este móvil.
-            </Texto>
-          )}
+          {x.firmado && <Texto tono="suave">Firma de la clínica comprobada en este móvil.</Texto>}
         </>
       )}
       {x.tipo === "certificado" && (
         <>
           <Texto>{x.detalle}</Texto>
           <Texto tono="suave">
-            Firma de la clínica comprobada. Se guarda en el pasaporte de viaje
-            al abrirlo en el portal web.
+            Firma de la clínica comprobada. Se guarda en el pasaporte de viaje al abrirlo en el portal web.
           </Texto>
         </>
       )}
       {x.tipo === "firma-mala" && (
         <Texto>
-          Dice venir de tu clínica, pero la firma no es la de su conexión con
-          Bark &amp; Meow. Si esperabas un registro, pregunta a tu clínica.
+          Dice venir de tu clínica, pero la firma no es la de su conexión con Bark &amp; Meow. Si esperabas un registro,
+          pregunta a tu clínica.
         </Texto>
       )}
       {x.tipo === "ilegible" && (
-        <Texto>
-          No se ha podido abrir con tu clave. Puede estar dañado o sellado para
-          otra clave.
-        </Texto>
+        <Texto>No se ha podido abrir con tu clave. Puede estar dañado o sellado para otra clave.</Texto>
       )}
 
       {!alMarcar && (
@@ -243,9 +209,7 @@ function Tarjetita({
             paddingHorizontal: 8,
           }}
         >
-          <Texto estilo={{ color: c.alertInk, fontFamily: fuente.textoFuerte }}>
-            Borrar
-          </Texto>
+          <Texto estilo={{ color: c.alertInk, fontFamily: fuente.textoFuerte }}>Borrar</Texto>
         </Pressable>
       )}
     </Tarjeta>
@@ -257,12 +221,8 @@ export default function Bandeja() {
   // null: no se está seleccionando. Si no, los ids marcados para borrar de golpe.
   const [seleccion, setSeleccion] = useState<Set<string> | null>(null);
   const [borrando, setBorrando] = useState(false);
-  const mensajes =
-    carga.estado === "listo" && !carga.datos.falta ? carga.datos.mensajes : [];
-  const todosMarcados =
-    !!seleccion &&
-    mensajes.length > 0 &&
-    mensajes.every((m) => seleccion.has(m.id));
+  const mensajes = carga.estado === "listo" && !carga.datos.falta ? carga.datos.mensajes : [];
+  const todosMarcados = !!seleccion && mensajes.length > 0 && mensajes.every((m) => seleccion.has(m.id));
 
   function quitarDeLaLista(ids: Set<string>) {
     setCarga((c) =>
@@ -313,10 +273,7 @@ export default function Bandeja() {
       quitarDeLaLista(ids);
       setSeleccion(null);
     } catch {
-      Alert.alert(
-        "No se ha podido borrar",
-        "Vuelve a intentarlo en un momento.",
-      );
+      Alert.alert("No se ha podido borrar", "Vuelve a intentarlo en un momento.");
     } finally {
       setBorrando(false);
     }
@@ -327,10 +284,7 @@ export default function Bandeja() {
       await borrarMensaje(id);
       quitarDeLaLista(new Set([id]));
     } catch {
-      Alert.alert(
-        "No se ha podido borrar",
-        "Vuelve a intentarlo en un momento.",
-      );
+      Alert.alert("No se ha podido borrar", "Vuelve a intentarlo en un momento.");
     }
   }
 
@@ -340,32 +294,25 @@ export default function Bandeja() {
       {carga.estado === "cargando" && <Cargando texto="Abriendo tu bandeja…" />}
       {carga.estado === "error" && (
         <Tarjeta tono="alerta">
-          <Texto>
-            No se ha podido cargar la bandeja. Tira hacia abajo para reintentar.
-          </Texto>
+          <Texto>No se ha podido cargar la bandeja. Tira hacia abajo para reintentar.</Texto>
         </Tarjeta>
       )}
       {carga.estado === "listo" && carga.datos.falta && (
         <Tarjeta tono="aviso">
           <Texto tono="fuerte">Este móvil no tiene tu clave</Texto>
           <Texto>
-            Las notas, los informes y los avisos llegan cerrados con tu clave, y
-            solo se abren donde está guardada. Escribe el código de recuperación
-            que apuntaste en el alta: la clave se reconstruye aquí y no sale del
-            móvil.
+            Las notas, los informes y los avisos llegan cerrados con tu clave, y solo se abren donde está guardada.
+            Escribe el código de recuperación que apuntaste en el alta: la clave se reconstruye aquí y no sale del móvil.
           </Texto>
-          <Boton alPulsar={() => router.push("/clave")}>
-            Escribir el código
-          </Boton>
+          <Boton alPulsar={() => router.push("/clave")}>Escribir el código</Boton>
         </Tarjeta>
       )}
       {carga.estado === "listo" &&
         !carga.datos.falta &&
         (carga.datos.mensajes.length === 0 ? (
           <Texto tono="suave">
-            No tienes mensajes. Aquí llegan las notas que te deja el veterinario
-            después de una consulta, los informes de tu clínica habitual y los
-            avisos de una clínica si alguien lleva a tu mascota perdida.
+            No tienes mensajes. Aquí llegan las notas que te deja el veterinario después de una consulta, los informes
+            de tu clínica habitual y los avisos de una clínica si alguien lleva a tu mascota perdida.
           </Texto>
         ) : (
           <>
@@ -373,13 +320,7 @@ export default function Bandeja() {
               <View style={{ gap: espacio.sm }}>
                 <Boton
                   variante="secundario"
-                  alPulsar={() =>
-                    setSeleccion(
-                      todosMarcados
-                        ? new Set()
-                        : new Set(mensajes.map((m) => m.id)),
-                    )
-                  }
+                  alPulsar={() => setSeleccion(todosMarcados ? new Set() : new Set(mensajes.map((m) => m.id)))}
                 >
                   {todosMarcados ? "Quitar todos" : "Seleccionar todos"}
                 </Boton>
@@ -393,19 +334,12 @@ export default function Bandeja() {
                     ? `Borrar ${seleccion.size} seleccionado${seleccion.size === 1 ? "" : "s"}`
                     : "Borrar"}
                 </Boton>
-                <Boton
-                  variante="secundario"
-                  desactivado={borrando}
-                  alPulsar={() => setSeleccion(null)}
-                >
+                <Boton variante="secundario" desactivado={borrando} alPulsar={() => setSeleccion(null)}>
                   Cancelar
                 </Boton>
               </View>
             ) : (
-              <Boton
-                variante="secundario"
-                alPulsar={() => setSeleccion(new Set())}
-              >
+              <Boton variante="secundario" alPulsar={() => setSeleccion(new Set())}>
                 Seleccionar mensajes
               </Boton>
             )}
@@ -413,10 +347,7 @@ export default function Bandeja() {
               <Tarjetita
                 key={m.id}
                 m={m}
-                nombre={
-                  (!carga.datos.falta && carga.datos.nombres[m.petId]) ||
-                  "Tu mascota"
-                }
+                nombre={(!carga.datos.falta && carga.datos.nombres[m.petId]) || "Tu mascota"}
                 alBorrar={() => void alBorrar(m.id)}
                 marcada={seleccion?.has(m.id)}
                 alMarcar={seleccion ? () => marcar(m.id) : undefined}
