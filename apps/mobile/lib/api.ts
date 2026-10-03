@@ -96,6 +96,14 @@ export const salir = () => conSesion.llamar(d.salir);
 
 export const yo = () => conSesion.llamar(d.yo);
 
+export const ponerTelefono = (telefono: string) => conSesion.llamar(d.ponerTelefono, { cuerpo: { telefono } });
+
+export const confirmarTelefono = (codigo: string) => conSesion.llamar(d.confirmarTelefono, { cuerpo: { codigo } });
+
+export const quitarTelefono = () => conSesion.llamar(d.quitarTelefono);
+
+export const elegirSegundoFactor = (canal: Canal) => conSesion.llamar(d.elegirSegundoFactor, { cuerpo: { canal } });
+
 export const cambiarContrasena = (actual: string, nueva: string) =>
   conSesion.llamar(d.cambiarContrasena, { cuerpo: { actual, nueva } });
 

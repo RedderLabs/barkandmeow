@@ -4,7 +4,17 @@ import { Alert, View } from "react-native";
 import { Boton, Campo, Cargando, Opciones, Pantalla, Tarjeta, Texto, Titulo, Ventana } from "@/components/ui";
 import { IDIOMAS } from "@barkandmeow/i18n";
 import { useAjustes, type Letra, type PreferenciaIdioma, type Tema } from "@/lib/ajustes";
-import { borrarCuenta, cambiarContrasena, ErrorApi, yo } from "@/lib/api";
+import {
+  borrarCuenta,
+  cambiarContrasena,
+  confirmarTelefono,
+  elegirSegundoFactor,
+  ErrorApi,
+  ponerTelefono,
+  quitarTelefono,
+  yo,
+  type Canal,
+} from "@/lib/api";
 import { leerClave, leerPush } from "@/lib/almacen";
 import { rellenarRecuperacion } from "@/lib/recuperacion";
 import { deBase64, iguales, publica } from "@/lib/cripto";
@@ -19,6 +29,8 @@ async function cargar() {
   rellenarRecuperacion(y, clave);
   return {
     correo: y.correo,
+    segundoFactor: y.segundoFactor,
+    telefono: y.telefono,
     clave: !!clave && iguales(publica(clave), deBase64(y.pubKey)),
     push: !!push,
   };
@@ -71,6 +83,133 @@ function Apariencia() {
         alElegir={elegirLetra}
       />
       <Texto tono="suave">{t("cuenta.pantallaNota")}</Texto>
+    </Tarjeta>
+  );
+}
+
+/** Lo que dice la API cuando algo del SMS sale mal, en el idioma de la app. */
+function errorDeSms(e: unknown, t: ReturnType<typeof useT>) {
+  const d = e instanceof ErrorApi ? e.datos : {};
+  if (d.motivo === "telefono") return t("cuenta.factor.error.telefono");
+  if (d.motivo === "espera") return t("cuenta.factor.error.espera", { n: String(d.segundos) });
+  if (d.motivo === "sin-cupo-sms") return t("cuenta.factor.error.sinCupo");
+  if (d.motivo === "incorrecto") return t("cuenta.factor.error.incorrecto", { n: String(d.intentosRestantes) });
+  if (d.motivo === "caducado") return t("cuenta.factor.error.caducado");
+  if (d.motivo === "demasiados-intentos") return t("cuenta.factor.error.demasiados");
+  if (d.motivo === "envio") return t("cuenta.factor.error.envio");
+  return t("comun.errorReintentar");
+}
+
+/* El código de entrada: por correo o por SMS, como en la web. El teléfono solo
+   sirve para eso y no cuenta hasta confirmarlo con el código que llega. */
+function CodigoDeEntrada({
+  canal,
+  telefono,
+  alCambiar,
+}: {
+  canal: Canal;
+  telefono: { numero: string; verificado: boolean } | null;
+  alCambiar: () => Promise<void>;
+}) {
+  const t = useT();
+  const [numero, setNumero] = useState("");
+  const [codigo, setCodigo] = useState("");
+  // El SMS enviado y sin confirmar: el paso del código.
+  const [esperando, setEsperando] = useState<string | null>(telefono && !telefono.verificado ? telefono.numero : null);
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const confirmado = telefono?.verificado ? telefono.numero : null;
+
+  async function hacer(accion: () => Promise<unknown>, despues?: () => void) {
+    setOcupado(true);
+    setError(null);
+    try {
+      await accion();
+      despues?.();
+      await alCambiar();
+    } catch (e) {
+      setError(errorDeSms(e, t));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  function enviar() {
+    void hacer(
+      async () => setEsperando((await ponerTelefono(numero)).telefono),
+      () => setCodigo(""),
+    );
+  }
+
+  function confirmar() {
+    const limpio = codigo.toUpperCase().replace(/[\s-]/g, "");
+    if (limpio.length !== 8) return setError(t("cuenta.factor.ochoCaracteres"));
+    void hacer(
+      () => confirmarTelefono(limpio),
+      () => {
+        setEsperando(null);
+        Alert.alert(t("cuenta.factor"), t("cuenta.factor.confirmado"));
+      },
+    );
+  }
+
+  return (
+    <Tarjeta>
+      <Texto tono="fuerte">{t("cuenta.factor")}</Texto>
+      <Texto>
+        {canal === "sms" && confirmado ? t("cuenta.factor.sms", { numero: confirmado }) : t("cuenta.factor.correo")}
+      </Texto>
+      {confirmado && !esperando && (
+        <>
+          <Boton
+            variante="secundario"
+            ocupado={ocupado}
+            alPulsar={() => void hacer(() => elegirSegundoFactor(canal === "sms" ? "correo" : "sms"))}
+          >
+            {canal === "sms" ? t("cuenta.factor.porCorreo") : t("cuenta.factor.porSms")}
+          </Boton>
+          <Boton variante="secundario" desactivado={ocupado} alPulsar={() => void hacer(quitarTelefono)}>
+            {t("cuenta.factor.quitar")}
+          </Boton>
+        </>
+      )}
+      {esperando ? (
+        <>
+          <Campo
+            etiqueta={t("cuenta.factor.codigo", { numero: esperando })}
+            datos
+            autoCapitalize="characters"
+            autoComplete="one-time-code"
+            maxLength={9}
+            placeholder="XXXX-XXXX"
+            value={codigo}
+            onChangeText={setCodigo}
+            error={error}
+          />
+          <Boton alPulsar={confirmar} ocupado={ocupado} desactivado={!codigo.trim()}>
+            {t("cuenta.factor.confirmar")}
+          </Boton>
+          <Boton variante="secundario" desactivado={ocupado} alPulsar={() => setEsperando(null)}>
+            {t("cuenta.factor.otroNumero")}
+          </Boton>
+        </>
+      ) : (
+        <>
+          {!confirmado && <Texto tono="suave">{t("cuenta.factor.intro")}</Texto>}
+          <Campo
+            etiqueta={confirmado ? t("cuenta.factor.cambiarTelefono") : t("cuenta.factor.telefono")}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            placeholder="+34 612 345 678"
+            value={numero}
+            onChangeText={setNumero}
+            error={error}
+          />
+          <Boton variante="secundario" alPulsar={enviar} ocupado={ocupado} desactivado={!numero.trim()}>
+            {t("cuenta.factor.enviar")}
+          </Boton>
+        </>
+      )}
     </Tarjeta>
   );
 }
@@ -260,6 +399,7 @@ export default function Cuenta() {
               </Boton>
             )}
           </Tarjeta>
+          <CodigoDeEntrada canal={carga.datos.segundoFactor} telefono={carga.datos.telefono} alCambiar={refrescar} />
         </View>
       )}
       <Apariencia />
